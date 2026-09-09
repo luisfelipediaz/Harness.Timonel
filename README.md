@@ -1,6 +1,6 @@
 # timonel
 
-> Repositorio: `luisfelipediaz/timonel` · Plugin de Claude Code: `timonel` · Marketplace: `luisfelipediaz-harness`
+> Repositorio: `luisfelipediaz/Harness.Timonel` · Plugin de Claude Code: `timonel` · Marketplace: `luisfelipediaz-harness`
 
 Harness opinionado de [Claude Code](https://code.claude.com/docs/en/plugins) para monorepos **Nx + Angular + NestJS**. Planifica SDD, épicas e historias de usuario **como GitHub Issues**, las implementa con sub-agentes en worktrees paralelos, y publica contrato API, code review, retrospectiva y Definition of Done en el mismo issue.
 
@@ -29,7 +29,7 @@ Nx · Angular 20+ (standalone, signals) · NestJS 10+ con Mongoose · NgRx Signa
 {
   "extraKnownMarketplaces": {
     "luisfelipediaz-harness": {
-      "source": { "source": "github", "repo": "luisfelipediaz/timonel" }
+      "source": { "source": "github", "repo": "luisfelipediaz/Harness.Timonel" }
     }
   },
   "enabledPlugins": { "timonel@luisfelipediaz-harness": true },
@@ -42,7 +42,7 @@ Nx · Angular 20+ (standalone, signals) · NestJS 10+ con Mongoose · NgRx Signa
 ### 2. Instalar desde Claude Code
 
 ```
-/plugin marketplace add luisfelipediaz/timonel
+/plugin marketplace add luisfelipediaz/Harness.Timonel
 /plugin install timonel@luisfelipediaz-harness
 ```
 

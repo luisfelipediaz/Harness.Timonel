@@ -38,7 +38,7 @@ Luego asegura en `.claude/settings.json` (crear si no existe, sin borrar claves 
 ```json
 {
   "extraKnownMarketplaces": {
-    "luisfelipediaz-harness": { "source": { "source": "github", "repo": "luisfelipediaz/timonel" } }
+    "luisfelipediaz-harness": { "source": { "source": "github", "repo": "luisfelipediaz/Harness.Timonel" } }
   },
   "enabledPlugins": { "timonel@luisfelipediaz-harness": true }
 }

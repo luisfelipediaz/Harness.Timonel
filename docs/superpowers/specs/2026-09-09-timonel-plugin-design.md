@@ -13,7 +13,7 @@ El harness de desarrollo asistido de `Bitakora.MonoRepo.Portal` (4 agentes, 8 sk
 
 ## 2. Objetivo
 
-Un **plugin de Claude Code** (`timonel`), publicado en `github.com/luisfelipediaz/timonel` con su propio marketplace, instalable en cualquier monorepo Nx Angular + NestJS, donde **las HU, épicas, SDD, contratos API, reviews, retros y DoD viven en GitHub Issues**, no en archivos.
+Un **plugin de Claude Code** (`timonel`), publicado en `github.com/luisfelipediaz/Harness.Timonel` con su propio marketplace, instalable en cualquier monorepo Nx Angular + NestJS, donde **las HU, épicas, SDD, contratos API, reviews, retros y DoD viven en GitHub Issues**, no en archivos.
 
 ## 3. No objetivos
 
@@ -204,7 +204,7 @@ Reglas: un marcador por tipo por issue; si se repite la fase, se **edita** el co
 ```json
 {
   "extraKnownMarketplaces": {
-    "luisfelipediaz-harness": { "source": { "source": "github", "repo": "luisfelipediaz/timonel" } }
+    "luisfelipediaz-harness": { "source": { "source": "github", "repo": "luisfelipediaz/Harness.Timonel" } }
   },
   "enabledPlugins": { "timonel@luisfelipediaz-harness": true }
 }

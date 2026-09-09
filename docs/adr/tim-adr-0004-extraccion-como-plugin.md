@@ -9,7 +9,7 @@ El harness nació en `Bitakora.MonoRepo.Portal/.claude/` y se copió a `Bitakora
 
 ## Decisión
 
-1. Repo propio `luisfelipediaz/timonel` con `.claude-plugin/plugin.json` y `.claude-plugin/marketplace.json` (`source: "./"`), siguiendo el layout de Mefisto: `agents/`, `commands/`, `skills/`, `scripts/`, `hooks/`, `docs/adr/`.
+1. Repo propio `luisfelipediaz/Harness.Timonel` con `.claude-plugin/plugin.json` y `.claude-plugin/marketplace.json` (`source: "./"`), siguiendo el layout de Mefisto: `agents/`, `commands/`, `skills/`, `scripts/`, `hooks/`, `docs/adr/`.
 2. Nombre `timonel`: quien gobierna el rumbo siguiendo la bitácora. Comandos bajo el namespace `/timonel:*`.
 3. Los agentes resuelven la raíz del plugin con `.timonel/.plugin-root` (escrito por el hook `SessionStart`) y fallback por glob en `~/.claude/plugins/cache/*/timonel/*/`, porque las heurísticas y plantillas viven dentro del plugin y no en el consumidor.
 4. Las heurísticas de código del autor (`~/.claude/heuristics`) se copian dentro del plugin como default para que el `code-review` funcione en cualquier máquina.
