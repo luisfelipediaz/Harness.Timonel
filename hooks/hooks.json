@@ -1,0 +1,29 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -n \"${CLAUDE_PLUGIN_ROOT:-}\" ] && mkdir -p .timonel 2>/dev/null && printf '%s' \"${CLAUDE_PLUGIN_ROOT}\" > .timonel/.plugin-root 2>/dev/null || true"
+          },
+          {
+            "type": "command",
+            "command": "[ -f .claude/timonel.config.json ] || [ -f .claude-plugin/plugin.json ] || echo '[timonel] No existe .claude/timonel.config.json en este repo. Ejecuta /timonel:onboard para generarlo.'"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "mkdir -p .timonel 2>/dev/null && jq -r 'if (.tool_input.command // \"\") | test(\"gh issue (create|close|edit|comment)\") then \"[\" + (now | strftime(\"%H:%M:%S\")) + \"][gh] \" + ((.tool_input.command | split(\" \") | .[0:3] | join(\" \")) // \"?\") else empty end' 2>/dev/null >> .timonel/events.log || true"
+          }
+        ]
+      }
+    ]
+  }
+}

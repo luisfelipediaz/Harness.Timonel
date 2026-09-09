@@ -1,0 +1,11 @@
+{
+  "name": "luisfelipediaz-harness",
+  "owner": { "name": "Luis Felipe Diaz Valbuena" },
+  "plugins": [
+    {
+      "name": "timonel",
+      "source": "./",
+      "description": "Timonel: harness Angular + NestJS con backlog en GitHub Issues para Claude Code"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+# Runtime del plugin en el consumidor (no se versiona)
+.timonel/
+.claude/settings.local.json
+__pycache__/
+*.pyc
+*.log
+.DS_Store
