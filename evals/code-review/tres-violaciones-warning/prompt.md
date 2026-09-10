@@ -52,6 +52,10 @@ ENTONCES veo el mensaje "No tienes gastos registrados este mes"
 
 - `GET /api/mis-finanzas/gastos` — ya existe, este cambio solo lo consume desde el frontend.
 
+### Notas técnicas
+
+- `GastosListaComponent` se monta en la ruta ya existente de `mis-finanzas`; el archivo de rutas no cambia y no es parte del alcance de esta historia.
+
 ## Código a revisar (`archivos_modificados`)
 
 Resultado de consolidación ya disponible: `TESTS_RESULTADO: PASSED` (el spec de abajo corre y pasa), `LINT_RESULTADO: PASSED`. No re-ejecutes tests.

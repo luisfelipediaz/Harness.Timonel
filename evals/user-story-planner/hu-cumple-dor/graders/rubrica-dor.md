@@ -2,7 +2,7 @@
 type: llm
 ---
 
-Evalúa la HU devuelta por el agente contra TIM-ADR-0003 (Definition of Ready). Score 1.0 si se cumple todo lo siguiente; restá proporcionalmente por cada punto incumplido:
+Evalúa la HU devuelta por el agente contra TIM-ADR-0003 (Definition of Ready). Score 1.0 si se cumple todo lo siguiente; resta proporcionalmente por cada punto incumplido:
 
 - El título está en infinitivo, sin prefijo `HU-`, `[`, `feat` ni `fix`.
 - La sección `## Historia` sigue el formato **Como** / **quiero** / **para**.

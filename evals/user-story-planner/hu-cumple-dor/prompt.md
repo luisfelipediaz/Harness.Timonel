@@ -27,7 +27,7 @@ Usa el agente `user-story-planner` del plugin `timonel` para redactar esta histo
 En tu respuesta final:
 
 1. Pon el body completo de la HU (con todas sus secciones, en el mismo orden que la plantilla) dentro de un único bloque ` ```markdown `.
-2. Inmediatamente después de cerrar ese bloque, agregá una única línea con el formato exacto:
+2. Inmediatamente después de cerrar ese bloque, agrega una única línea con el formato exacto:
 
    ```
    Labels: tipo:hu, alcance:<x>, sp:<n>, mod:<m>, moscow:<y>, prioridad:<z>, estado:borrador
