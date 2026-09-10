@@ -17,6 +17,9 @@ Ejecuta la checklist de DoD con los resultados acumulados de fases anteriores ma
 | `tareas_completas` | `si` \| `no` (todas las tareas aplicables de `## Tareas` marcadas) |
 | `retro_generada` | `si` \| `no` |
 | `veredicto_code_review` | `APROBADO` \| `APROBADO CON OBSERVACIONES` \| `REQUIERE CAMBIOS` \| `NO_GENERADO` |
+| `perfil` | `consumidor` (default) \| `plugin` |
+
+**Perfil plugin**: items 5, 6 y 7 son `SKIPPED`; item 3 usa `git diff --name-only --diff-filter=AM main...HEAD -- tests/`; `<rama-base>` es `main`. El item 11 **nunca** es SKIPPED: en el plugin tambien hay code review.
 
 ## Checklist
 

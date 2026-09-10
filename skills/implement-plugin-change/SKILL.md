@@ -1,0 +1,38 @@
+---
+name: implement-plugin-change
+description: Implementa un cambio del propio plugin Timonel (agentes, skills, scripts, hooks, docs) a partir de un issue mod:plugin de luisfelipediaz/Harness.Timonel, con TDD sobre unittest y respetando la gobernanza del repo (issue obligatorio, commits con #N, sin tocar CHANGELOG ni version). Lo usa el sub-agente unico del perfil plugin de flechodiezx.
+---
+
+Recibes del orquestador: `issue`, el body del issue, el **contrato de cambio** (tabla archivo → cambio) y la investigacion (`timonel:investigacion`). Trabajas en la rama `hu/<issue>-*` ya creada, en el repo del plugin. Siempre en espanol.
+
+## Reglas del repo (TIM-ADR-0005 y `CLAUDE.md` del plugin)
+
+- **Solo los archivos del contrato de cambio.** Si necesitas tocar otro, no lo hagas: documentalo en el output como pendiente.
+- **No edites `CHANGELOG.md` ni `.claude-plugin/plugin.json`**: lo hace `consolidate-story`.
+- **Cambios de formato de issue/comentario** → actualiza en el mismo commit `skills/github-issues/references/*.md`, `scripts/timonel_gh.py`, `scripts/validar_marcador.py` y sus tests.
+- **Agentes**: frontmatter `name`, `description`, `model`, `color`, `skills`. **Commands**: `description`, `argument-hint`, `model`. **Skills**: `name` = carpeta, `description` con cuando usarlo.
+- Python stdlib puro, lookup maps antes que cadenas de `if` (`heuristics/general/evitar-ifs.md`), sin tipos espejo.
+- Commits: `<tipo>: <que> (#<issue>)`; el hook `commit-msg` rechaza sin `#N`.
+
+## Pasos
+
+1. Lee `CLAUDE.md` del plugin, el contrato de cambio y los "Archivos de referencia" de la investigacion. No explores fuera de ellos.
+2. **TDD**: si el cambio toca `scripts/*.py`, escribe primero el test en `tests/` (unittest, sin `gh` real: funciones puras sobre dicts) y velo fallar; si toca agentes/skills/commands/hooks, `tests/test_consistencia.py` es tu red: agrega ahi la regla nueva si el cambio introduce una invariante (p. ej. "todo agente X invoca Y").
+3. Implementa. Para `hooks/hooks.json`, prueba el hook con entradas simuladas (`echo '{"tool_input":{...}}' | bash -c "$(jq -r '.hooks...command' hooks/hooks.json)"`) y deja el caso en el output.
+4. Verifica localmente:
+   ```bash
+   python3 -m unittest discover -s tests
+   bash -n scripts/*.sh .githooks/*
+   jq . .claude-plugin/plugin.json .claude-plugin/marketplace.json hooks/hooks.json >/dev/null
+   ```
+   Maximo 2 intentos de correccion; si persiste, detente y reporta el error exacto.
+5. Commit: `git add <archivos del contrato> && git commit -m "<tipo>: <que> (#<issue>)"`.
+
+## Output (obligatorio)
+
+- Archivos creados/modificados (incluidos tests)
+- Casos de prueba de hooks ejecutados (si aplica)
+- Invariantes nuevas agregadas a `test_consistencia.py` (si aplica)
+- Pendientes fuera del contrato (o "Ninguno")
+- Rama y hash del commit
+- Si la verificacion fallo: error exacto y lo intentado
