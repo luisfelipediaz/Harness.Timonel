@@ -6,6 +6,7 @@
 
 - Perfil `plugin` en `flechodiezx`: HUs `mod:plugin` se implementan con el flujo completo (investigación, contrato de cambio, sub-agente único con `implement-plugin-change`, consolidación con unittest/bash -n/jq, review, retro, DoD, merge `--no-ff`); el guard del plugin bloquea commits directos en `main` (#27)
 - DoD estricto: el ítem 11 con `REQUIERE CAMBIOS`, `NO_GENERADO` o `SKIPPED` es FAILED CRITICO en `tipo:hu`/`tipo:hotfix` (sin degradación a "no crítico"); el ítem 9 (retro) es CRITICO en perfil plugin; `validar_marcador.py` rechaza `decision: DONE` con `Item 11 · veredicto: NO_GENERADO|SKIPPED` y, con `perfil: plugin`, exige la fila 9 en PASSED; `flechodiezx` y `flechodiezx-hotfix` reintentan review/retro una vez y pasan `perfil` a `verify-dod` (#28)
+- Smoke E2E del harness: `scripts/smoke_harness.py [--repo] [--issues 27,28] [--events-log]` mide por HU la cobertura de los 6 marcadores, labels `review:*`/`retro:*`, issues derivados de `cosechar_retro.py`, commits `#N` y eventos de `.timonel/events.log`, e imprime la tabla "disparos por sensor/hook"; evidencia real sobre #27/#28 publicada en el issue (#29)
 
 ## 0.4.1 — 2026-09-10
 

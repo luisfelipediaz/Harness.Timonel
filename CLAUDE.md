@@ -16,7 +16,7 @@ Plugin de Claude Code (`.claude-plugin/plugin.json`) que empaqueta el harness de
 | `agents/` | `sdd-planner`, `user-story-planner`, `backlog-refiner`, `harness-auditor` (opus); `flechodiezx`, `flechodiezx-hotfix` (opus, orquestan); `dora-exploradora` (sonnet, investiga) |
 | `commands/` | Slash commands `/timonel:*` (lanzadores delgados, haiku/sonnet) |
 | `skills/` | Skills de implementación y del ciclo + `github-issues` (plantillas/recetas) + `retro-tools` |
-| `scripts/` | `_common.sh`, `setup-github-labels.sh`, `install-git-hooks.sh`, `timonel_gh.py`, `retro_query.py`, `retro_distill.py`, `review_query.py`, `review_distill.py`, `metricas_flujo.py`, `migrate_backlog.py`, y los sensores `dor_check.py`, `validar_marcador.py`, `estado_historia.py`, `contrato_check.py`, `cosechar_retro.py` |
+| `scripts/` | `_common.sh`, `setup-github-labels.sh`, `install-git-hooks.sh`, `timonel_gh.py`, `retro_query.py`, `retro_distill.py`, `review_query.py`, `review_distill.py`, `metricas_flujo.py`, `migrate_backlog.py`, y los sensores `dor_check.py`, `validar_marcador.py`, `estado_historia.py`, `contrato_check.py`, `cosechar_retro.py`, `smoke_harness.py` |
 | `heuristics/` | Heurísticas de código que consume `code-review` |
 | `hooks/` | `SessionStart`: `.timonel/.plugin-root`, aviso de config faltante, aviso de versión nueva. `PreToolUse`: issue obligatorio en commits del plugin; en consumidores protege ramas base, bloquea `push --force`, exige `#N` en ramas `hu/`. `PostToolUse`: loguea `gh issue *` y avisa al editar archivos raíz (`modelos.path`, `moduleFile`, `routesFile`) |
 | `docs/adr/` | `TIM-ADR-000N` decisiones del marco |
