@@ -13,7 +13,7 @@ El timonel gobierna el rumbo siguiendo la bitácora. Aquí la bitácora es el ba
 - **Comandos** `/timonel:*`: `onboard`, `sdd`, `plan`, `refine`, `draft`, `investigar`, `implement`, `hotfix`, `backlog`, `insights`, `audit`, `migrate`.
 - **Agentes**: `sdd-planner`, `user-story-planner`, `backlog-refiner`, `dora-exploradora` (investiga), `flechodiezx` (ejecuta historias), `flechodiezx-hotfix`, `harness-auditor`.
 - **Skills**: `github-issues` (plantillas + recetas `gh`), `implement-backend-story`, `implement-frontend-story`, `consolidate-story`, `code-review`, `generate-retro`, `verify-dod`, `retro-tools`, `ngrx-signal-store`, `interrogame`, `investigar`, `implement-plugin-change` (perfil plugin).
-- **Scripts** (stdlib + `gh`): labels idempotentes, query/destilado de retros y reviews, métricas de flujo, migración de backlog markdown, y los **sensores** del flujo: `dor_check.py` (Definition of Ready), `validar_marcador.py` (formato de comentarios), `estado_historia.py` (reanudar `/implement`), `contrato_check.py` (contrato API vs controllers), `cosechar_retro.py` (ratchet retro → issues), `smoke_harness.py` (smoke E2E: mide disparos de sensores/hooks sobre HUs reales) e `integracion.py` (comando de PR según remote GitHub/Azure DevOps + cuerpo del PR).
+- **Scripts** (stdlib + `gh`): labels idempotentes, query/destilado de retros y reviews, métricas de flujo, migración de backlog markdown, y los **sensores** del flujo: `dor_check.py` (Definition of Ready), `validar_marcador.py` (formato de comentarios), `estado_historia.py` (reanudar `/implement`), `contrato_check.py` (contrato API vs controllers), `cosechar_retro.py` (ratchet retro → issues), `smoke_harness.py` (smoke E2E: mide disparos de sensores/hooks sobre HUs reales), `eval_dor.py` (DoR sobre la HU devuelta por el eval del planner) e `integracion.py` (comando de PR según remote GitHub/Azure DevOps + cuerpo del PR).
 - **Heurísticas** de código (`evitar-ifs`, `no-tipos-espejo`, `usar-pipes-existentes`) usadas por el code review.
 - **ADRs** `TIM-ADR-0001..0004` en `docs/adr/`.
 
@@ -90,6 +90,17 @@ Genera `.claude/timonel.config.json` inspeccionando `nx.json`, `tsconfig.base.js
 ```
 
 Cada fase deja su artefacto en el issue y la siguiente lo lee (output → input): Dora reutiliza investigaciones e insights, el contrato se contrasta con el código, la retro genera issues, `/implement` reanuda desde `## Tareas`. Todo queda en el issue: labels facetados (`tipo:`, `estado:`, `alcance:`, `moscow:`, `sp:`, `prioridad:`, `mod:`, `review:`, `retro:`), checklist `## Tareas`, y comentarios con marcador (`<!-- timonel:contrato-api -->`, `consolidacion`, `review`, `retro`, `dod`, `refinamiento`). Ver `skills/github-issues/references/`.
+
+## Evals
+
+`evals/` mide agentes y skills con `claude plugin eval`, en vez de solo suponer que funcionan: hoy hay un caso para `user-story-planner` (la HU generada cumple el DoR) y otro para `code-review` (detecta 3 violaciones sembradas como WARNING, sin inventar CRITICO). Cada caso es `prompt.md` + `graders/*.md` — ver `evals/README.md`.
+
+```bash
+claude plugin eval . --no-publish
+claude plugin eval . --no-publish --case 'code-review/*' --runs 1 --threshold 0.8
+```
+
+`claude plugin eval` está en early access: si responde `plugin eval is currently in early access`, los casos quedan listos para cuando se habilite.
 
 ## Desarrollo del plugin
 
