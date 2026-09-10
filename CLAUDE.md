@@ -16,7 +16,7 @@ Plugin de Claude Code (`.claude-plugin/plugin.json`) que empaqueta el harness de
 | `agents/` | `sdd-planner`, `user-story-planner`, `backlog-refiner`, `harness-auditor` (opus); `flechodiezx`, `flechodiezx-hotfix` (opus, orquestan); `dora-exploradora` (sonnet, investiga) |
 | `commands/` | Slash commands `/timonel:*` (lanzadores delgados, haiku/sonnet) |
 | `skills/` | Skills de implementación y del ciclo + `github-issues` (plantillas/recetas) + `retro-tools` |
-| `scripts/` | `_common.sh`, `setup-github-labels.sh`, `install-git-hooks.sh`, `timonel_gh.py`, `retro_query.py`, `retro_distill.py`, `review_query.py`, `review_distill.py`, `metricas_flujo.py`, `migrate_backlog.py`, y los sensores `dor_check.py`, `validar_marcador.py`, `estado_historia.py`, `contrato_check.py`, `cosechar_retro.py`, `smoke_harness.py` |
+| `scripts/` | `_common.sh`, `setup-github-labels.sh`, `install-git-hooks.sh`, `timonel_gh.py`, `retro_query.py`, `retro_distill.py`, `review_query.py`, `review_distill.py`, `metricas_flujo.py`, `migrate_backlog.py`, y los sensores `dor_check.py`, `validar_marcador.py`, `estado_historia.py`, `contrato_check.py`, `cosechar_retro.py`, `smoke_harness.py`, `integracion.py` |
 | `heuristics/` | Heurísticas de código que consume `code-review` |
 | `hooks/` | `SessionStart`: `.timonel/.plugin-root`, aviso de config faltante, aviso de versión nueva. `PreToolUse`: issue obligatorio en commits del plugin; en consumidores protege ramas base, bloquea `push --force`, exige `#N` en ramas `hu/`. `PostToolUse`: loguea `gh issue *` y avisa al editar archivos raíz (`modelos.path`, `moduleFile`, `routesFile`) |
 | `docs/adr/` | `TIM-ADR-000N` decisiones del marco |
@@ -28,7 +28,7 @@ Plugin de Claude Code (`.claude-plugin/plugin.json`) que empaqueta el harness de
 
 - **Todo cambio nace en un issue de este repo** (`tipo:hu|hotfix`, `mod:plugin`, agrupado en la épica de la versión). Capturalo con `/timonel:draft` o `gh issue create -R luisfelipediaz/Harness.Timonel`.
 - **Todo commit referencia el issue** (`#N`). Lo exige `.githooks/commit-msg` (activar con `scripts/install-git-hooks.sh`) y el hook `PreToolUse` del plugin cuando corre en este repo.
-- **El plugin se desarrolla con Timonel** (#27): `/timonel:implement #N` detecta el perfil `plugin` (sin nx): rama `hu/N-*`, Dora, contrato de cambio, sub-agente con `implement-plugin-change`, consolidación (unittest, `bash -n`, `jq`, línea en CHANGELOG), review, retro (+ cosecha), DoD y `git merge --no-ff` a `main`. El hook bloquea `git commit` en `main`.
+- **El plugin se desarrolla con Timonel** (#27): `/timonel:implement #N` detecta el perfil `plugin` (sin nx): rama `hu/N-*`, Dora, contrato de cambio, sub-agente con `implement-plugin-change`, consolidación (unittest, `bash -n`, `jq`, línea en CHANGELOG), review, retro (+ cosecha), DoD y `git merge --no-ff` a `main` (o PR con `integracion.py` si `git.integracion: pr`). El hook bloquea `git commit` en `main`.
 - Al cerrar la épica de la versión: `git tag vX.Y.Z` + `gh release create`; CHANGELOG pasa de "en desarrollo" a la fecha; se cierran los issues con el comentario de DoD.
 
 ## Convenciones al editar el plugin
