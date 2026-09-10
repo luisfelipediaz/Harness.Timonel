@@ -12,7 +12,7 @@ El timonel gobierna el rumbo siguiendo la bitácora. Aquí la bitácora es el ba
 
 - **Comandos** `/timonel:*`: `onboard`, `sdd`, `plan`, `refine`, `draft`, `investigar`, `implement`, `hotfix`, `backlog`, `insights`, `audit`, `migrate`.
 - **Agentes**: `sdd-planner`, `user-story-planner`, `backlog-refiner`, `dora-exploradora` (investiga), `flechodiezx` (ejecuta historias), `flechodiezx-hotfix`, `harness-auditor`.
-- **Skills**: `github-issues` (plantillas + recetas `gh`), `implement-backend-story`, `implement-frontend-story`, `consolidate-story`, `code-review`, `generate-retro`, `verify-dod`, `retro-tools`, `ngrx-signal-store`, `interrogame`, `investigar`.
+- **Skills**: `github-issues` (plantillas + recetas `gh`), `implement-backend-story`, `implement-frontend-story`, `consolidate-story`, `code-review`, `generate-retro`, `verify-dod`, `retro-tools`, `ngrx-signal-store`, `interrogame`, `investigar`, `implement-plugin-change` (perfil plugin).
 - **Scripts** (stdlib + `gh`): labels idempotentes, query/destilado de retros y reviews, métricas de flujo, migración de backlog markdown, y los **sensores** del flujo: `dor_check.py` (Definition of Ready), `validar_marcador.py` (formato de comentarios), `estado_historia.py` (reanudar `/implement`), `contrato_check.py` (contrato API vs controllers), `cosechar_retro.py` (ratchet retro → issues).
 - **Heurísticas** de código (`evitar-ifs`, `no-tipos-espejo`, `usar-pipes-existentes`) usadas por el code review.
 - **ADRs** `TIM-ADR-0001..0004` en `docs/adr/`.
@@ -99,7 +99,7 @@ python3 -m unittest discover -s tests          # parsers, destilado, migración
 scripts/setup-github-labels.sh --repo o/r --dry-run
 ```
 
-**Todo cambio nace en un issue de este repo y el commit lo referencia** (TIM-ADR-0005). El propio repo usa sus labels, épicas por versión e issues como backlog; `/timonel:draft`, `/timonel:plan`, `/timonel:backlog` y `/timonel:audit plugin` funcionan aquí sin `timonel.config.json`.
+**Todo cambio nace en un issue de este repo y el commit lo referencia** (TIM-ADR-0005), y se implementa con el propio flujo: `/timonel:implement #N` en perfil `plugin` (rama `hu/N-*`, sub-agente único, unittest como consolidación, review, retro, DoD, merge `--no-ff`; `main` protegida por hook). El propio repo usa sus labels, épicas por versión e issues como backlog; `/timonel:draft`, `/timonel:plan`, `/timonel:backlog` y `/timonel:audit plugin` funcionan aquí sin `timonel.config.json`.
 
 ## Licencia
 

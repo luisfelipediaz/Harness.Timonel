@@ -15,6 +15,10 @@ Timonel exige a sus consumidores que el backlog viva en GitHub Issues (TIM-ADR-0
 4. **Cerrar el issue = entregar**: el commit o la release que lo resuelve comenta el issue y lo cierra; el CHANGELOG cita los `#N`.
 5. Los comandos de Timonel (`/timonel:draft`, `/timonel:plan`, `/timonel:refine`, `/timonel:backlog`) funcionan dentro del repo del plugin usando `gh repo view` como `github.repo` cuando no hay `timonel.config.json`.
 
+## Control de cambios
+
+- 2026-09-10 (#27): el plugin se desarrolla con su propio flujo (perfil `plugin` de `flechodiezx`). `main` queda protegida tambien en el plugin: el trabajo va en ramas `hu/N-*` y se integra con `git merge --no-ff`; la release se etiqueta al cerrar la epica.
+
 ## Consecuencias
 
 - Un clon nuevo debe correr `scripts/install-git-hooks.sh` una vez (documentado en README y CLAUDE.md).

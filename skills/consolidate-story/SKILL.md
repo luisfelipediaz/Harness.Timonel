@@ -18,8 +18,18 @@ Integra los branches de implementacion a la rama actual (`hu/N-slug`), registra 
 | `output_sub_agente_backend` / `output_sub_agente_frontend` | Resumen del output (archivos, providers/rutas a registrar) |
 | `api_module_file`, `api_project` | `config.api.moduleFile`, `config.api.project` |
 | `frontend_routes_file`, `frontend_project` | `routesFile` y `project` de la app destino |
+| `perfil` | `consumidor` (default) \| `plugin` (repo del propio Timonel: sin nx ni worktrees) |
+| `output_sub_agente` (perfil plugin) | Resumen del output del sub-agente unico de `implement-plugin-change` (archivos, tests, pendientes) |
+| `version_en_desarrollo` (perfil plugin) | Version `X.Y.0` de la epica en curso, para la seccion `## X.Y.0 — en desarrollo` del CHANGELOG |
 
-Si falta alguno, detente y reporta cual.
+Si falta alguno, detente y reporta cual. En `perfil: plugin` solo se requieren `issue`, `repo`, `output_sub_agente` y `version_en_desarrollo`.
+
+## Perfil plugin
+
+- **Fase A**: no hay worktrees ni providers/rutas: verifica que el commit del sub-agente esta en la rama `hu/<issue>-*` (`git log --oneline main..HEAD`).
+- **Fase B**: `python3 -m unittest discover -s tests` → `TESTS_RESULTADO`; `bash -n scripts/*.sh .githooks/*` y `jq . .claude-plugin/plugin.json .claude-plugin/marketplace.json hooks/hooks.json >/dev/null` → `LINT_RESULTADO`. Mismas reglas de 2 intentos.
+- **CHANGELOG**: agrega bajo `## <version_en_desarrollo> — en desarrollo` una linea `- <resumen del cambio> (#<issue>)` (crea la seccion si no existe y actualiza `.claude-plugin/plugin.json` a esa version). Commit `chore: changelog #<issue>`.
+- **Fase C** igual: el checklist `## Tareas` es el estandar de `plantilla-hu.md`; marca `Backend` (la implementacion), `Consolidación (lint + tests)` y, si `Contrato API aprobado`/`Modelos compartidos` no aplican, dejalos sin marcar (el DoD los trata como SKIPPED en perfil plugin). Comentario `timonel:consolidacion` con comentario `timonel:consolidacion` con `providers_registrados: n-a`, `rutas_registradas: n-a`).
 
 ## Fase A: Consolidacion
 

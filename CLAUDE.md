@@ -28,7 +28,8 @@ Plugin de Claude Code (`.claude-plugin/plugin.json`) que empaqueta el harness de
 
 - **Todo cambio nace en un issue de este repo** (`tipo:hu|hotfix`, `mod:plugin`, agrupado en la épica de la versión). Capturalo con `/timonel:draft` o `gh issue create -R luisfelipediaz/Harness.Timonel`.
 - **Todo commit referencia el issue** (`#N`). Lo exige `.githooks/commit-msg` (activar con `scripts/install-git-hooks.sh`) y el hook `PreToolUse` del plugin cuando corre en este repo.
-- Al publicar una versión: CHANGELOG cita los `#N`, se cierran los issues con el comentario de DoD y se etiqueta `vX.Y.Z`.
+- **El plugin se desarrolla con Timonel** (#27): `/timonel:implement #N` detecta el perfil `plugin` (sin nx): rama `hu/N-*`, Dora, contrato de cambio, sub-agente con `implement-plugin-change`, consolidación (unittest, `bash -n`, `jq`, línea en CHANGELOG), review, retro (+ cosecha), DoD y `git merge --no-ff` a `main`. El hook bloquea `git commit` en `main`.
+- Al cerrar la épica de la versión: `git tag vX.Y.Z` + `gh release create`; CHANGELOG pasa de "en desarrollo" a la fecha; se cierran los issues con el comentario de DoD.
 
 ## Convenciones al editar el plugin
 

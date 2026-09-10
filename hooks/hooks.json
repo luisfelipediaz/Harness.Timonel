@@ -44,7 +44,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cmd=$(jq -r '.tool_input.command // \"\"' 2>/dev/null); case \"$cmd\" in *'git commit'*) ;; *) exit 0 ;; esac; [ -f .claude-plugin/plugin.json ] && jq -e '.name==\"timonel\"' .claude-plugin/plugin.json >/dev/null 2>&1 || exit 0; printf '%s' \"$cmd\" | grep -qE '(^|[^A-Za-z0-9])#[0-9]+' && exit 0; echo '[timonel] Bloqueado: todo commit en Harness.Timonel debe referenciar un issue (#N). Crea el issue (gh issue create o /timonel:draft) y cita su numero en el mensaje (TIM-ADR-0005).' >&2; exit 2"
+            "command": "cmd=$(jq -r '.tool_input.command // \"\"' 2>/dev/null); case \"$cmd\" in *'git commit'*) ;; *) exit 0 ;; esac; [ -f .claude-plugin/plugin.json ] && jq -e '.name==\"timonel\"' .claude-plugin/plugin.json >/dev/null 2>&1 || exit 0; branch=$(git branch --show-current 2>/dev/null); if [ \"$branch\" = main ] || [ \"$branch\" = master ]; then echo '[timonel] Bloqueado: en Harness.Timonel no se commitea directo en main. Crea la rama de la historia (git checkout -b hu/<issue>-<slug>); la integracion se hace con git merge --no-ff (TIM-ADR-0005, #27).' >&2; exit 2; fi; printf '%s' \"$cmd\" | grep -qE '(^|[^A-Za-z0-9])#[0-9]+' && exit 0; echo '[timonel] Bloqueado: todo commit en Harness.Timonel debe referenciar un issue (#N). Crea el issue (gh issue create o /timonel:draft) y cita su numero en el mensaje (TIM-ADR-0005).' >&2; exit 2"
           },
           {
             "type": "command",

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0 — en desarrollo
+
+Épica #26: el harness aplicado a sí mismo.
+
+- Perfil `plugin` en `flechodiezx`: HUs `mod:plugin` se implementan con el flujo completo (investigación, contrato de cambio, sub-agente único con `implement-plugin-change`, consolidación con unittest/bash -n/jq, review, retro, DoD, merge `--no-ff`); el guard del plugin bloquea commits directos en `main` (#27)
+
 ## 0.4.1 — 2026-09-10
 
 Corrige los defectos que la re-auditoría #24 encontró en los sensores de 0.4.0 (#25).

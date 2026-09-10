@@ -94,6 +94,20 @@ class MarcadoresTests(unittest.TestCase):
         self.assertFalse(faltan, f"marcadores sin contrato en validar_marcador.py: {sorted(faltan)}")
 
 
+class PerfilPluginTests(unittest.TestCase):
+    def test_flechodiezx_tiene_perfil_plugin(self):
+        texto = (ROOT / "agents/flechodiezx.md").read_text(encoding="utf-8")
+        for frase in ("Perfil plugin", "implement-plugin-change", "git merge --no-ff", "contrato de cambio"):
+            self.assertIn(frase, texto, f"flechodiezx.md debe describir el perfil plugin: falta `{frase}`")
+        self.assertIn("implement-plugin-change", SKILLS)
+
+    def test_guard_del_plugin_protege_main(self):
+        hooks = json.loads((ROOT / "hooks/hooks.json").read_text(encoding="utf-8"))
+        guard = hooks["hooks"]["PreToolUse"][0]["hooks"][0]["command"]
+        self.assertIn('"$branch" = main', guard)
+        self.assertIn("exit 2", guard)
+
+
 class InvocadoresTests(unittest.TestCase):
     def test_cada_contrato_del_validador_tiene_invocador(self):
         import validar_marcador as vm
