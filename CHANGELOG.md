@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.0 — 2026-09-10
+
+### Añadido
+
+- Skill `interrogame` (rescatado de `Bitakora.MonoRepo.Portal` rama `feature/fal/notificaciones`): entrevista exhaustiva una pregunta a la vez con respuesta recomendada, con bloques A–J para diseño de software.
+- `sdd-planner` precarga `interrogame`, explora el código antes de preguntar y lee el skill `*-estructura` del consumidor si existe.
+- Plantilla de SDD ampliada a 15 secciones fusionando el agente `sdd-specs` del Portal (RF con actor/precondición/flujo, RNF en tabla, archivos nuevos por capa, seguridad, plan de despliegue, criterios de aceptación, dudas abiertas con responsable).
+
+### Notas
+
+- `portal-estructura` no entra al plugin: es específico del Portal y se restauró en su `.claude/skills/`.
+
 ## 0.1.0 — 2026-09-09
 
 Extracción del harness SDD de `Bitakora.MonoRepo.Portal/.claude` como plugin (TIM-ADR-0004).

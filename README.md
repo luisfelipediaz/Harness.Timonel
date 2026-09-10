@@ -12,7 +12,7 @@ El timonel gobierna el rumbo siguiendo la bitácora. Aquí la bitácora es el ba
 
 - **Comandos** `/timonel:*`: `onboard`, `sdd`, `plan`, `refine`, `draft`, `implement`, `hotfix`, `backlog`, `insights`, `migrate`.
 - **Agentes**: `sdd-planner`, `user-story-planner`, `backlog-refiner`, `story-executor`, `hotfix-executor`.
-- **Skills**: `github-issues` (plantillas + recetas `gh`), `implement-backend-story`, `implement-frontend-story`, `consolidate-story`, `code-review`, `generate-retro`, `verify-dod`, `retro-tools`, `ngrx-signal-store`.
+- **Skills**: `github-issues` (plantillas + recetas `gh`), `implement-backend-story`, `implement-frontend-story`, `consolidate-story`, `code-review`, `generate-retro`, `verify-dod`, `retro-tools`, `ngrx-signal-store`, `interrogame`.
 - **Scripts** (stdlib + `gh`): labels idempotentes, query/destilado de retros y reviews, migración de backlog markdown.
 - **Heurísticas** de código (`evitar-ifs`, `no-tipos-espejo`, `usar-pipes-existentes`) usadas por el code review.
 - **ADRs** `TIM-ADR-0001..0004` en `docs/adr/`.

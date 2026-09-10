@@ -6,77 +6,155 @@
 
 **Padre**: ninguno. **Hijos**: epicas (`tipo:epica`) derivadas.
 
-Secciones tomadas de los SDD reales del Portal y del POC. Las numeradas son fijas; el contenido escala con la complejidad.
+Estructura fusionada de los SDD reales del Portal (`docs/especificaciones/`), del agente `sdd-specs` del Portal y del POC. Las secciones numeradas son fijas; una seccion que no aplica se deja con una linea `No aplica: <motivo>` (no se borra, para que el indice sea estable). El contenido escala con la complejidad.
 
 ## Body
 
 ````markdown
+**Versión:** 1.0 · **Fecha:** YYYY-MM-DD · **Autor:** [git config user.name] · **Estado:** Borrador | Aprobado | Implementado
+**Stack detectado:** [de `.claude/timonel.config.json` y del codigo real]
+**Historial:**
+- YYYY-MM-DD v1.0: version inicial
+
 ## 1. Resumen ejecutivo
 
-[3-6 lineas: que se construye, por que ahora, resultado esperado.]
-
-**Stack detectado:** [de `.claude/timonel.config.json` y del codigo real]
-**Estado:** Borrador | Aprobado | Implementado
+[Que se construye, por que y que valor entrega. Maximo 5 lineas.]
 
 ## 2. Contexto y motivación
 
-[Evidencia del codigo actual, pain points, restricciones de plataforma. Citar archivos reales.]
+[Problema, antecedentes, evidencia del codigo actual (citar `ruta:linea`), referencias a issues (#N).]
 
 ## 3. Alcance
 
-### 3.1 In scope
+### 3.1 Proyectos y módulos afectados
+
+| Proyecto | Tipo de cambio | Descripción |
+| --- | --- | --- |
+| `apps/api` | Nuevo módulo / extensión | ... |
+| `apps/<app>` | Nuevo feature | ... |
+| `libs/modelos` | Nuevas interfaces | ... |
+
 ### 3.2 Fuera de alcance
-### 3.3 Módulos / archivos afectados
+
+- ...
 
 ## 4. Requisitos funcionales
 
-### RF-01 — [titulo]
-[Descripcion + criterio verificable]
+### RF-001 — [Nombre]
+
+- **Actor:**
+- **Precondición:**
+- **Flujo principal:**
+  1. ...
+- **Flujos alternativos / errores:**
+- **Postcondición:**
+
+[Repetir RF-00N.]
 
 ## 5. Requisitos no funcionales
 
-[Rendimiento, offline, accesibilidad, seguridad, observabilidad.]
+| ID | Categoría | Descripción | Criterio de aceptación |
+| --- | --- | --- | --- |
+| RNF-001 | Rendimiento | ... | ... |
+| RNF-002 | Seguridad | ... | ... |
 
 ## 6. Decisiones de diseño
 
 | # | Decisión | Alternativas consideradas | Razón |
-| - | -------- | ------------------------- | ----- |
+| --- | --- | --- | --- |
 | D-1 | ... | ... | ... |
 
 ## 7. Contrato de datos y API
 
-### 7.1 Tipos / interfaces (en `modelos.path`, sin prefijo `I`)
-### 7.2 Endpoints
+### 7.1 Interfaces compartidas (`modelos.alias`, sin prefijo `I`, sin `any`)
+
+```typescript
+export interface NombreEntidad { campo: tipo; }
+```
+
+### 7.2 Esquemas / persistencia
+
+[Esquema Mongoose nuevo o modificado; si es discriminador de la coleccion base; indices; migraciones.]
+
+### 7.3 Endpoints
+
+#### `[MÉTODO] /api/<modulo>/<recurso>`
+
+- **Descripción:**
+- **Auth:** `AuthorizationGuard<TiposDePermisos>` + permiso
+- **Sesión:** campos de `Sesion` que consume
+- **Request / Response:** bloques `typescript`
+- **Errores:** tabla codigo → condicion
 
 ## 8. Diseño de componentes y estado
 
-[Estructura de carpetas, store, facade, servicios, flujos. Diagramas en ```mermaid.]
+### 8.1 Backend — flujo por capas y archivos nuevos
+
+```
+Controller (@AuditoriaApi) → Aplicacion → Dominio → Servicio → Esquema
+```
+
+| Ruta | Clase | Capa | Responsabilidad |
+| --- | --- | --- | --- |
+
+Cambios en modulos existentes (providers, swaps `*Development`).
+
+### 8.2 Frontend — containers, componentes, estado, rutas
+
+| Ruta | Clase | Tipo | Responsabilidad |
+| --- | --- | --- | --- |
+
+- **Estado:** store raiz vs store del modulo; forma del estado; metodos/effects.
+- **HTTP:** llamadas nuevas y cadena de interceptores.
+- **Rutas y permisos:** ruta lazy, `data.permisos`, cadena de guards.
+- **Estados de UI:** loading/skeleton, empty state, errores.
+- **Flujo de datos:** `Componente → Facade/Store → HTTP → API` (```mermaid opcional).
 
 ## 9. Estrategia de pruebas
 
+| Capa | Tipo | Herramienta | Cobertura objetivo |
+| --- | --- | --- | --- |
+
+**Escenarios críticos:**
+- [ ] ...
+
 ## 10. Seguridad y permisos
+
+Autenticación, autorización (permisos concretos), multi-tenancy (campos de `Sesion`), validación de inputs, datos sensibles, auditoría.
 
 ## 11. Riesgos y mitigaciones
 
-| Riesgo | Impacto | Mitigación |
-| ------ | ------- | ---------- |
+| Riesgo | Probabilidad | Impacto | Mitigación |
+| --- | --- | --- | --- |
 
-## 12. Épicas propuestas
+## 12. Plan de despliegue
+
+1. [orden api/client, migraciones, feature flags, Capacitor sync si aplica]
+
+**Retrocompatibilidad:** Sí/No — [explicacion]
+
+## 13. Criterios de aceptación
+
+- [ ] [Criterio verificable 1]
+- [ ] Tests y lint en verde en los proyectos afectados
+
+## 14. Épicas propuestas
 
 - [ ] [Nombre de epica 1] — [1 linea]
-- [ ] [Nombre de epica 2] — [1 linea]
 
-(Al crearlas como sub-issues, reemplazar cada linea por `#N`.)
+(Al crearlas como sub-issues, reemplazar cada linea por `- [ ] #N`.)
 
-## 13. Dudas abiertas
+## 15. Dudas abiertas
 
-- DA-1: [pregunta] — **Resuelta 2026-MM-DD:** [respuesta] (o `Pendiente`)
+| # | Pregunta | Responsable | Estado |
+| --- | --- | --- | --- |
+| DA-1 | ... | ... | Pendiente / Resuelta YYYY-MM-DD: ... |
 ````
 
-## Tamano
+## Tamaño
 
-El body de un issue admite 65.536 caracteres. Si el SDD lo supera, dejar en el body las secciones 1–6 y 12–13, y publicar 7–11 como comentarios que empiecen con `<!-- timonel:sdd:seccion=7 -->` (uno por seccion), agregando en el body un indice `## Secciones en comentarios` con links a cada comentario.
+El body admite 65.536 caracteres. Si el SDD lo supera, dejar en el body 1–6 y 13–15, y publicar 7–12 como comentarios que empiecen con `<!-- timonel:sdd:seccion=N -->` (uno por seccion), agregando en el body un indice `## Secciones en comentarios` con links.
 
 ## Versionado
 
-Cada cambio relevante agrega una linea al inicio del body bajo `**Historial:**` con fecha y resumen (`- 2026-07-21 v1.2: resuelta DA-1, agrega RF-09`). No se crean issues nuevos por version.
+Cada cambio relevante agrega una linea al `**Historial:**` (`- 2026-07-21 v1.2: resuelta DA-1, agrega RF-009`) y actualiza `**Versión:**`. No se crean issues nuevos por version.
