@@ -65,11 +65,11 @@ Registra `LINT_RESULTADO`, `TESTS_RESULTADO` (`PASSED|FAILED|NO_SPECS`). Si fall
 
 ## Fase 3: Code review (siempre)
 
-Sub-agente `model: "sonnet"` sin worktree con `"$PLUGIN_ROOT/skills/code-review/SKILL.md"`. Parametros: `issue`, `repo`, `modulo`, `alcance`, `archivos_modificados`, `plugin_root`. Publica `<!-- timonel:review -->` + label `review:*`. No abortes con `REQUIERE CAMBIOS`. Marca `- [x] Code review`.
+Sub-agente `model: "sonnet"` sin worktree con `"$PLUGIN_ROOT/skills/code-review/SKILL.md"`. Parametros: `issue`, `repo`, `modulo`, `alcance`, `archivos_modificados`, `plugin_root`. Publica `<!-- timonel:review -->` + label `review:*`. No abortes con `REQUIERE CAMBIOS`. Si falla en ejecucion, **reintenta una vez** antes de marcar `VEREDICTO: NO_GENERADO`. Marca `- [x] Code review`.
 
 ## Fase 4: DoD reducido
 
-Sub-agente `"$PLUGIN_ROOT/skills/verify-dod/SKILL.md"` con `providers_registrados: n-a`, `rutas_registradas: n-a`, `retro_generada: {si|no}`, `tareas_completas`, `veredicto_code_review`. Items tipicamente `SKIPPED`: 3, 5, 6, 7. Criticos: 1, 2, 4, 8, 11. Publica `<!-- timonel:dod -->`; si `DONE`, marca la tarea y `gh issue close N -R "$REPO" --reason completed`.
+Sub-agente `"$PLUGIN_ROOT/skills/verify-dod/SKILL.md"` con `providers_registrados: n-a`, `rutas_registradas: n-a`, `retro_generada: {si|no}`, `tareas_completas`, `veredicto_code_review`, `perfil` (`consumidor` por defecto; `plugin` si el hotfix es sobre el propio plugin). Items tipicamente `SKIPPED`: 3, 5, 6, 7. Criticos: 1, 2, 4, 8, 11 (y 9 en perfil plugin). `NO_GENERADO`/`SKIPPED` en la fila 11 = `FALLAS_CRITICAS` (no se cierra el issue: el code review es obligatorio). Publica `<!-- timonel:dod -->`; si `DONE`, marca la tarea y `gh issue close N -R "$REPO" --reason completed`.
 
 ## Fase 5: Retro opcional
 

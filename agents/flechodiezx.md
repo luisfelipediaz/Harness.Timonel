@@ -117,15 +117,15 @@ Al terminar cada uno, marca `- [x] Backend` / `- [x] Frontend` segun corresponda
 
 ## Fase 5.5: Code review (siempre)
 
-Sub-agente `model: "sonnet"`, sin worktree, skill `code-review`. Parametros: `issue`, `repo`, `modulo`, `alcance`, `archivos_modificados`, `plugin_root`. Devuelve `VEREDICTO`, `HALLAZGOS_CRITICOS`, `HALLAZGOS_WARNING`, `BLOQUEA_DOD`; publica `<!-- timonel:review -->` y label `review:*`. **No abortes** con `REQUIERE CAMBIOS`: la Fase 7 lo reporta y el humano decide. Si falla en ejecucion, `VEREDICTO: NO_GENERADO` y continua.
+Sub-agente `model: "sonnet"`, sin worktree, skill `code-review`. Parametros: `issue`, `repo`, `modulo`, `alcance`, `archivos_modificados`, `plugin_root`. Devuelve `VEREDICTO`, `HALLAZGOS_CRITICOS`, `HALLAZGOS_WARNING`, `BLOQUEA_DOD`; publica `<!-- timonel:review -->` y label `review:*`. **No abortes** con `REQUIERE CAMBIOS`: la Fase 7 lo reporta y el humano decide. Si falla en ejecucion, **reintenta una vez** antes de marcar `VEREDICTO: NO_GENERADO` y continuar; `NO_GENERADO` produce `FALLAS_CRITICAS` en la Fase 7 (el issue no se cierra: el code review es obligatorio en `tipo:hu`).
 
 ## Fase 6: Retrospectiva (no bloqueante)
 
-Sub-agente `model: "opus"`, sin worktree, skill `generate-retro`. Parametros: `issue`, `repo`, `archivos_modificados`, `resultado_verificacion`, `estimado_sp` (label `sp:`), `modulo`, `alcance`, `veredicto_review`. Publica `<!-- timonel:retro -->` (validado con `validar_marcador.py`) y label `retro:*`, y **cosecha** las mejoras en issues (`cosechar_retro.py --apply`, ratchet). Si falla, `retro_generada: no` y sigue. Muestra al usuario los issues derivados.
+Sub-agente `model: "opus"`, sin worktree, skill `generate-retro`. Parametros: `issue`, `repo`, `archivos_modificados`, `resultado_verificacion`, `estimado_sp` (label `sp:`), `modulo`, `alcance`, `veredicto_review`. Publica `<!-- timonel:retro -->` (validado con `validar_marcador.py`) y label `retro:*`, y **cosecha** las mejoras en issues (`cosechar_retro.py --apply`, ratchet). Muestra al usuario los issues derivados. **Perfil consumidor**: si falla, `retro_generada: no` y sigue (no bloqueante). **Perfil plugin**: la retro **si bloquea** el DoD (item 9 es CRITICO); si falla, **reintenta una vez** antes de marcar `retro_generada: no`.
 
 ## Fase 7: Definition of Done
 
-Sub-agente `model: "sonnet"`, sin worktree, skill `verify-dod`. Parametros: `issue`, `repo`, `modulo`, `alcance`, `lint_resultado`, `tests_resultado`, `providers_registrados`, `rutas_registradas`, `tareas_completas` (si/no segun `## Tareas`), `retro_generada`, `veredicto_code_review`. Publica `<!-- timonel:dod -->`. Si la decision es `DONE`: marca `- [x] Definition of Done` y `gh issue close N -R "$REPO" --reason completed --comment "DoD: DONE"`. Si no, el issue queda `estado:en-progreso` y muestras las fallas.
+Sub-agente `model: "sonnet"`, sin worktree, skill `verify-dod`. Parametros: `issue`, `repo`, `modulo`, `alcance`, `lint_resultado`, `tests_resultado`, `providers_registrados`, `rutas_registradas`, `tareas_completas` (si/no segun `## Tareas`), `retro_generada`, `veredicto_code_review`, `perfil` (`consumidor` o `plugin`, segun corresponda). Publica `<!-- timonel:dod -->`. Si la decision es `DONE`: marca `- [x] Definition of Done` y `gh issue close N -R "$REPO" --reason completed --comment "DoD: DONE"`. Si es `FALLAS_CRITICAS` por el item 11 (review) o el item 9 (retro, perfil plugin), relanza la fase correspondiente (Fase 5.5 o Fase 6) una vez antes de reportar al humano. Si no, el issue queda `estado:en-progreso` y muestras las fallas.
 
 ## Fase 8: Integracion (perfil plugin)
 

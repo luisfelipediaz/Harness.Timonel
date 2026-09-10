@@ -117,6 +117,47 @@ class ValidarDodTests(unittest.TestCase):
         self.assertTrue(any("Item 11 · veredicto" in p for p in problemas))
         self.assertTrue(any("fila 11 en PASSED" in p for p in problemas))
 
+    def test_dod_done_con_veredicto_11_no_generado_es_invalido(self):
+        # Fila 11 dice PASSED pero la linea de veredicto dice NO_GENERADO: el
+        # sensor no debe confiar solo en el estado de la fila (gap de #28).
+        malo = DOD_OK.replace("Item 11 · veredicto: APROBADO", "Item 11 · veredicto: NO_GENERADO")
+        problemas = vm.validar(malo)
+        self.assertTrue(any("NO_GENERADO" in p for p in problemas))
+
+    def test_dod_done_con_veredicto_11_skipped_es_invalido(self):
+        malo = DOD_OK.replace("Item 11 · veredicto: APROBADO", "Item 11 · veredicto: SKIPPED")
+        problemas = vm.validar(malo)
+        self.assertTrue(any("SKIPPED" in p for p in problemas))
+
+    def test_dod_perfil_plugin_con_fila_9_failed_es_invalido(self):
+        malo = (
+            DOD_OK.replace("decision: DONE\n```", "decision: DONE\nperfil: plugin\n```")
+            .replace("| 9 | Item 9 | PASSED |", "| 9 | Item 9 | FAILED |")
+        )
+        problemas = vm.validar(malo)
+        self.assertTrue(any("fila 9" in p for p in problemas))
+
+    def test_dod_perfil_consumidor_con_fila_9_failed_y_pendientes_es_valido(self):
+        bueno = (
+            DOD_OK.replace("decision: DONE\n```", "decision: PENDIENTES\nperfil: consumidor\n```")
+            .replace("| 9 | Item 9 | PASSED |", "| 9 | Item 9 | FAILED |")
+        )
+        self.assertEqual(vm.validar(bueno), [])
+
+    def test_dod_perfil_desconocido_es_invalido(self):
+        malo = DOD_OK.replace("decision: DONE\n```", "decision: DONE\nperfil: otro\n```")
+        problemas = vm.validar(malo)
+        self.assertTrue(any("perfil" in p for p in problemas))
+
+    def test_dod_ok_con_perfil_consumidor_explicito_sigue_valido(self):
+        bueno = DOD_OK.replace("decision: DONE\n```", "decision: DONE\nperfil: consumidor\n```")
+        self.assertEqual(vm.validar(bueno), [])
+
+    def test_dod_ok_sin_perfil_sigue_valido_por_retrocompatibilidad(self):
+        # DOD_OK ya no declara `perfil`: los DoD historicos deben seguir siendo validos.
+        self.assertNotIn("perfil", vm.parse_yaml_plano(DOD_OK))
+        self.assertEqual(vm.validar(DOD_OK), [])
+
 
 class DorCheckTests(unittest.TestCase):
     def test_hu_completa(self):

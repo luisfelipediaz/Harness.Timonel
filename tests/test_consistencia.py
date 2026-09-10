@@ -108,6 +108,22 @@ class PerfilPluginTests(unittest.TestCase):
         self.assertIn("exit 2", guard)
 
 
+class DodEstrictoTests(unittest.TestCase):
+    """DoD estricto (gap 3 de la auditoria #24, issue #28): sin autoevaluacion sin evaluador."""
+
+    def test_fila_11_de_verify_dod_no_degrada_a_no_critico(self):
+        texto = (ROOT / "skills/verify-dod/SKILL.md").read_text(encoding="utf-8")
+        fila_11 = next((l for l in texto.splitlines() if l.startswith("| 11 |")), None)
+        self.assertIsNotNone(fila_11, "verify-dod/SKILL.md debe tener la fila 11 de la checklist")
+        self.assertNotIn("FAILED NO critico", fila_11, "la fila 11 no debe degradar NO_GENERADO/SKIPPED a NO critico")
+
+    def test_agentes_pasan_perfil_a_verify_dod(self):
+        for nombre in ("flechodiezx", "flechodiezx-hotfix"):
+            texto = (ROOT / f"agents/{nombre}.md").read_text(encoding="utf-8")
+            self.assertIn("verify-dod", texto, f"{nombre}.md debe invocar verify-dod")
+            self.assertIn("perfil", texto, f"{nombre}.md debe pasar `perfil` a verify-dod")
+
+
 class InvocadoresTests(unittest.TestCase):
     def test_cada_contrato_del_validador_tiene_invocador(self):
         import validar_marcador as vm
