@@ -89,6 +89,11 @@ FILAS_CRITICAS_POR_PERFIL: dict[str, tuple[int, ...]] = {
 }
 # Veredictos del item 11 que significan "nadie reviso el codigo": nunca validos con decision DONE.
 VEREDICTOS_SIN_REVIEW = {"NO_GENERADO", "SKIPPED"}
+# Motivo que acompana al rechazo de cada fila critica (mensaje util para quien publica el DoD).
+MOTIVO_FILA_CRITICA: dict[int, str] = {
+    9: "la retrospectiva es obligatoria en perfil plugin",
+    11: "el code review nunca es SKIPPED en tipo:hu/hotfix",
+}
 
 
 def detectar_tipo(texto: str) -> str | None:
@@ -174,7 +179,7 @@ def validar(texto: str, tipo: str | None = None) -> list[str]:
             filas_criticas = FILAS_CRITICAS_POR_PERFIL.get(perfil, FILAS_CRITICAS_POR_PERFIL["consumidor"])
             for n in filas_criticas:
                 if not estados.get(n, "").startswith("PASSED"):
-                    problemas.append(f"DoD: decision DONE exige la fila {n} en PASSED (tiene `{estados.get(n, 'ausente')}`); el code review nunca es SKIPPED en tipo:hu/hotfix")
+                    problemas.append(f"DoD: decision DONE exige la fila {n} en PASSED (tiene `{estados.get(n, 'ausente')}`); {MOTIVO_FILA_CRITICA.get(n, 'es una fila critica')}")
             if veredicto_11 in VEREDICTOS_SIN_REVIEW:
                 problemas.append(f"DoD: decision DONE con Item 11 · veredicto: {veredicto_11}; el code review es obligatorio en tipo:hu/hotfix")
 

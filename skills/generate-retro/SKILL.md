@@ -1,6 +1,6 @@
 ---
 name: generate-retro
-description: Genera la retrospectiva de una historia completada y la publica como comentario timonel:retro en el issue de GitHub (YAML plano + cuatro secciones fijas: desviaciones, errores recurrentes, patrones descubiertos, mejoras sugeridas) con su label retro:*. Usa tras consolidacion y code review. Fase NO bloqueante: si falla, reporta el motivo sin abortar la entrega.
+description: Genera la retrospectiva de una historia completada y la publica como comentario timonel:retro en el issue de GitHub (YAML plano + cuatro secciones fijas: desviaciones, errores recurrentes, patrones descubiertos, mejoras sugeridas) con su label retro:*. Usa tras consolidacion y code review. Fase NO bloqueante en perfil consumidor: si falla, reporta el motivo sin abortar la entrega. En perfil plugin la retro es critica para el DoD (item 9), asi que el orquestador la reintenta una vez.
 ---
 
 Analiza la implementacion completada y publica la retro en el issue. Siempre en espanol.
