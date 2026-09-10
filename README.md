@@ -13,7 +13,7 @@ El timonel gobierna el rumbo siguiendo la bitácora. Aquí la bitácora es el ba
 - **Comandos** `/timonel:*`: `onboard`, `sdd`, `plan`, `refine`, `draft`, `investigar`, `implement`, `hotfix`, `backlog`, `insights`, `audit`, `migrate`.
 - **Agentes**: `sdd-planner`, `user-story-planner`, `backlog-refiner`, `dora-exploradora` (investiga), `flechodiezx` (ejecuta historias), `flechodiezx-hotfix`, `harness-auditor`.
 - **Skills**: `github-issues` (plantillas + recetas `gh`), `implement-backend-story`, `implement-frontend-story`, `consolidate-story`, `code-review`, `generate-retro`, `verify-dod`, `retro-tools`, `ngrx-signal-store`, `interrogame`, `investigar`, `implement-plugin-change` (perfil plugin).
-- **Scripts** (stdlib + `gh`): labels idempotentes, query/destilado de retros y reviews, métricas de flujo, migración de backlog markdown, y los **sensores** del flujo: `dor_check.py` (Definition of Ready), `validar_marcador.py` (formato de comentarios), `estado_historia.py` (reanudar `/implement`), `contrato_check.py` (contrato API vs controllers), `cosechar_retro.py` (ratchet retro → issues).
+- **Scripts** (stdlib + `gh`): labels idempotentes, query/destilado de retros y reviews, métricas de flujo, migración de backlog markdown, y los **sensores** del flujo: `dor_check.py` (Definition of Ready), `validar_marcador.py` (formato de comentarios), `estado_historia.py` (reanudar `/implement`), `contrato_check.py` (contrato API vs controllers), `cosechar_retro.py` (ratchet retro → issues) y `smoke_harness.py` (smoke E2E: mide disparos de sensores/hooks sobre HUs reales).
 - **Heurísticas** de código (`evitar-ifs`, `no-tipos-espejo`, `usar-pipes-existentes`) usadas por el code review.
 - **ADRs** `TIM-ADR-0001..0004` en `docs/adr/`.
 
