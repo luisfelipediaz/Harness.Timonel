@@ -40,7 +40,10 @@ CONTRATOS: dict[str, dict] = {
     },
     "dod": {
         "yaml": ["fecha", "decision"],
-        "valores": {"decision": {"DONE", "FALLAS_CRITICAS", "PENDIENTES"}},
+        "valores": {
+            "decision": {"DONE", "FALLAS_CRITICAS", "PENDIENTES"},
+            "perfil": {"consumidor", "plugin"},
+        },
         "secciones": ["Decisión final"],
         "tabla": "dod",
     },
@@ -77,6 +80,20 @@ CONTRATOS: dict[str, dict] = {
 }
 FECHA = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 ENTEROS = {"criticos", "warnings", "estimado_sp", "real_sp", "problemas_detectados", "cambios_aplicados", "harness", "semi", "adhoc", "score"}
+
+# Filas CRITICAS del DoD (gap 3 de la auditoria #24, issue #28): en perfil plugin
+# la retro (fila 9) tambien bloquea; el item 11 (code review) es critico en ambos.
+FILAS_CRITICAS_POR_PERFIL: dict[str, tuple[int, ...]] = {
+    "consumidor": (1, 2, 4, 8, 11),
+    "plugin": (1, 2, 4, 8, 9, 11),
+}
+# Veredictos del item 11 que significan "nadie reviso el codigo": nunca validos con decision DONE.
+VEREDICTOS_SIN_REVIEW = {"NO_GENERADO", "SKIPPED"}
+# Motivo que acompana al rechazo de cada fila critica (mensaje util para quien publica el DoD).
+MOTIVO_FILA_CRITICA: dict[int, str] = {
+    9: "la retrospectiva es obligatoria en perfil plugin",
+    11: "el code review nunca es SKIPPED en tipo:hu/hotfix",
+}
 
 
 def detectar_tipo(texto: str) -> str | None:
@@ -153,12 +170,18 @@ def validar(texto: str, tipo: str | None = None) -> list[str]:
         for n, est in estados.items():
             if not est.startswith(("PASSED", "FAILED", "SKIPPED")):
                 problemas.append(f"DoD: fila {n} con estado invalido `{est}` (PASSED|FAILED|SKIPPED)")
-        if not re.search(r"^Item 11 · veredicto:", texto, re.MULTILINE):
+        m11 = re.search(r"^Item 11 · veredicto:\s*(.+)$", texto, re.MULTILINE)
+        if not m11:
             problemas.append("DoD: falta la linea `Item 11 · veredicto: <valor>`")
+        veredicto_11 = m11.group(1).strip() if m11 else None
         if meta.get("decision") == "DONE":
-            for n in (1, 2, 4, 8, 11):
+            perfil = meta.get("perfil", "consumidor")
+            filas_criticas = FILAS_CRITICAS_POR_PERFIL.get(perfil, FILAS_CRITICAS_POR_PERFIL["consumidor"])
+            for n in filas_criticas:
                 if not estados.get(n, "").startswith("PASSED"):
-                    problemas.append(f"DoD: decision DONE exige la fila {n} en PASSED (tiene `{estados.get(n, 'ausente')}`); el code review nunca es SKIPPED en tipo:hu/hotfix")
+                    problemas.append(f"DoD: decision DONE exige la fila {n} en PASSED (tiene `{estados.get(n, 'ausente')}`); {MOTIVO_FILA_CRITICA.get(n, 'es una fila critica')}")
+            if veredicto_11 in VEREDICTOS_SIN_REVIEW:
+                problemas.append(f"DoD: decision DONE con Item 11 · veredicto: {veredicto_11}; el code review es obligatorio en tipo:hu/hotfix")
 
     if tipo == "retro":
         secciones = parse_secciones(texto)

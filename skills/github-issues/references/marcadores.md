@@ -176,6 +176,7 @@ Maximo 3-5 bullets por seccion; `- Ninguno` si no aplica. Los scripts leen las s
 ```yaml
 fecha: 2026-09-09
 decision: DONE | FALLAS_CRITICAS | PENDIENTES
+perfil: consumidor | plugin
 ```
 
 | #   | Item                              | Estado  |

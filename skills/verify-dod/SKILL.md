@@ -19,7 +19,7 @@ Ejecuta la checklist de DoD con los resultados acumulados de fases anteriores ma
 | `veredicto_code_review` | `APROBADO` \| `APROBADO CON OBSERVACIONES` \| `REQUIERE CAMBIOS` \| `NO_GENERADO` |
 | `perfil` | `consumidor` (default) \| `plugin` |
 
-**Perfil plugin**: items 5, 6 y 7 son `SKIPPED`; en el item 8 las tareas `Contrato API aprobado`, `Modelos compartidos` y `Frontend` cuentan como SKIPPED si no estan marcadas; item 3 usa `git diff --name-only --diff-filter=AM main...HEAD -- tests/`; `<rama-base>` es `main`. El item 11 **nunca** es SKIPPED: en el plugin tambien hay code review.
+**Perfil plugin**: items 5, 6 y 7 son `SKIPPED`; en el item 8 las tareas `Contrato API aprobado`, `Modelos compartidos` y `Frontend` cuentan como SKIPPED si no estan marcadas; item 3 usa `git diff --name-only --diff-filter=AM main...HEAD -- tests/`; `<rama-base>` es `main`. El item 11 **nunca** es SKIPPED: en el plugin tambien hay code review. El item 9 (retrospectiva) es **CRITICO** en este perfil: `retro_generada: no` → FAILED CRITICO (la retro no es opcional cuando el plugin se implementa a si mismo).
 
 ## Checklist
 
@@ -33,9 +33,9 @@ Ejecuta la checklist de DoD con los resultados acumulados de fases anteriores ma
 | 6 | Providers registrados | CRITICO si aplica | `providers_registrados` (`n-a` → SKIPPED) |
 | 7 | Rutas registradas | CRITICO si aplica | `rutas_registradas` (`n-a` → SKIPPED) |
 | 8 | Checklist de tareas completo | CRITICO | `tareas_completas`; verifica en el body: `gh issue view <issue> -R <repo> --json body -q .body \| awk '/^## Tareas/{f=1} f'` — las tareas no aplicables al alcance (ej. Frontend en `alcance:backend`) cuentan como SKIPPED |
-| 9 | Retrospectiva publicada | NO critico | `retro_generada` |
+| 9 | Retrospectiva publicada | NO critico (CRITICO en perfil plugin) | `retro_generada`: `si` → PASSED; `no` → FAILED CRITICO en perfil plugin, FAILED NO critico en perfil consumidor |
 | 10 | Sin TODOs criticos en archivos nuevos | NO critico | `git diff --name-only --diff-filter=A <rama-base>...HEAD \| xargs grep -l 'TODO'` → lista si hay (no bloquea) |
-| 11 | Code review aprobado | CRITICO condicional | `APROBADO`/`APROBADO CON OBSERVACIONES` → PASSED; `REQUIERE CAMBIOS` → FAILED CRITICO; `NO_GENERADO` → FAILED NO critico |
+| 11 | Code review aprobado | CRITICO | `APROBADO`/`APROBADO CON OBSERVACIONES` → PASSED; `REQUIERE CAMBIOS`, `NO_GENERADO` o `SKIPPED` → FAILED CRITICO en `tipo:hu` y `tipo:hotfix` (sin autoevaluacion sin evaluador: nunca se degrada a NO critico) |
 
 `<rama-base>` es la rama desde la que se creo `hu/N-slug` (normalmente `main` o `develop`; usa `git merge-base`).
 
@@ -47,7 +47,7 @@ Ejecuta la checklist de DoD con los resultados acumulados de fases anteriores ma
 
 ## Publicar en el issue
 
-Comentario `<!-- timonel:dod -->` con el formato de `PLUGIN_ROOT/skills/github-issues/references/marcadores.md` (YAML: fecha, decision; tabla de 11 filas; linea `Item 11 · veredicto: ...`; seccion Decisión final con fallas/pendientes). Valida con `python3 PLUGIN_ROOT/scripts/validar_marcador.py <archivo> --tipo dod` y luego `publicar_marcador <issue> dod <archivo>`.
+Comentario `<!-- timonel:dod -->` con el formato de `PLUGIN_ROOT/skills/github-issues/references/marcadores.md` (YAML: fecha, decision, `perfil: consumidor | plugin`; tabla de 11 filas; linea `Item 11 · veredicto: ...`; seccion Decisión final con fallas/pendientes). Valida con `python3 PLUGIN_ROOT/scripts/validar_marcador.py <archivo> --tipo dod` y luego `publicar_marcador <issue> dod <archivo>`.
 
 Si la decision es `DONE` o `PENDIENTES`, marca `- [x] Definition of Done` en `## Tareas`. **No cierres el issue**: lo hace el orquestador.
 
