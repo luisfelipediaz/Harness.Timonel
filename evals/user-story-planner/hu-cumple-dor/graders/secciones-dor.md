@@ -1,6 +1,5 @@
 ---
 type: regex
-weight: 2
 flags: ms
 pattern: "## Historia.*## Criterios de aceptaci.*## Ficha t.*## Endpoints.*## Modelos compartidos.*## Dependencias.*## Tareas"
 match: contains

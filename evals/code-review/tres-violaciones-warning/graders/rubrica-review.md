@@ -2,7 +2,7 @@
 type: llm
 ---
 
-Evaluá el comentario `timonel:review` devuelto. Score 1.0 si se cumple todo:
+Evalúa el comentario `timonel:review` devuelto. Score 1.0 si se cumple todo:
 
 - Las 3 violaciones sembradas (`gastos: any[]`, `*ngIf` en el template, `GastoResponse` como tipo espejo de `Gasto`) aparecen como hallazgos de severidad WARNING en la tabla.
 - Ninguna de esas 3 aparece como CRITICO.
@@ -11,4 +11,4 @@ Evaluá el comentario `timonel:review` devuelto. Score 1.0 si se cumple todo:
 - `criticos: 0` y `warnings` coincide con la cantidad de filas de la tabla con severidad WARNING.
 - `bloquea_dod: no`.
 
-Restá proporcionalmente por cada punto incumplido; 0 si el formato no es reconocible como `timonel:review`.
+Resta proporcionalmente por cada punto incumplido; 0 si el formato no es reconocible como `timonel:review`.

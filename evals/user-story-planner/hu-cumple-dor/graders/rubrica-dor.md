@@ -1,9 +1,8 @@
 ---
 type: llm
-weight: 1
 ---
 
-Evaluá la HU devuelta por el agente contra TIM-ADR-0003 (Definition of Ready). Score 1.0 si se cumple todo lo siguiente; restá proporcionalmente por cada punto incumplido:
+Evalúa la HU devuelta por el agente contra TIM-ADR-0003 (Definition of Ready). Score 1.0 si se cumple todo lo siguiente; restá proporcionalmente por cada punto incumplido:
 
 - El título está en infinitivo, sin prefijo `HU-`, `[`, `feat` ni `fix`.
 - La sección `## Historia` sigue el formato **Como** / **quiero** / **para**.
@@ -15,4 +14,4 @@ Evaluá la HU devuelta por el agente contra TIM-ADR-0003 (Definition of Ready). 
 - El `sp:` elegido es un valor Fibonacci válido y no supera 13.
 - El agente no ejecutó `gh` ni intentó crear ningún issue.
 
-Devolvé 0 si falta el bloque ` ```markdown ` o la línea `Labels:`.
+Devuelve 0 si falta el bloque ` ```markdown ` o la línea `Labels:`.

@@ -5,7 +5,7 @@ runs: 2
 max_turns: 8
 ---
 
-Necesito que redactes UNA historia de usuario para el siguiente feature ficticio. No preguntes nada al usuario: si algo no está definido, asume lo más razonable y seguí adelante.
+Necesito que redactes UNA historia de usuario para el siguiente feature ficticio. No preguntes nada al usuario: si algo no está definido, asume lo más razonable y sigue adelante.
 
 ## Contexto del feature
 
@@ -20,13 +20,13 @@ Necesito que redactes UNA historia de usuario para el siguiente feature ficticio
 - **Endpoint**: `POST /api/mis-finanzas/gastos`.
 - **Permiso**: `TiposDePermisos.RegistrarGasto`.
 
-## Lo que tenés que hacer
+## Lo que tienes que hacer
 
-Usá el agente `user-story-planner` del plugin `timonel` para redactar esta historia con la plantilla `skills/github-issues/references/plantilla-hu.md`, pero **sin publicarla**: no ejecutes `gh`, no crees ningún issue.
+Usa el agente `user-story-planner` del plugin `timonel` para redactar esta historia con la plantilla `skills/github-issues/references/plantilla-hu.md`, pero **sin publicarla**: no ejecutes `gh`, no crees ningún issue.
 
 En tu respuesta final:
 
-1. Poné el body completo de la HU (con todas sus secciones, en el mismo orden que la plantilla) dentro de un único bloque ` ```markdown `.
+1. Pon el body completo de la HU (con todas sus secciones, en el mismo orden que la plantilla) dentro de un único bloque ` ```markdown `.
 2. Inmediatamente después de cerrar ese bloque, agregá una única línea con el formato exacto:
 
    ```

@@ -1,6 +1,5 @@
 ---
 type: regex
-weight: 2
 flags: i
 pattern: "veredicto:\\s*APROBADO CON OBSERVACIONES"
 match: contains
