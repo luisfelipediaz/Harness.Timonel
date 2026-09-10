@@ -8,6 +8,7 @@ import contrato_check as cc  # noqa: E402
 import cosechar_retro as cr  # noqa: E402
 import dor_check as dc  # noqa: E402
 import estado_historia as eh  # noqa: E402
+import eval_dor as ed  # noqa: E402
 import integracion as ig  # noqa: E402
 import metricas_flujo as mf  # noqa: E402
 import validar_marcador as vm  # noqa: E402
@@ -190,6 +191,49 @@ class DorCheckTests(unittest.TestCase):
         hu = dict(HU_OK, label_names=HU_OK["label_names"] + ["bloqueado"])
         self.assertEqual(dc.check(hu), [])
         self.assertTrue(any("bloqueado" in f for f in dc.check(hu, "implementar")))
+
+
+class EvalDorTests(unittest.TestCase):
+    """Sensor del eval del planner (#32): DoR sobre la HU devuelta en la respuesta del agente."""
+
+    def _respuesta(self, body: str, labels: str | None = "tipo:hu, alcance:full-stack, sp:5, mod:mis-finanzas, moscow:must, prioridad:alta") -> str:
+        texto = f"Aca va la HU propuesta:\n\n```markdown\n{body}```\n"
+        if labels is not None:
+            texto += f"\nLabels: {labels}\n"
+        return texto
+
+    def test_extraer_hu_de_bloque_markdown_y_labels(self):
+        hu = ed.extraer_hu(self._respuesta(HU_OK["body"]))
+        self.assertEqual(hu["body"], HU_OK["body"])
+        self.assertEqual(
+            hu["label_names"],
+            ["tipo:hu", "alcance:full-stack", "sp:5", "mod:mis-finanzas", "moscow:must", "prioridad:alta"],
+        )
+        self.assertEqual(len(hu["label_names"]), 6)
+        self.assertEqual(hu["title"], "")
+
+    def test_extraer_hu_sin_bloque_usa_todo_el_texto(self):
+        hu = ed.extraer_hu("texto plano sin fences", title="Registrar gasto")
+        self.assertEqual(hu["body"], "texto plano sin fences")
+        self.assertEqual(hu["title"], "Registrar gasto")
+        self.assertEqual(hu["label_names"], [])
+
+    def test_evaluar_hu_completa_cumple_dor(self):
+        self.assertEqual(ed.evaluar(self._respuesta(HU_OK["body"])), [])
+
+    def test_evaluar_reporta_faltantes_si_falta_seccion_o_label(self):
+        cuerpo_sin_tareas = HU_OK["body"].split("## Tareas")[0]
+        faltantes = ed.evaluar(self._respuesta(
+            cuerpo_sin_tareas,
+            labels="tipo:hu, alcance:full-stack, mod:mis-finanzas, moscow:must, prioridad:alta",
+        ))
+        self.assertTrue(faltantes)
+        self.assertTrue(any("Tareas" in f for f in faltantes))
+        self.assertTrue(any("sp:" in f for f in faltantes))
+
+    def test_evaluar_sin_labels_reporta_falta_label(self):
+        faltantes = ed.evaluar(self._respuesta(HU_OK["body"], labels=None))
+        self.assertTrue(any("label" in f for f in faltantes))
 
 
 class EstadoHistoriaTests(unittest.TestCase):

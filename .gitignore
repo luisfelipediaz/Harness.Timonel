@@ -5,3 +5,6 @@ __pycache__/
 *.pyc
 *.log
 .DS_Store
+
+# Salida de claude plugin eval
+evals/results/

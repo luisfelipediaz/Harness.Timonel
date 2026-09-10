@@ -169,5 +169,48 @@ class VersionTests(unittest.TestCase):
             self.assertIn(f"\n{label}|", script, f"labels.md documenta `{label}` pero setup-github-labels.sh no lo crea")
 
 
+class EvalsTests(unittest.TestCase):
+    """Casos de `claude plugin eval` (issue #32, gap 12 de la auditoria #11)."""
+
+    GRADER_TYPES = {"regex", "llm", "tool_used", "file_exists", "tool_order", "baseline"}
+
+    def _prompts(self) -> list[Path]:
+        return list((ROOT / "evals").glob("**/prompt.md"))
+
+    def _casos(self) -> list[Path]:
+        return self._prompts() + list((ROOT / "evals").glob("**/case.yaml"))
+
+    def test_cada_case_referencia_agente_o_skill_existente(self):
+        casos = self._casos()
+        self.assertTrue(casos, "evals/ debe tener al menos un caso (prompt.md o case.yaml)")
+        conocidos = AGENTES | SKILLS
+        for caso in casos:
+            primero = caso.relative_to(ROOT / "evals").parts[0]
+            self.assertIn(primero, conocidos, f"{caso} cuelga de `{primero}`, que no es un agente ni un skill existente")
+
+    def test_cada_case_tiene_graders(self):
+        for prompt in self._prompts():
+            graders = list((prompt.parent / "graders").glob("*.md"))
+            self.assertTrue(graders, f"{prompt} no tiene graders/*.md")
+            for grader in graders:
+                fm = _frontmatter(grader)
+                self.assertIn(fm.get("type"), self.GRADER_TYPES, f"{grader}: `type` invalido o ausente")
+
+    def test_prompt_tiene_name(self):
+        for prompt in self._prompts():
+            fm = _frontmatter(prompt)
+            self.assertIn("name", fm, f"{prompt} no declara `name` en el frontmatter")
+
+    def test_fixture_code_review_siembra_tres_violaciones(self):
+        prompt = ROOT / "evals/code-review/tres-violaciones-warning/prompt.md"
+        texto = prompt.read_text(encoding="utf-8")
+        for violacion in (": any", "*ngIf", "GastoResponse"):
+            self.assertIn(violacion, texto, f"el fixture de code-review debe sembrar `{violacion}`")
+
+    def test_evals_results_ignorado(self):
+        gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
+        self.assertIn("evals/results/", gitignore, ".gitignore debe ignorar evals/results/")
+
+
 if __name__ == "__main__":
     unittest.main()
