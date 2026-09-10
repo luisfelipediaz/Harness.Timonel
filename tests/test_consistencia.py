@@ -97,7 +97,8 @@ class MarcadoresTests(unittest.TestCase):
 class PerfilPluginTests(unittest.TestCase):
     def test_flechodiezx_tiene_perfil_plugin(self):
         texto = (ROOT / "agents/flechodiezx.md").read_text(encoding="utf-8")
-        for frase in ("Perfil plugin", "implement-plugin-change", "git merge --no-ff", "contrato de cambio"):
+        for frase in ("Perfil plugin", "implement-plugin-change", "git merge --no-ff", "contrato de cambio",
+                      "verify-dod", "perfil", "git.integracion", "integracion.py"):
             self.assertIn(frase, texto, f"flechodiezx.md debe describir el perfil plugin: falta `{frase}`")
         self.assertIn("implement-plugin-change", SKILLS)
 
@@ -135,6 +136,21 @@ class InvocadoresTests(unittest.TestCase):
         claude = (ROOT / "CLAUDE.md").read_text(encoding="utf-8") + (ROOT / "README.md").read_text(encoding="utf-8")
         sin = [p.name for p in (ROOT / "scripts").glob("*.py") if p.name not in claude and p.stem not in claude]
         self.assertFalse(sin, f"scripts sin mencion en CLAUDE.md/README.md: {sin}")
+
+
+class TareasTests(unittest.TestCase):
+    def test_tareas_de_estado_historia_estan_en_plantilla_hu(self):
+        import estado_historia as eh
+        plantilla = (ROOT / "skills/github-issues/references/plantilla-hu.md").read_text(encoding="utf-8")
+        lineas_plantilla = re.findall(r"^- \[ \] (.+)$", plantilla, re.MULTILINE)
+        self.assertEqual(eh.TAREAS, lineas_plantilla,
+                          "TAREAS (estado_historia.py) y el checklist de plantilla-hu.md deben coincidir en contenido y orden")
+
+    def test_git_integracion_documentado(self):
+        adr = (ROOT / "docs/adr/tim-adr-0002-configuracion-del-consumidor.md").read_text(encoding="utf-8")
+        onboard = (ROOT / "commands/onboard.md").read_text(encoding="utf-8")
+        self.assertIn("git.integracion", adr, "tim-adr-0002 debe documentar `git.integracion`")
+        self.assertIn("integracion", onboard, "onboard.md debe generar/detectar `git.integracion`")
 
 
 class VersionTests(unittest.TestCase):

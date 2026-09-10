@@ -32,7 +32,7 @@ Ejecuta la checklist de DoD con los resultados acumulados de fases anteriores ma
 | 5 | Modelos compartidos | NO critico | `git diff --name-only <rama-base>...HEAD -- <modelos.path>` → PASSED si hay; SKIPPED si el alcance no los implica |
 | 6 | Providers registrados | CRITICO si aplica | `providers_registrados` (`n-a` → SKIPPED) |
 | 7 | Rutas registradas | CRITICO si aplica | `rutas_registradas` (`n-a` → SKIPPED) |
-| 8 | Checklist de tareas completo | CRITICO | `tareas_completas`; verifica en el body: `gh issue view <issue> -R <repo> --json body -q .body \| awk '/^## Tareas/{f=1} f'` — las tareas no aplicables al alcance (ej. Frontend en `alcance:backend`) cuentan como SKIPPED |
+| 8 | Checklist de tareas completo | CRITICO | `tareas_completas`; verifica en el body: `gh issue view <issue> -R <repo> --json body -q .body \| awk '/^## Tareas/{f=1} f'` — las tareas no aplicables al alcance (ej. Frontend en `alcance:backend`) cuentan como SKIPPED; `PR abierto` cuenta **siempre** como SKIPPED aqui (se marca en la Fase 8, despues del DoD) |
 | 9 | Retrospectiva publicada | NO critico (CRITICO en perfil plugin) | `retro_generada`: `si` → PASSED; `no` → FAILED CRITICO en perfil plugin, FAILED NO critico en perfil consumidor |
 | 10 | Sin TODOs criticos en archivos nuevos | NO critico | `git diff --name-only --diff-filter=A <rama-base>...HEAD \| xargs grep -l 'TODO'` → lista si hay (no bloquea) |
 | 11 | Code review aprobado | CRITICO | `APROBADO`/`APROBADO CON OBSERVACIONES` → PASSED; `REQUIERE CAMBIOS`, `NO_GENERADO` o `SKIPPED` → FAILED CRITICO en `tipo:hu` y `tipo:hotfix` (sin autoevaluacion sin evaluador: nunca se degrada a NO critico) |

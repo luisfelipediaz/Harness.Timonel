@@ -8,6 +8,7 @@ import contrato_check as cc  # noqa: E402
 import cosechar_retro as cr  # noqa: E402
 import dor_check as dc  # noqa: E402
 import estado_historia as eh  # noqa: E402
+import integracion as ig  # noqa: E402
 import metricas_flujo as mf  # noqa: E402
 import validar_marcador as vm  # noqa: E402
 from test_markers import RETRO_COMMENT, REVIEW_COMMENT  # noqa: E402
@@ -225,6 +226,28 @@ class EstadoHistoriaTests(unittest.TestCase):
         e = eh.estado(issue, rama=None)
         self.assertTrue(e["nueva"], "una HU backend sin trabajo debe ser nueva aunque Frontend cuente como N/A")
 
+    COMENTARIOS_HASTA_DOD = [{"body": "<!-- timonel:investigacion -->\nx"}, {"body": "<!-- timonel:dod -->\nx"}]
+
+    def test_pr_pendiente_tras_dod(self):
+        body = HU_OK["body"].replace("- [ ]", "- [x]") + "\n- [ ] PR abierto"
+        issue = dict(HU_OK, body=body, state="OPEN", comments=self.COMENTARIOS_HASTA_DOD)
+        e = eh.estado(issue, rama="hu/42-registrar-gasto")
+        self.assertEqual(e["reanudar_en"], "8 PR/Integración")
+        self.assertFalse(e["nueva"])
+
+    def test_pr_marcado_cierra(self):
+        body = HU_OK["body"].replace("- [ ]", "- [x]") + "\n- [x] PR abierto"
+        issue = dict(HU_OK, body=body, state="OPEN", comments=self.COMENTARIOS_HASTA_DOD)
+        e = eh.estado(issue, rama="hu/42-registrar-gasto")
+        self.assertEqual(e["reanudar_en"], "cerrar")
+
+    def test_sin_linea_pr_es_skipped(self):
+        body = HU_OK["body"].replace("- [ ]", "- [x]")
+        issue = dict(HU_OK, body=body, state="OPEN", comments=self.COMENTARIOS_HASTA_DOD)
+        e = eh.estado(issue, rama="hu/42-registrar-gasto")
+        self.assertEqual(e["reanudar_en"], "cerrar")
+        self.assertIn("8 PR/Integración", e["fases_hechas"])
+
 
 class CosecharRetroTests(unittest.TestCase):
     def test_extrae_mejoras_y_omite_ninguno(self):
@@ -255,6 +278,80 @@ class ContratoCheckTests(unittest.TestCase):
         indice = [("c.ts", "organigrama", [("GET", "empleados")])]
         res = cc.verificar([("GET", "/api/organigrama/empleados?area=1&sede=2")], indice)
         self.assertEqual(res[0][2], "PASSED")
+
+
+class IntegracionTests(unittest.TestCase):
+    def test_tipo_remote_github(self):
+        for url in ("https://github.com/o/r.git", "git@github.com:o/r.git"):
+            self.assertEqual(ig.tipo_remote(url), "github")
+
+    def test_tipo_remote_azure_devops(self):
+        urls = (
+            "https://dev.azure.com/org/proj/_git/repo",
+            "https://org.visualstudio.com/proj/_git/repo",
+            "git@ssh.dev.azure.com:v3/org/proj/repo",
+        )
+        for url in urls:
+            self.assertEqual(ig.tipo_remote(url), "azure-devops")
+
+    def test_tipo_remote_desconocido(self):
+        self.assertEqual(ig.tipo_remote("https://gitlab.com/o/r"), "desconocido")
+
+    def test_comando_pr_github(self):
+        cmd = ig.comando_pr("https://github.com/o/r.git", "hu/31-x", "main", "Titulo (#31)", "/tmp/pr-31.md")
+        for esperado in ("gh pr create", "--head hu/31-x", "--base main", "(#31)"):
+            self.assertIn(esperado, cmd)
+
+    def test_comando_pr_azure_devops(self):
+        cmd = ig.comando_pr("https://dev.azure.com/org/proj/_git/repo", "hu/31-x", "main", "Titulo (#31)", "/tmp/pr-31.md")
+        for esperado in ("az repos pr create", "--source-branch hu/31-x", "--organization https://dev.azure.com/org", "--project proj", "--repository repo"):
+            self.assertIn(esperado, cmd)
+
+    def test_comando_pr_visualstudio(self):
+        cmd = ig.comando_pr("https://org.visualstudio.com/proj/_git/repo", "hu/31-x", "main", "Titulo (#31)", "/tmp/pr-31.md")
+        self.assertIn("--organization https://org.visualstudio.com", cmd)
+
+    def test_comando_pr_azure_ssh(self):
+        cmd = ig.comando_pr("git@ssh.dev.azure.com:v3/org/proj/repo", "hu/31-x", "main", "Titulo (#31)", "/tmp/pr-31.md")
+        for esperado in ("az repos pr create", "--organization https://dev.azure.com/org", "--project proj", "--repository repo"):
+            self.assertIn(esperado, cmd)
+
+    def test_comando_pr_escapa_titulo_con_apostrofo(self):
+        import shlex
+        titulo = "Fase 8: abrir el PR de 'hu/N-slug' y registrarlo (#31)"
+        for url in ("https://github.com/o/r.git", "https://dev.azure.com/org/proj/_git/repo"):
+            cmd = ig.comando_pr(url, "hu/31-x", "main", titulo, "/tmp/pr-31.md")
+            partes = shlex.split(cmd)
+            self.assertIn(titulo, partes, "el titulo debe sobrevivir intacto a shlex.split (eval en la Fase 8)")
+
+    def test_comando_pr_azure_no_usa_command_substitution(self):
+        cmd = ig.comando_pr("https://dev.azure.com/org/proj/_git/repo", "hu/31-x", "main", "Titulo (#31)", "/tmp/pr-31.md")
+        self.assertNotIn("$(", cmd)
+        self.assertIn("--description @/tmp/pr-31.md", cmd)
+
+    def test_comando_pr_desconocido_lanza(self):
+        with self.assertRaises(ValueError):
+            ig.comando_pr("https://gitlab.com/o/r", "hu/31-x", "main", "Titulo (#31)", "/tmp/pr-31.md")
+
+    def test_cuerpo_pr_sin_contrato(self):
+        cuerpo = ig.cuerpo_pr(31, "luisfelipediaz/Harness.Timonel", "Titulo", None, DOD_OK)
+        self.assertIn("Cierra #31", cuerpo)
+        self.assertIn("Sin contrato publicado", cuerpo)
+        self.assertIn("| 1 |", cuerpo)
+
+    def test_cuerpo_pr_corta_en_seccion_hermana_y_prefiere_contrato_de_cambio(self):
+        contrato = ("<!-- timonel:contrato-api -->\n## Contrato API aprobado\n\n### Modelos compartidos\n\nNinguno.\n\n"
+                    "### Endpoints\n\nNinguno — explícito.\n\n### Contrato de cambio\n\n| Archivo | Cambio |\n| --- | --- |\n| a.py | x |\n\n"
+                    "### Invariantes nuevas\n\n- una invariante\n")
+        cuerpo = ig.cuerpo_pr(31, "o/r", "Titulo", contrato, None)
+        self.assertIn("| a.py | x |", cuerpo)
+        self.assertNotIn("una invariante", cuerpo)
+        self.assertNotIn("Ninguno — explícito", cuerpo)
+
+    def test_cuerpo_pr_sin_dod(self):
+        cuerpo = ig.cuerpo_pr(31, "luisfelipediaz/Harness.Timonel", "Titulo", "### Contrato de cambio\n\nTabla.", None)
+        self.assertIn("Sin DoD publicado", cuerpo)
+        self.assertIn("Tabla.", cuerpo)
 
 
 class MetricasTests(unittest.TestCase):

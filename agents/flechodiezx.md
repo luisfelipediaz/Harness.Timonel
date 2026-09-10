@@ -13,7 +13,7 @@ El orquestador **no escribe codigo de negocio**: crea modelos compartidos (Fase 
 
 ## Fase 0: Contexto y perfil
 
-1. **Perfil**. Si existe `.claude-plugin/plugin.json` con `name == "timonel"`, o el issue lleva `mod:plugin`, el perfil es **`plugin`**: el repo es el propio Timonel (issues en `gh repo view --json nameWithOwner`), no hay nx ni `api`/`frontends`, y las fases cambian como se indica en cada seccion bajo "Perfil plugin". Si no, perfil **`consumidor`**: lee `.claude/timonel.config.json` → `REPO`, `api`, `frontends`, `modelos`, `stack`; si falta, pide `/timonel:onboard`. En ambos perfiles lee el `CLAUDE.md` del repo.
+1. **Perfil**. Si existe `.claude-plugin/plugin.json` con `name == "timonel"`, o el issue lleva `mod:plugin`, el perfil es **`plugin`**: el repo es el propio Timonel (issues en `gh repo view --json nameWithOwner`), no hay nx ni `api`/`frontends`, y las fases cambian como se indica en cada seccion bajo "Perfil plugin". Si no, perfil **`consumidor`**: lee `.claude/timonel.config.json` → `REPO`, `api`, `frontends`, `modelos`, `stack`; si falta, pide `/timonel:onboard`. En ambos perfiles lee el `CLAUDE.md` del repo. Lee tambien `git.integracion` del config (TIM-ADR-0002): default `"pr"` en perfil consumidor; en perfil plugin no hay config, default `"merge"`. Este valor decide la Fase 8.
 2. Resuelve `PLUGIN_ROOT` (skill `github-issues`). Los skills viven en `"$PLUGIN_ROOT/skills/<nombre>/SKILL.md"`; pasa esa ruta absoluta a los sub-agentes.
 3. Registra la frontera git: rama actual, `git status --porcelain`. No cambies de rama ni hagas stash sobre trabajo del usuario.
 
@@ -125,13 +125,22 @@ Sub-agente `model: "opus"`, sin worktree, skill `generate-retro`. Parametros: `i
 
 ## Fase 7: Definition of Done
 
-Sub-agente `model: "sonnet"`, sin worktree, skill `verify-dod`. Parametros: `issue`, `repo`, `modulo`, `alcance`, `lint_resultado`, `tests_resultado`, `providers_registrados`, `rutas_registradas`, `tareas_completas` (si/no segun `## Tareas`), `retro_generada`, `veredicto_code_review`, `perfil` (`consumidor` o `plugin`, segun corresponda). Publica `<!-- timonel:dod -->`. Si la decision es `DONE`: marca `- [x] Definition of Done` y `gh issue close N -R "$REPO" --reason completed --comment "DoD: DONE"`. Si es `FALLAS_CRITICAS` por el item 11 (review) o el item 9 (retro, perfil plugin), relanza la fase correspondiente (Fase 5.5 o Fase 6) una vez antes de reportar al humano. Si no, el issue queda `estado:en-progreso` y muestras las fallas.
+Sub-agente `model: "sonnet"`, sin worktree, skill `verify-dod`. Parametros: `issue`, `repo`, `modulo`, `alcance`, `lint_resultado`, `tests_resultado`, `providers_registrados`, `rutas_registradas`, `tareas_completas` (si/no segun `## Tareas`), `retro_generada`, `veredicto_code_review`, `perfil` (`consumidor` o `plugin`, segun corresponda). Publica `<!-- timonel:dod -->`. Si la decision es `DONE`: marca `- [x] Definition of Done` y **pasa a la Fase 8** (el cierre del issue ya no ocurre aqui: una HU `DONE` sin integrar a la rama base no esta terminada). Si es `FALLAS_CRITICAS` por el item 11 (review) o el item 9 (retro, perfil plugin), relanza la fase correspondiente (Fase 5.5 o Fase 6) una vez antes de reportar al humano. Si no, el issue queda `estado:en-progreso` y muestras las fallas.
 
-## Fase 8: Integracion (perfil plugin)
+## Fase 8: Integracion
 
-Con `DONE`: `git checkout main && git merge --no-ff hu/N-<slug> -m "merge: #N <titulo>" && git push origin main && git checkout -` (el guard de rama base bloquea `git commit` directo en `main`; `git merge` esta permitido porque el commit ya existe en la rama). No publiques release: eso ocurre al cerrar la epica (`git tag vX.Y.Z` + `gh release create`). En perfil consumidor la integracion (PR) queda fuera del harness hasta #31.
+Con `DONE` (Fase 7), la rama `hu/N-<slug>` debe llegar a la rama base. El camino depende de `git.integracion` (leido en Fase 0) y es el mismo en **ambos perfiles**:
 
-Presenta al usuario la tabla del DoD, la decision, la rama `hu/N-slug` y el link al issue.
+- **`git.integracion: "merge"`** (default en perfil plugin): `git checkout main && git merge --no-ff hu/N-<slug> -m "merge: #N <titulo>" && git push origin main && git checkout -` (el guard de rama base bloquea `git commit` directo en `main`; `git merge` esta permitido porque el commit ya existe en la rama). La tarea `- [ ] PR abierto` queda sin marcar (no aplica: el merge es directo; `estado_historia.py`/DoD la reportan `SKIPPED`). Al terminar, `git branch -d hu/N-<slug>`.
+- **`git.integracion: "pr"`** (default en perfil consumidor): `git push -u origin hu/N-<slug>`, luego:
+  ```bash
+  CMD=$(python3 "$PLUGIN_ROOT/scripts/integracion.py" N --rama hu/N-<slug> --base <rama base> --repo "$REPO" --body-out /tmp/pr-N.md)
+  ```
+  `integracion.py` solo **arma e imprime** el comando (`gh pr create ...` para remotes GitHub, `az repos pr create ...` para Azure DevOps — el tipo se detecta con `python3 "$PLUGIN_ROOT/scripts/integracion.py" --tipo-remote`); nunca lo ejecuta ni improvisa `gh`/`az` por su cuenta. Si `$CMD` empieza por `az` y `! command -v az`, muestra el comando al usuario y pidele que lo ejecute (no marques la tarea, deja el DoD `PENDIENTES`). Si el comando esta disponible, ejecutalo con `eval "$CMD"`, captura la URL de salida, comenta `gh issue comment N -R "$REPO" --body "PR abierto: <url> (rama hu/N-slug → <rama base>)"` y marca `- [x] PR abierto`. El merge a la rama base lo hace un humano al aprobar el PR: la Fase 8 termina al abrirlo.
+
+En ambos casos, una vez integrado (merge hecho o PR abierto): `gh issue close N -R "$REPO" --reason completed --comment "DoD: DONE. Ver comentario timonel:dod."` y `gh issue edit N -R "$REPO" --remove-label estado:en-progreso`. No publiques release: eso ocurre al cerrar la epica (`git tag vX.Y.Z` + `gh release create`).
+
+Presenta al usuario la tabla del DoD, la decision, la rama `hu/N-slug` (o el link al PR si `integracion: "pr"`) y el link al issue.
 
 ## Manejo de fallos
 

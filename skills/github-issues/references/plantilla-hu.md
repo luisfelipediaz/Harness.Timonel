@@ -80,6 +80,7 @@ Depende de #N
 - [ ] Code review
 - [ ] Retrospectiva
 - [ ] Definition of Done
+- [ ] PR abierto
 ````
 
 ## Reglas
@@ -88,5 +89,6 @@ Depende de #N
 - `Alcance` solo acepta `Backend`, `Frontend`, `Full-stack`. Si la historia es solo modelos compartidos, usar `Full-stack` con nota.
 - El checklist es el mismo para HUs del propio plugin (`mod:plugin`): `Backend` = implementacion, `Frontend`/`Modelos compartidos` quedan SKIPPED.
 - Las tareas que no apliquen al alcance se dejan sin marcar y el DoD las reporta como `SKIPPED` (ej: `Frontend` en una HU `alcance:backend`). No borrar lineas del checklist.
+- `PR abierto` se marca en la Fase 8, **despues** del DoD: el item 8 de `verify-dod` la cuenta siempre como SKIPPED. Con `git.integracion: merge` (default en el plugin) queda sin marcar y `estado_historia` la trata como SKIPPED; con `pr` la marca flechodiezx al abrir el PR.
 - `POR DEFINIR` en cualquier celda impide pasar a `estado:listo`.
 - Calibracion de Story Points: 1 = config/texto/fix puntual; 2 = CRUD simple de una capa; 3 = feature small full-stack; 5 = feature medium con logica y store; 8 = feature compleja multi-capa (workflow + notificaciones); 13 = integracion externa + UI compleja; 21 = dividir.
