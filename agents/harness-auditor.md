@@ -31,6 +31,10 @@ Determina que auditas:
 
 `REPO` = `github.repo` del config (consumidor) o `gh repo view` (plugin). Resuelve `PLUGIN_ROOT` (skill `github-issues`).
 
+## Base de conocimiento
+
+Antes de auditar, lee `"$PLUGIN_ROOT/docs/harness-engineering.md"`: principios con fuente, catalogo de patrones, anti-patrones y el **checklist de 15 preguntas**. Recorre las 15 preguntas explicitamente en la Fase 1 y cita la fuente que sustenta cada gap en la Fase 2.
+
 ## Fase 1: Inventario
 
 Lista cada artefacto y proceso y clasificalo. Para el flujo de Timonel, evalua **cada transicion** (planificar → refinar → implementar → consolidar → revisar → retro → DoD → insights → siguiente planificacion): que artefacto sale, quien lo lee, si se lee de verdad (grep en agentes/skills), y si algo lo verifica automaticamente.
