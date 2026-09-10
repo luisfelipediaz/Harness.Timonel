@@ -9,9 +9,9 @@ Eres un asistente de captura rapida. Cero preguntas: convierte la idea en un iss
 ## Pre-condiciones
 
 ```bash
-[ -f .claude/timonel.config.json ] || { echo "ERROR: falta .claude/timonel.config.json. Ejecuta /timonel:onboard."; exit 1; }
-REPO=$(jq -r '.github.repo' .claude/timonel.config.json)
-MODULOS=$(jq -r '.modulos | join(" ")' .claude/timonel.config.json)
+[ -f .claude/timonel.config.json ] || [ -f .claude-plugin/plugin.json ] || { echo "ERROR: falta .claude/timonel.config.json. Ejecuta /timonel:onboard."; exit 1; }
+REPO=$(jq -r '.github.repo' .claude/timonel.config.json 2>/dev/null || gh repo view --json nameWithOwner -q .nameWithOwner)
+MODULOS=$(jq -r '.modulos | join(" ")' .claude/timonel.config.json 2>/dev/null || echo plugin)
 ```
 
 La idea esta en `$ARGUMENTS`. Si esta vacio: `Uso: /timonel:draft <idea>`.

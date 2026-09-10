@@ -10,9 +10,9 @@ El timonel gobierna el rumbo siguiendo la bitácora. Aquí la bitácora es el ba
 
 ## Qué incluye
 
-- **Comandos** `/timonel:*`: `onboard`, `sdd`, `plan`, `refine`, `draft`, `implement`, `hotfix`, `backlog`, `insights`, `migrate`.
-- **Agentes**: `sdd-planner`, `user-story-planner`, `backlog-refiner`, `story-executor`, `hotfix-executor`.
-- **Skills**: `github-issues` (plantillas + recetas `gh`), `implement-backend-story`, `implement-frontend-story`, `consolidate-story`, `code-review`, `generate-retro`, `verify-dod`, `retro-tools`, `ngrx-signal-store`, `interrogame`.
+- **Comandos** `/timonel:*`: `onboard`, `sdd`, `plan`, `refine`, `draft`, `investigar`, `implement`, `hotfix`, `backlog`, `insights`, `audit`, `migrate`.
+- **Agentes**: `sdd-planner`, `user-story-planner`, `backlog-refiner`, `dora-exploradora` (investiga), `flechodiezx` (ejecuta historias), `flechodiezx-hotfix`, `harness-auditor`.
+- **Skills**: `github-issues` (plantillas + recetas `gh`), `implement-backend-story`, `implement-frontend-story`, `consolidate-story`, `code-review`, `generate-retro`, `verify-dod`, `retro-tools`, `ngrx-signal-store`, `interrogame`, `investigar`.
 - **Scripts** (stdlib + `gh`): labels idempotentes, query/destilado de retros y reviews, migración de backlog markdown.
 - **Heurísticas** de código (`evitar-ifs`, `no-tipos-espejo`, `usar-pipes-existentes`) usadas por el code review.
 - **ADRs** `TIM-ADR-0001..0004` en `docs/adr/`.
@@ -46,7 +46,7 @@ Nx · Angular 20+ (standalone, signals) · NestJS 10+ con Mongoose · NgRx Signa
 /plugin install timonel@luisfelipediaz-harness
 ```
 
-Instala con scope `user` si vas a usar `story-executor` (los worktrees hermanos no cargan plugins de scope `project`).
+Instala con scope `user` si vas a usar `flechodiezx` (los worktrees hermanos no cargan plugins de scope `project`).
 
 ### 3. Configurar el consumidor
 
@@ -76,10 +76,12 @@ Genera `.claude/timonel.config.json` inspeccionando `nx.json`, `tsconfig.base.js
 /timonel:plan #sdd          → épicas (sub-issues) → HUs (sub-issues, DoR)
 /timonel:draft "idea"       → HU borrador rápido
 /timonel:refine #epica      → dividir / repriorizar / deduplicar / completar
-/timonel:implement #hu      → contrato API → backend ∥ frontend (worktrees) → consolidación → review → retro → DoD → close
+/timonel:investigar #hu     → Dora publica hallazgos (archivos de referencia, patrón, riesgos)
+/timonel:implement #hu      → investigación → contrato API → backend ∥ frontend (worktrees) → consolidación → review → retro → DoD → close
 /timonel:hotfix #n | "fix"  → un sub-agente, sin worktree, DoD reducido
 /timonel:backlog            → estado por épica
 /timonel:insights           → issues "Insights destilados" (retros / reviews)
+/timonel:audit              → issue harness-audit (madurez del harness, gaps priorizados)
 /timonel:migrate --apply    → importa docs/user-stories del harness original
 ```
 
@@ -88,11 +90,12 @@ Todo queda en el issue: labels facetados (`tipo:`, `estado:`, `alcance:`, `mosco
 ## Desarrollo del plugin
 
 ```bash
+scripts/install-git-hooks.sh                    # una vez por clon: commit-msg exige #issue
 python3 -m unittest discover -s tests          # parsers, destilado, migración
 scripts/setup-github-labels.sh --repo o/r --dry-run
 ```
 
-El propio repo usa sus labels e issues como backlog (dogfooding).
+**Todo cambio nace en un issue de este repo y el commit lo referencia** (TIM-ADR-0005). El propio repo usa sus labels, épicas por versión e issues como backlog; `/timonel:draft`, `/timonel:plan`, `/timonel:backlog` y `/timonel:audit plugin` funcionan aquí sin `timonel.config.json`.
 
 ## Licencia
 

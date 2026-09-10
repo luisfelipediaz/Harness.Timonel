@@ -39,7 +39,7 @@ Reglas del formato:
 - **Alcance** solo `Backend` | `Frontend` | `Full-stack`. Si `frontends[]` del config tiene mas de una app, la ficha incluye `App destino` con el `project` exacto.
 - **Modulo destino** debe ser uno de `modulos[]` o `NUEVO: nombre` (y entonces avisa que hay que agregarlo al config y correr labels).
 - **Modelos compartidos** sin prefijo `I`, importables desde `modelos.alias`.
-- **Endpoints** con Request/Response/Errores: el story-executor arma el contrato API desde ahi.
+- **Endpoints** con Request/Response/Errores: el flechodiezx arma el contrato API desde ahi.
 - MoSCoW, Story Points y Prioridad **no van en el body**: son labels.
 - Una historia cabe en un sprint (max 2 semanas, ≤13 SP). Si es mas grande, dividela.
 - `POR DEFINIR` en cualquier celda → la historia nace `estado:borrador`.

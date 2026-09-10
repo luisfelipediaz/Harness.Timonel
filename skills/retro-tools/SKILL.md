@@ -41,6 +41,6 @@ Los comentarios con marcador se describen en `PLUGIN_ROOT/skills/github-issues/r
 
 ## Uso recomendado
 
-- `user-story-planner` y `story-executor` consultan `retro_query.py --modulo` antes de estimar o definir el contrato.
+- `user-story-planner` y `flechodiezx` consultan `retro_query.py --modulo` antes de estimar o definir el contrato.
 - `backlog-refiner` consulta `review_query.py --solo-bloqueantes` para repriorizar con evidencia.
 - `/timonel:insights` corre ambos `--publish` y pinnea los issues resultantes.

@@ -47,6 +47,12 @@ modulo: <modulo>
 - ...
 ### Mejoras sugeridas
 - ...
+
+### Harness engineering
+- ¿Surgió un patrón repetitivo? → heurística propuesta o `Ninguno`
+- ¿Un proceso manual se ejecutó 2+ veces? → skill/hook propuesto o `Ninguno`
+- ¿Faltó contexto que ralentizó? → sección de CLAUDE.md / config propuesta o `Ninguno`
+- ¿Un error pudo prevenirse automáticamente? → hook / CI step / test propuesto o `Ninguno`
 ````
 
 4. Publica con `publicar_marcador <issue> retro <archivo>`; label exclusivo `cambiar_label_exclusivo <issue> retro <precision>`; marca `- [x] Retrospectiva` en `## Tareas`.
@@ -56,6 +62,7 @@ modulo: <modulo>
 - Maximo 3-5 bullets por seccion; `- Ninguno` si no aplica.
 - `real_sp` es tu juicio, no una copia del estimado. `precision_estimacion`: `sobreestimado` si real < estimado, `preciso` si igual, `subestimado` si real > estimado.
 - Mejoras sugeridas deben ser accionables: a que skill, heuristica, `CLAUDE.md` o convencion apuntan.
+- La seccion **Harness engineering** responde las 4 preguntas siempre (con `Ninguno` si no aplica): es la que convierte cada historia en una mejora del entorno de la siguiente. Si alguna respuesta apunta al plugin Timonel, sugiere `/timonel:draft` en el repo del plugin.
 
 ## Reporte de salida
 

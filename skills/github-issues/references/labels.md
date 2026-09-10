@@ -6,7 +6,7 @@ Provisionados por `scripts/setup-github-labels.sh` (idempotente). Los ejes `tipo
 | --- | --- | --- |
 | `tipo:sdd` | `5319E7` | Software Design Document; padre de épicas |
 | `tipo:epica` | `3E4B9E` | Épica; padre de historias |
-| `tipo:hu` | `0052CC` | Historia de usuario implementable por story-executor |
+| `tipo:hu` | `0052CC` | Historia de usuario implementable por flechodiezx |
 | `tipo:hotfix` | `1D76DB` | Cambio ≤2 SP sin ceremonia completa |
 | `estado:borrador` | `EDEDED` | Capturado, no cumple DoR |
 | `estado:listo` | `0E8A16` | Cumple DoR; puede implementarse |
@@ -34,5 +34,6 @@ Provisionados por `scripts/setup-github-labels.sh` (idempotente). Los ejes `tipo
 | `duplicada` | `CFD3D7` | Duplicada de otra HU (cerrada not_planned) |
 | `obsoleta` | `CFD3D7` | Reemplazada o ya no aplica (cerrada not_planned) |
 | `insights` | `5319E7` | Issue de insights destilados (retro/review) |
+| `harness-audit` | `0E8A16` | Auditoría de madurez del harness (una por corrida) |
 
 Los 9 labels default de GitHub (`enhancement`, `documentation`, `good first issue`, …) se eliminan en repos nuevos dedicados a backlog; en repos con historia se conservan.

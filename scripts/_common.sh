@@ -35,6 +35,15 @@ load_timonel_config() {
         echo "ERROR: jq no esta instalado. Requerido para leer $config" >&2
         return 1
     fi
+    if [ ! -f "$config" ] && [ -f .claude-plugin/plugin.json ]; then
+        # Dentro del repo del plugin (TIM-ADR-0005): el backlog del plugin vive en su propio repo.
+        export TIMONEL_CONFIG_PATH="(plugin)"
+        export TIMONEL_PROJECT_NAME="timonel"
+        export TIMONEL_REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null)"
+        export TIMONEL_MODULOS="plugin"
+        export TIMONEL_API_PROJECT="" TIMONEL_API_PATH="" TIMONEL_API_MODULE_FILE="" TIMONEL_FRONTEND_PROJECTS="" TIMONEL_MODELOS_ALIAS="" TIMONEL_MODELOS_PATH="" TIMONEL_HEURISTICS_DIR=""
+        [ -n "$TIMONEL_REPO" ] && return 0
+    fi
     if [ ! -f "$config" ]; then
         echo "ERROR: no se encontro $config" >&2
         echo "  Ejecuta /timonel:onboard en la raiz del repo consumidor para generarlo." >&2

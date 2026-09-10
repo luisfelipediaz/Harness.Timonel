@@ -31,8 +31,8 @@ timonel/
 │   ├── sdd-planner.md                  # NUEVO — SDD como issue padre
 │   ├── user-story-planner.md           # épicas + HUs como sub-issues
 │   ├── backlog-refiner.md              # mantiene issues abiertos
-│   ├── story-executor.md               # 7 fases sobre un issue
-│   └── hotfix-executor.md              # ≤2 SP sin worktrees
+│   ├── flechodiezx.md               # 7 fases sobre un issue
+│   └── flechodiezx-hotfix.md              # ≤2 SP sin worktrees
 ├── commands/                           # slash commands /timonel:*
 │   ├── onboard.md   plan.md   sdd.md   refine.md   implement.md
 │   ├── hotfix.md    draft.md  insights.md  backlog.md  migrate.md
@@ -147,7 +147,7 @@ Cada fase publica **un comentario** en la HU con un marcador HTML en la primera 
 
 | Marcador | Quién | Contenido |
 | --- | --- | --- |
-| `<!-- timonel:contrato-api -->` | story-executor F2 | Contrato aprobado por el usuario |
+| `<!-- timonel:contrato-api -->` | flechodiezx F2 | Contrato aprobado por el usuario |
 | `<!-- timonel:consolidacion -->` | consolidate-story | Reporte ARCHIVOS_*, LINT, TESTS |
 | `<!-- timonel:review -->` | code-review | YAML (veredicto, criticos, warnings, bloquea_dod) + tabla de hallazgos |
 | `<!-- timonel:retro -->` | generate-retro | YAML (estimado_sp, real_sp, precision) + 4 secciones |
@@ -174,8 +174,8 @@ Reglas: un marcador por tipo por issue; si se repite la fase, se **edita** el co
 - **Persistencia**: donde escribía archivos ahora publica comentarios/labels/cierres según §6.6.
 - **DoD item 8** pasa de "marcada `[x]` en BACKLOG" a "checklist `## Tareas` completa e issue cerrable".
 - **code-review** referencia heurísticas en `${PLUGIN_ROOT}/heuristics/` (o `heuristicsDir`).
-- **story-executor** ya no lista el BACKLOG para elegir: si no recibe número, muestra `gh issue list --label tipo:hu --label estado:listo`.
-- **hotfix-executor** caso B crea el issue `tipo:hotfix` (raíz) en vez de un archivo.
+- **flechodiezx** ya no lista el BACKLOG para elegir: si no recibe número, muestra `gh issue list --label tipo:hu --label estado:listo`.
+- **flechodiezx-hotfix** caso B crea el issue `tipo:hotfix` (raíz) en vez de un archivo.
 - **user-story-planner** crea épica primero y HUs como sub-issues; valida DoR antes de `estado:listo`.
 - **sdd-planner** (nuevo): entrevista → SDD issue → propone épicas → delega HUs al planner.
 - Skills de implementación reciben del orquestador el body del issue (sin cambios de fondo) y leen `config.frontends[]` para la app destino.

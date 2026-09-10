@@ -54,5 +54,5 @@ Ninguna
 
 ## Reglas
 
-- `Endpoints` y `Modelos compartidos` deben ser `Ninguno`; si no, es una HU y va por `story-executor`.
+- `Endpoints` y `Modelos compartidos` deben ser `Ninguno`; si no, es una HU y va por `flechodiezx`.
 - `sp` ≥ 5 → no es hotfix.

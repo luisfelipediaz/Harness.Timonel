@@ -19,7 +19,13 @@ El YAML es **plano** (clave: valor, sin anidar, sin listas): se parsea con `part
 
 ---
 
-## `timonel:contrato-api` — story-executor, Fase 2
+## `timonel:investigacion` — dora-exploradora, Fase 1.5
+
+Formato completo en `agents/dora-exploradora.md`. YAML: `fecha`, `modulo`, `alcance`, `reutiliza_investigacion_de`. Secciones `### Archivos de referencia`, `### Patrón a replicar`, `### Contrato existente relacionado`, `### Dependencias y puntos de registro`, `### Documentación externa`, `### Riesgos y consideraciones`. Una por issue; se edita si se repite.
+
+---
+
+## `timonel:contrato-api` — flechodiezx, Fase 2
 
 ````markdown
 <!-- timonel:contrato-api -->
@@ -157,7 +163,7 @@ modulo: mis-finanzas
 - ...
 ````
 
-Maximo 3-5 bullets por seccion; `- Ninguno` si no aplica. Los scripts leen las cuatro secciones `### ` por nombre exacto.
+Maximo 3-5 bullets por seccion; `- Ninguno` si no aplica. Los scripts leen las secciones `### ` por nombre exacto. La retro incluye ademas `### Harness engineering` con las 4 preguntas (patron repetitivo, proceso manual 2+, contexto faltante, error prevenible).
 
 ---
 
@@ -192,6 +198,12 @@ Item 11 · veredicto: APROBADO CON OBSERVACIONES
 
 **DONE** — [o lista de fallas criticas / pendientes no bloqueantes]
 ````
+
+---
+
+## `timonel:harness-audit` — harness-auditor (issue propio con label `harness-audit`)
+
+Formato completo en `agents/harness-auditor.md`. YAML: `fecha`, `alcance`, `harness`, `semi`, `adhoc`, `score`, `auditoria_anterior`. Un issue por auditoria (historial), nunca se edita el anterior.
 
 ---
 

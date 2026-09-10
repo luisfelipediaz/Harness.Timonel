@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.3.0 — 2026-09-10
+
+Épica #4. Incorpora lo rescatable del harness de `Cosmos.BuildingBlocks` y formaliza la gobernanza del plugin.
+
+### Añadido
+
+- Agente **`dora-exploradora`** (#7) y skill `investigar`: investigación acotada del código y docs antes del contrato API; publica `<!-- timonel:investigacion -->` y reutiliza investigaciones previas del módulo. Nueva Fase 1.5 en `flechodiezx` (y ligera en `flechodiezx-hotfix`); comando `/timonel:investigar`.
+- Agente **`harness-auditor`** (#8) y comando `/timonel:audit`: clasifica artefactos y transiciones del flujo en HARNESS / SEMI / AD-HOC, persiste issue `harness-audit` y compara con el anterior. Label `harness-audit`.
+- Sección **Harness engineering** obligatoria en la retro (#9): patrón repetitivo, proceso manual 2+, contexto faltante, error prevenible.
+- Regla de alcance en `implement-backend-story` / `implement-frontend-story` (#9): no tocar archivos fuera de la tarea.
+- **Gobernanza** (#5, TIM-ADR-0005): todo cambio del plugin nace en un issue del repo; `.githooks/commit-msg` + `scripts/install-git-hooks.sh` y hook `PreToolUse` bloquean commits sin `#N`. Los comandos funcionan dentro del repo del plugin usando `gh repo view` como repo de issues.
+
+### Cambiado
+
+- Ejecutores renombrados (#6): `story-executor` → **`flechodiezx`**, `hotfix-executor` → **`flechodiezx-hotfix`**.
+
 ## 0.2.0 — 2026-09-10
 
 ### Añadido

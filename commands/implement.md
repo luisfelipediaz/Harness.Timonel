@@ -1,10 +1,10 @@
 ---
-description: "Implementa una historia de usuario (issue tipo:hu) con el orquestador story-executor: contrato API, sub-agentes en worktrees, consolidacion, review, retro y DoD publicados en el issue."
+description: "Implementa una historia de usuario (issue tipo:hu) con el orquestador flechodiezx: contrato API, sub-agentes en worktrees, consolidacion, review, retro y DoD publicados en el issue."
 argument-hint: "<numero-de-issue>"
 model: haiku
 ---
 
-Lanza el agente `story-executor` para el issue indicado. Comunicate en **espanol**.
+Lanza el agente `flechodiezx` para el issue indicado. Comunicate en **espanol**.
 
 ## Entrada
 
@@ -13,8 +13,8 @@ Lanza el agente `story-executor` para el issue indicado. Comunicate en **espanol
 ## Pre-validacion rapida
 
 ```bash
-[ -f .claude/timonel.config.json ] || { echo "ERROR: falta .claude/timonel.config.json. Ejecuta /timonel:onboard."; exit 1; }
-REPO=$(jq -r '.github.repo' .claude/timonel.config.json)
+[ -f .claude/timonel.config.json ] || [ -f .claude-plugin/plugin.json ] || { echo "ERROR: falta .claude/timonel.config.json. Ejecuta /timonel:onboard."; exit 1; }
+REPO=$(jq -r '.github.repo' .claude/timonel.config.json 2>/dev/null || gh repo view --json nameWithOwner -q .nameWithOwner)
 gh issue view "$ARGUMENTS" -R "$REPO" --json number,title,state,labels -q '"#\(.number): \(.title) [\(.state)] :: \([.labels[].name]|join(", "))"'
 ```
 
@@ -24,7 +24,7 @@ gh issue view "$ARGUMENTS" -R "$REPO" --json number,title,state,labels -q '"#\(.
 
 ## Lanzar
 
-Invoca al agente `story-executor` (`subagent_type: "timonel:story-executor"`) con: `Implementa el issue #$ARGUMENTS`.
+Invoca al agente `flechodiezx` (`subagent_type: "timonel:flechodiezx"`) con: `Implementa el issue #$ARGUMENTS`.
 
 ## Reglas
 

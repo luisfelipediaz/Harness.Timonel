@@ -31,6 +31,10 @@ Recibes del orquestador el body del issue, el contrato API a consumir, la lista 
 
 6. **Commit**: `git commit -m "feat(<modulo>): frontend #<issue> — <detalle>"`.
 
+## Regla de alcance
+
+No modifiques archivos fuera de tu tarea: solo los que la historia, el contrato y la investigacion (`timonel:investigacion`) indican. Si necesitas tocar algo mas (un modelo compartido, el modulo raiz, una ruta, una lib ajena), **no lo hagas**: documentalo en el output como pendiente para el orquestador. Si el plan es ambiguo, pregunta antes de asumir.
+
 ## Output (obligatorio)
 
 - Archivos creados/modificados (incluidos `.spec.ts`)

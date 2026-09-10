@@ -9,7 +9,7 @@ Lanza el agente `user-story-planner` para planificar historias del repo consumid
 ## Pre-condiciones
 
 ```bash
-[ -f .claude/timonel.config.json ] || { echo "ERROR: falta .claude/timonel.config.json. Ejecuta /timonel:onboard."; exit 1; }
+[ -f .claude/timonel.config.json ] || [ -f .claude-plugin/plugin.json ] || { echo "ERROR: falta .claude/timonel.config.json. Ejecuta /timonel:onboard."; exit 1; }
 ```
 
 ## Lanzar

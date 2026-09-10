@@ -13,7 +13,7 @@ Plugin de Claude Code (`.claude-plugin/plugin.json`) que empaqueta el harness de
 
 | Carpeta | Contenido |
 | --- | --- |
-| `agents/` | Orquestadores (opus): `sdd-planner`, `user-story-planner`, `backlog-refiner`, `story-executor`, `hotfix-executor` |
+| `agents/` | `sdd-planner`, `user-story-planner`, `backlog-refiner`, `harness-auditor` (opus); `flechodiezx`, `flechodiezx-hotfix` (opus, orquestan); `dora-exploradora` (sonnet, investiga) |
 | `commands/` | Slash commands `/timonel:*` (lanzadores delgados, haiku/sonnet) |
 | `skills/` | Skills de implementación y del ciclo + `github-issues` (plantillas/recetas) + `retro-tools` |
 | `scripts/` | `_common.sh`, `setup-github-labels.sh`, `timonel_gh.py`, `retro_*.py`, `review_*.py`, `migrate_backlog.py` |
@@ -22,6 +22,12 @@ Plugin de Claude Code (`.claude-plugin/plugin.json`) que empaqueta el harness de
 | `docs/adr/` | `TIM-ADR-000N` decisiones del marco |
 | `docs/superpowers/specs/` | Spec de diseño de la extracción |
 | `tests/` | `unittest` stdlib; `python3 -m unittest discover -s tests` |
+
+## Gobernanza (TIM-ADR-0005)
+
+- **Todo cambio nace en un issue de este repo** (`tipo:hu|hotfix`, `mod:plugin`, agrupado en la épica de la versión). Capturalo con `/timonel:draft` o `gh issue create -R luisfelipediaz/Harness.Timonel`.
+- **Todo commit referencia el issue** (`#N`). Lo exige `.githooks/commit-msg` (activar con `scripts/install-git-hooks.sh`) y el hook `PreToolUse` del plugin cuando corre en este repo.
+- Al publicar una versión: CHANGELOG cita los `#N`, se cierran los issues con el comentario de DoD y se etiqueta `vX.Y.Z`.
 
 ## Convenciones al editar el plugin
 

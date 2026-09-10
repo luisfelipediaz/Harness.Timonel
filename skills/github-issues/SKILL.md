@@ -12,7 +12,9 @@ Todo el estado de planificacion y del ciclo de una historia vive en GitHub (TIM-
 Siempre lee el repo desde el config del consumidor y pasalo explicito a `gh`:
 
 ```bash
-REPO=$(jq -r '.github.repo' .claude/timonel.config.json)
+REPO=$(jq -r '.github.repo' .claude/timonel.config.json 2>/dev/null)
+# Dentro del repo del plugin Timonel (TIM-ADR-0005) el backlog es el propio repo:
+[ -n "$REPO" ] && [ "$REPO" != "null" ] || { [ -f .claude-plugin/plugin.json ] && REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner); }
 [ -n "$REPO" ] && [ "$REPO" != "null" ] || { echo "ERROR: falta github.repo en .claude/timonel.config.json — ejecuta /timonel:onboard"; exit 1; }
 ```
 

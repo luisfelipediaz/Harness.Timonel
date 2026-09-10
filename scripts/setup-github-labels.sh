@@ -39,7 +39,7 @@ labels_base() {
 cat <<'EOF'
 tipo:sdd|5319E7|Software Design Document; padre de epicas
 tipo:epica|3E4B9E|Epica; padre de historias
-tipo:hu|0052CC|Historia de usuario implementable por story-executor
+tipo:hu|0052CC|Historia de usuario implementable por flechodiezx
 tipo:hotfix|1D76DB|Cambio <=2 SP sin ceremonia completa
 estado:borrador|EDEDED|Capturado, no cumple DoR
 estado:listo|0E8A16|Cumple DoR; puede implementarse
@@ -72,6 +72,7 @@ bug|D73A4A|Corrige un defecto (ortogonal a tipo:)
 duplicada|CFD3D7|Duplicada de otra HU
 obsoleta|CFD3D7|Reemplazada o ya no aplica
 insights|5319E7|Insights destilados (retro/review)
+harness-audit|0E8A16|Auditoria de madurez del harness
 EOF
 }
 LABELS="$(labels_base)"

@@ -25,6 +25,10 @@ Recibes del orquestador el body del issue (historia + ficha tecnica), el contrat
 
 7. **Commit**: `git add` de tus archivos y `git commit -m "feat(<modulo>): backend #<issue> — <detalle>"`.
 
+## Regla de alcance
+
+No modifiques archivos fuera de tu tarea: solo los que la historia, el contrato y la investigacion (`timonel:investigacion`) indican. Si necesitas tocar algo mas (un modelo compartido, el modulo raiz, una ruta, una lib ajena), **no lo hagas**: documentalo en el output como pendiente para el orquestador. Si el plan es ambiguo, pregunta antes de asumir.
+
 ## Output (obligatorio)
 
 - Issue implementado (`#N titulo`)

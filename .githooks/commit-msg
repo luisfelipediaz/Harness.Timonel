@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# commit-msg --- Todo cambio en Timonel se documenta en un issue del repo (issue #5).
+# Rechaza commits cuyo mensaje no referencia un issue (#N) salvo merges, reverts y fixups.
+msg_file="$1"
+first_line=$(head -n1 "$msg_file")
+case "$first_line" in
+  Merge*|Revert*|fixup!*|squash!*) exit 0 ;;
+esac
+if ! grep -qE '(^|[^A-Za-z0-9])#[0-9]+' "$msg_file"; then
+  cat >&2 <<'EOF'
+ERROR: el commit no referencia ningun issue de Harness.Timonel (#N).
+
+Todo cambio del plugin se documenta primero en un issue del repo:
+  gh issue create -R luisfelipediaz/Harness.Timonel --title "..." --label tipo:hu --label mod:plugin ...
+  (o /timonel:draft "<idea>" desde el repo del plugin)
+
+Luego referencia el numero en el mensaje, p. ej.:
+  feat: agregar agente dora-exploradora (#7)
+EOF
+  exit 1
+fi

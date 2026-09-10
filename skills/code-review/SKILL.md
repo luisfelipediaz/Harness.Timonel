@@ -1,6 +1,6 @@
 ---
 name: code-review
-description: Revisa el codigo implementado contra los criterios de aceptacion del issue de GitHub, clasifica hallazgos por severidad (CRITICO | WARNING) y publica el review como comentario timonel:review en el issue con su label review:*. Usa como Fase 5.5 del story-executor (y Fase 3 del hotfix-executor), tras consolidate-story y antes de generate-retro. El veredicto bloquea el DoD cuando hay hallazgos criticos.
+description: Revisa el codigo implementado contra los criterios de aceptacion del issue de GitHub, clasifica hallazgos por severidad (CRITICO | WARNING) y publica el review como comentario timonel:review en el issue con su label review:*. Usa como Fase 5.5 del flechodiezx (y Fase 3 del flechodiezx-hotfix), tras consolidate-story y antes de generate-retro. El veredicto bloquea el DoD cuando hay hallazgos criticos.
 ---
 
 Revisa la implementacion de una historia contra su issue y las convenciones del proyecto, clasifica cada hallazgo por severidad y publica el review en el issue. Siempre en espanol.

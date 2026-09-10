@@ -5,7 +5,7 @@
 
 ## Contexto
 
-`story-executor` consume el body del issue como única especificación. Si llega sin Ficha Técnica o sin Gherkin, los sub-agentes inventan endpoints y el code review no puede evaluar criterios. El harness original ya exigía la ficha "obligatoria", pero nadie la validaba antes de implementar.
+`flechodiezx` consume el body del issue como única especificación. Si llega sin Ficha Técnica o sin Gherkin, los sub-agentes inventan endpoints y el code review no puede evaluar criterios. El harness original ya exigía la ficha "obligatoria", pero nadie la validaba antes de implementar.
 
 ## Decisión
 

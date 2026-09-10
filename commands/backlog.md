@@ -7,8 +7,8 @@ model: haiku
 Muestra el backlog del repo consumidor. Comunicate en **espanol**. Solo lectura.
 
 ```bash
-[ -f .claude/timonel.config.json ] || { echo "ERROR: falta .claude/timonel.config.json. Ejecuta /timonel:onboard."; exit 1; }
-REPO=$(jq -r '.github.repo' .claude/timonel.config.json)
+[ -f .claude/timonel.config.json ] || [ -f .claude-plugin/plugin.json ] || { echo "ERROR: falta .claude/timonel.config.json. Ejecuta /timonel:onboard."; exit 1; }
+REPO=$(jq -r '.github.repo' .claude/timonel.config.json 2>/dev/null || gh repo view --json nameWithOwner -q .nameWithOwner)
 ```
 
 ## Sin argumentos

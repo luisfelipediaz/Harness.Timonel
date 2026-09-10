@@ -18,6 +18,8 @@ CONFIG_PATH = Path(".claude/timonel.config.json")
 MARCADOR_RETRO = "retro"
 MARCADOR_REVIEW = "review"
 MARCADOR_DOD = "dod"
+MARCADOR_INVESTIGACION = "investigacion"
+MARCADOR_HARNESS_AUDIT = "harness-audit"
 
 VEREDICTOS_VALIDOS = {"APROBADO", "APROBADO CON OBSERVACIONES", "REQUIERE CAMBIOS"}
 SEVERIDADES_VALIDAS = {"CRITICO", "WARNING"}
@@ -29,12 +31,20 @@ TIPOS_NORMALIZADOS = {"Convención": "Convencion", "Heurística": "Heuristica"}
 # ---------------------------------------------------------------------------
 
 
+PLUGIN_MANIFEST = Path(".claude-plugin/plugin.json")
+
+
 def load_config(path: Path = CONFIG_PATH) -> dict:
-    if not path.exists():
-        raise SystemExit(
-            f"ERROR: no se encontro {path}. Ejecuta /timonel:onboard en la raiz del consumidor."
-        )
-    return json.loads(path.read_text(encoding="utf-8"))
+    """Config del consumidor. Dentro del repo del plugin (TIM-ADR-0005) devuelve un
+    config minimo con github.repo = repo actual, para que los comandos funcionen ahi."""
+    if path.exists():
+        return json.loads(path.read_text(encoding="utf-8"))
+    if PLUGIN_MANIFEST.exists():
+        repo = gh("repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner").strip()
+        return {"projectName": "timonel", "github": {"repo": repo}, "modulos": ["plugin"]}
+    raise SystemExit(
+        f"ERROR: no se encontro {path}. Ejecuta /timonel:onboard en la raiz del consumidor."
+    )
 
 
 def repo_from_config(config: dict | None = None) -> str:
