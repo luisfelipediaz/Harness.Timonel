@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.4.0 — 2026-09-10
+
+Épica #12: cierra los gaps 1–9, 13, 14 y 15 de la auditoría #11 (score 4/10). El loop se cierra: cada fase produce un artefacto que la siguiente lee y verifica.
+
+### Añadido
+
+- **Ratchet** (#13): `scripts/cosechar_retro.py` convierte "Mejoras sugeridas" y "Harness engineering" de cada retro en issues `estado:borrador` (en el consumidor o en `timonel.repo`), idempotente, y anota "Issues derivados" en la retro. `generate-retro` lo ejecuta siempre.
+- **CI** (#14): `.github/workflows/ci.yml` corre unittest, `bash -n`, `jq`, labels dry-run y, en PRs, exige `#issue` en cada commit. `tests/test_consistencia.py` detecta drift: agentes referenciados inexistentes, skills declarados inexistentes, marcadores sin documentar o sin contrato en el validador, versión ≠ CHANGELOG, labels documentados sin script.
+- **Guardrails en hooks** (#15): en consumidores, `PreToolUse` bloquea `git commit` en ramas base (`git.baseBranches`, `git.protectBase`), bloquea `git push --force`, y en ramas `hu/N-*` exige `#N` en el mensaje; `PostToolUse` avisa y loguea cuando se edita `modelos.path`, `api.moduleFile` o un `routesFile`.
+- **Reanudación** (#16): `scripts/estado_historia.py N` deduce la fase pendiente desde `## Tareas`, marcadores y rama local; `flechodiezx` y `flechodiezx-hotfix` arrancan con ella (Fase 0.5).
+- **Validador de marcadores** (#17): `scripts/validar_marcador.py` con contrato por tipo (claves YAML, valores, secciones, tabla de hallazgos, coherencia criticos/warnings/bloquea_dod y estimado/real/precisión). Lo corren `code-review`, `generate-retro`, `verify-dod`, `consolidate-story` antes de publicar.
+- **DoR único** (#18): `scripts/dor_check.py N [--para implementar]` implementa TIM-ADR-0003; lo usan `user-story-planner` (antes de `estado:listo`), `backlog-refiner`, `/timonel:implement`, `flechodiezx` y `flechodiezx-hotfix`.
+- **Insights con lector** (#19): planner, refiner y Dora leen "Errores recurrentes" / "Calibración" de los issues `insights` al arrancar.
+- **Contrato vs código** (#20): `scripts/contrato_check.py N` contrasta `timonel:contrato-api` con los `@Controller/@Get…` del consumidor; `code-review` pega la tabla en Ficha.
+- **Aviso de versión** (#22): `SessionStart` compara la versión instalada con el último release (cache 1 día).
+- **Métricas de flujo** (#23): `scripts/metricas_flujo.py [--publish]` (cobertura de artefactos, review a la primera, precisión, lead time, backlog por estado); `/timonel:insights` lo publica.
+
+### Cambiado
+
+- `code-review` (#21): las convenciones se leen del `CLAUDE.md` / `.claude/rules/` del consumidor; las de Bitákora pasan a `heuristics/angular/convenciones-bitakora.md`.
+- Config del consumidor: `git.baseBranches`, `git.protectBase`, `timonel.repo` (TIM-ADR-0002).
+- `generate-retro` y `code-review` reportan `RETRO_VALIDA` / `REVIEW_VALIDO`, `ISSUES_DERIVADOS`, `CONTRATO_CHECK`.
+
 ## 0.3.0 — 2026-09-10
 
 Épica #4. Incorpora lo rescatable del harness de `Cosmos.BuildingBlocks` y formaliza la gobernanza del plugin.

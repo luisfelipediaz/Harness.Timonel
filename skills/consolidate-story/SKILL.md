@@ -51,7 +51,7 @@ Ante fallos: corrige directo (prettier → `npm run prettier`), maximo **2 inten
 Sigue el skill `github-issues` (`PLUGIN_ROOT/skills/github-issues/SKILL.md`):
 
 1. Marca en `## Tareas`: `- [x] Consolidación (lint + tests)` solo si lint y tests son `PASSED` o `NO_SPECS`.
-2. Publica `<!-- timonel:consolidacion -->` con el formato de `references/marcadores.md` (YAML: fecha, lint, tests, providers_registrados, rutas_registradas; secciones Archivos, Correcciones aplicadas, Pendientes y notas de migracion). Usa `publicar_marcador` (edita si ya existe).
+2. Publica `<!-- timonel:consolidacion -->` con el formato de `references/marcadores.md` (YAML: fecha, lint, tests, providers_registrados, rutas_registradas; secciones Archivos, Correcciones aplicadas, Pendientes y notas de migracion). Valida con `python3 PLUGIN_ROOT/scripts/validar_marcador.py <archivo> --tipo consolidacion` y luego `publicar_marcador` (edita si ya existe).
 
 ## Reporte de salida (obligatorio)
 

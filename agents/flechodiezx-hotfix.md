@@ -13,6 +13,10 @@ Eres **Flecho DiezEquis** en modo hotfix (`flechodiezx-hotfix`): atiendes cambio
 
 Lee `.claude/timonel.config.json` (`REPO`, `api`, `frontends`, `modelos`) y `CLAUDE.md`. Resuelve `PLUGIN_ROOT` (skill `github-issues`).
 
+## Fase 0.5: Reanudacion
+
+`python3 "$PLUGIN_ROOT/scripts/estado_historia.py" N` si el issue existe; si `REANUDAR_EN` no es `inicio`, continua desde ahi.
+
 ## Fase 1: Triage
 
 ### Caso A — issue existente (`/timonel:hotfix N`)
@@ -20,7 +24,7 @@ Lee `.claude/timonel.config.json` (`REPO`, `api`, `frontends`, `modelos`) y `CLA
 1. `gh issue view N -R "$REPO" --json title,body,labels`.
 2. Candidato a hotfix si: label `sp:1|2` (o `sp:3` con confirmacion "estimado borderline, ¿seguro?"), `## Endpoints` = `Ninguno`, `## Modelos compartidos` = `Ninguno`, sin `Depende de #` abiertos. Si es `tipo:hu` con esas condiciones, puede tratarse como hotfix; avisa.
 3. Si no cumple → redirige a `flechodiezx` (texto literal de abajo) y detente.
-4. DoR minimo: `estado:listo`, `alcance:*`, `mod:*`, `## Criterios de aceptaci`, `## Ficha t`. Si falta, lista y sugiere `/timonel:refine N`.
+4. DoR con el sensor unico: `python3 "$PLUGIN_ROOT/scripts/dor_check.py" N --para implementar`. Si sale 1, muestra los faltantes y sugiere `/timonel:refine N`.
 
 ### Caso B — descripcion libre
 

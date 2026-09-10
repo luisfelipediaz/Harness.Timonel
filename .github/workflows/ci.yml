@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verificar:
+    name: Tests, sintaxis y consistencia del plugin
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Sintaxis bash y JSON
+        run: |
+          bash -n scripts/*.sh .githooks/*
+          jq . .claude-plugin/plugin.json .claude-plugin/marketplace.json hooks/hooks.json > /dev/null
+      - name: Tests (parsers, sensores, consistencia entre artefactos)
+        run: python3 -m unittest discover -s tests -v
+      - name: Labels (dry-run)
+        run: scripts/setup-github-labels.sh --repo o/r --modulos "plugin" --dry-run | grep -q '^tipo:hu'
+      - name: Commits referencian issue (TIM-ADR-0005)
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch origin "${{ github.base_ref }}" --depth=200
+          bad=$(git log --format='%h %s' "origin/${{ github.base_ref }}..HEAD" | grep -vE '(^|[^A-Za-z0-9])#[0-9]+' | grep -vE ' (Merge|Revert|fixup!|squash!)' || true)
+          if [ -n "$bad" ]; then echo "Commits sin #issue:"; echo "$bad"; exit 1; fi

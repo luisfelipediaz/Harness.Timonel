@@ -17,11 +17,21 @@ El orquestador **no escribe codigo de negocio**: crea modelos compartidos (Fase 
 2. Resuelve `PLUGIN_ROOT` (skill `github-issues`). Los skills viven en `"$PLUGIN_ROOT/skills/<nombre>/SKILL.md"`; pasa esa ruta absoluta a los sub-agentes.
 3. Registra la frontera git: rama actual, `git status --porcelain`. No cambies de rama ni hagas stash sobre trabajo del usuario.
 
+## Fase 0.5: Reanudacion (memoria en el issue)
+
+Antes de analizar, lee el estado real de la historia con el sensor, no de memoria:
+
+```bash
+python3 "$PLUGIN_ROOT/scripts/estado_historia.py" N
+```
+
+Si `REANUDAR_EN` no es `inicio`, anuncia "Reanudo #N desde la fase X" y **salta** las fases hechas: no vuelvas a pedir el contrato si existe `timonel:contrato-api`, no relances sub-agentes cuyas tareas estan marcadas, reutiliza la rama `hu/N-*` existente. Si la rama existe pero la tarea Backend/Frontend no esta marcada, revisa `git log` de la rama antes de relanzar.
+
 ## Fase 1: Analisis del issue
 
 1. Si no recibiste numero: `gh issue list -R "$REPO" --label tipo:hu --label estado:listo --state open --json number,title,labels` y pide elegir uno. No leas otros issues.
 2. `gh issue view N -R "$REPO" --json number,title,body,labels,comments`. Extrae Historia, Gherkin, Ficha tecnica (Alcance, App destino, Entidad, Operacion, Permiso, Modulo), Endpoints, Modelos compartidos, Notas tecnicas, Dependencias, Tareas.
-3. **DoR** (TIM-ADR-0003): `estado:listo`, `tipo:hu`, `alcance:*`, `sp:*`, `mod:*`, secciones `## Criterios de aceptaci`, `## Ficha t`, `## Tareas`. Si falla algo, lista todo lo que falta, sugiere `/timonel:refine N` y detente.
+3. **DoR** (TIM-ADR-0003) con el sensor unico: `python3 "$PLUGIN_ROOT/scripts/dor_check.py" N --para implementar`. Si sale 1, muestra los faltantes tal cual, sugiere `/timonel:refine N` y detente.
 4. **Bloqueo**: si tiene `bloqueado`, evalua `Depende de #N` (receta del skill). Si alguna esta `OPEN`, muestra cuales y detente. Si todas cerraron, quita el label y sigue.
 5. Alcance → sub-agentes: `Backend` solo backend; `Frontend` solo frontend; `Full-stack` ambos. App destino: si `frontends[]` tiene una sola, es esa; si hay varias y la ficha no dice, pregunta.
 6. Retros previas: `python3 "$PLUGIN_ROOT/scripts/retro_query.py" --modulo <mod>` → usa errores conocidos y patrones para el contrato y los prompts.
@@ -105,7 +115,7 @@ Sub-agente `model: "sonnet"`, sin worktree, skill `code-review`. Parametros: `is
 
 ## Fase 6: Retrospectiva (no bloqueante)
 
-Sub-agente `model: "opus"`, sin worktree, skill `generate-retro`. Parametros: `issue`, `repo`, `archivos_modificados`, `resultado_verificacion`, `estimado_sp` (label `sp:`), `modulo`, `alcance`, `veredicto_review`. Publica `<!-- timonel:retro -->` y label `retro:*`. Si falla, `retro_generada: no` y sigue.
+Sub-agente `model: "opus"`, sin worktree, skill `generate-retro`. Parametros: `issue`, `repo`, `archivos_modificados`, `resultado_verificacion`, `estimado_sp` (label `sp:`), `modulo`, `alcance`, `veredicto_review`. Publica `<!-- timonel:retro -->` (validado con `validar_marcador.py`) y label `retro:*`, y **cosecha** las mejoras en issues (`cosechar_retro.py --apply`, ratchet). Si falla, `retro_generada: no` y sigue. Muestra al usuario los issues derivados.
 
 ## Fase 7: Definition of Done
 

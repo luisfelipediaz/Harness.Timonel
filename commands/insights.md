@@ -16,7 +16,8 @@ Segun `$ARGUMENTS`:
 
 - Sin `--solo-review`: `python3 "$S/retro_distill.py" --publish` (sin `--publish` si viene `--no-publicar`).
 - Sin `--solo-retro`: `python3 "$S/review_distill.py" --publish` (idem).
+- Siempre: `python3 "$S/metricas_flujo.py" --publish` (issue "Métricas de flujo": cobertura de artefactos, review a la primera, precision, lead time, backlog por estado).
 
 Si publico, pinnea los issues (`gh issue pin N -R "$REPO"`; ignora el error si ya estan pinneados o si hay mas de 3 pins).
 
-Reporta los `#N` actualizados y las 3 lineas mas relevantes de cada reporte (errores recurrentes con mas ocurrencias, tendencia de estimacion, archivo mas problematico).
+Reporta los `#N` actualizados y las 3 lineas mas relevantes de cada reporte (errores recurrentes con mas ocurrencias, tendencia de estimacion, archivo mas problematico, % de HUs cerradas sin retro/review).

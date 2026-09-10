@@ -20,7 +20,12 @@ gh issue view "$ARGUMENTS" -R "$REPO" --json number,title,state,labels -q '"#\(.
 
 - Si no existe o esta `CLOSED`, informa y detente.
 - Si no tiene `tipo:hu`: si tiene `tipo:hotfix`, sugiere `/timonel:hotfix N`; si es `tipo:epica`/`tipo:sdd`, explica que no se implementan directamente.
-- Si no tiene `estado:listo`, muestra los labels y sugiere `/timonel:refine N` (el agente valida el DoR completo igual).
+- DoR con el sensor unico:
+  ```bash
+  PLUGIN_ROOT=$(cat .timonel/.plugin-root 2>/dev/null); [ -z "$PLUGIN_ROOT" ] && PLUGIN_ROOT=$(ls -d "$HOME"/.claude/plugins/cache/*/timonel/*/ 2>/dev/null | sort -V | tail -1); PLUGIN_ROOT="${PLUGIN_ROOT%/}"
+  python3 "$PLUGIN_ROOT/scripts/dor_check.py" "$ARGUMENTS" --para implementar
+  ```
+  Si sale 1, muestra los faltantes tal cual y sugiere `/timonel:refine N`; no lances el agente.
 
 ## Lanzar
 

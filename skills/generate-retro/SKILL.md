@@ -55,7 +55,14 @@ modulo: <modulo>
 - ¿Un error pudo prevenirse automáticamente? → hook / CI step / test propuesto o `Ninguno`
 ````
 
-4. Publica con `publicar_marcador <issue> retro <archivo>`; label exclusivo `cambiar_label_exclusivo <issue> retro <precision>`; marca `- [x] Retrospectiva` en `## Tareas`.
+4. **Valida antes de publicar**: `python3 "$PLUGIN_ROOT/scripts/validar_marcador.py" <archivo> --tipo retro`. Si sale 1, corrige el archivo (claves, secciones, coherencia estimado/real/precision) y vuelve a validar; nunca publiques un comentario invalido.
+5. Publica con `publicar_marcador <issue> retro <archivo>`; label exclusivo `cambiar_label_exclusivo <issue> retro <precision>`; marca `- [x] Retrospectiva` en `## Tareas`.
+6. **Ratchet** (gap 1 de la auditoria #11): convierte las mejoras en issues.
+   ```bash
+   python3 "$PLUGIN_ROOT/scripts/cosechar_retro.py" <issue>            # plan
+   python3 "$PLUGIN_ROOT/scripts/cosechar_retro.py" <issue> --apply    # crea issues estado:borrador y anota "Issues derivados" en la retro
+   ```
+   Las mejoras que apuntan al plugin (skills, agentes, plantillas) van a `timonel.repo` del config (default `luisfelipediaz/Harness.Timonel`); las demas al repo del consumidor. Reporta los numeros creados.
 
 ## Reglas de contenido
 
@@ -69,7 +76,9 @@ modulo: <modulo>
 ```
 RETRO_GENERADA: si | no
 RETRO_PUBLICADA: si | no
+RETRO_VALIDA: si | no
 REAL_SP: <n>
 PRECISION: <valor>
+ISSUES_DERIVADOS: [lista owner/repo#N, o "Ninguno"]
 MOTIVO: <solo si no>
 ```

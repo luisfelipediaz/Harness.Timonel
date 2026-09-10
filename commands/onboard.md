@@ -28,6 +28,8 @@ Si ya existe `.claude/timonel.config.json`, muestralo y pregunta si regenerar o 
 - `stack`: versiones de `@angular/core` y `@nestjs/core` en `package.json`; `estado` = `NgRx Signal Store` si depende de `@ngrx/signals`, `NgRx Store` si `@ngrx/store`, si no `sin store`.
 - `modulos[]`: carpetas de primer nivel en `<api.path>/src/app/` que tengan `controllers/` o `*.module.ts` (kebab-case). Muestra la lista y deja que el usuario quite/agregue.
 - `heuristicsDir`: `null`.
+- `git`: `{ "baseBranches": [<rama por defecto de `gh repo view` o `main`, mas `develop` si existe>], "protectBase": true }`. Pregunta si el equipo commitea directo a la rama base; si sí, `protectBase: false`.
+- `timonel`: `{ "repo": "luisfelipediaz/Harness.Timonel" }`.
 
 ## 2. Confirmar y escribir
 

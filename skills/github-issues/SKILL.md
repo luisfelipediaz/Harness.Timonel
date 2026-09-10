@@ -161,6 +161,6 @@ Si alguna dependencia esta `OPEN`, el issue lleva label `bloqueado`; cuando toda
 1. Siempre `-R "$REPO"`. Nunca asumas el repo del `cwd`.
 2. Body por `--body-file`; nunca inline con comillas.
 3. No dupliques informacion de labels en el body (MoSCoW, SP, prioridad solo en labels).
-4. Un comentario por marcador; edita en vez de repetir.
+4. Un comentario por marcador; edita en vez de repetir. **Valida siempre antes de publicar**: `python3 "$PLUGIN_ROOT/scripts/validar_marcador.py" <archivo>` (sensor de formato; sale 1 con la lista de problemas).
 5. Antes de crear un label que falte, corre `scripts/setup-github-labels.sh` del plugin (idempotente) en vez de `gh label create` ad hoc.
 6. Titulos en infinitivo, sin prefijos ni numeros.

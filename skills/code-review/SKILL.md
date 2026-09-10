@@ -24,8 +24,9 @@ En paralelo:
 
 - **Issue**: `gh issue view <issue> -R <repo> --json title,body,labels,comments`. Extrae Gherkin, Ficha tecnica, Tipo de operacion.
 - **Retro previa** del modulo: `python3 <plugin_root>/scripts/retro_query.py --modulo <modulo> --seccion "Errores recurrentes"`.
-- **CLAUDE.md** del consumidor.
-- **Heuristicas**: `HEUR=$(jq -r '.heuristicsDir // empty' .claude/timonel.config.json); HEUR="${HEUR:-<plugin_root>/heuristics}"` → lee `general/evitar-ifs.md`, `general/no-tipos-espejo.md`, `angular/usar-pipes-existentes.md` (las que existan).
+- **Convenciones del consumidor (mandan)**: `CLAUDE.md` y todo `.claude/rules/*.md` si existe. Extrae de ahi la lista de reglas verificables; solo lo que no este cubierto se toma de `heuristics/angular/convenciones-bitakora.md`.
+- **Heuristicas**: `HEUR=$(jq -r '.heuristicsDir // empty' .claude/timonel.config.json); HEUR="${HEUR:-<plugin_root>/heuristics}"` → lee `general/evitar-ifs.md`, `general/no-tipos-espejo.md`, `angular/usar-pipes-existentes.md`, `angular/convenciones-bitakora.md` (las que existan).
+- **Contrato vs codigo (sensor)**: `python3 <plugin_root>/scripts/contrato_check.py <issue>` → tabla PASSED/FAILED por endpoint declarado en `timonel:contrato-api`.
 - **Formato**: `<plugin_root>/skills/github-issues/references/marcadores.md`, seccion `timonel:review`.
 
 Si el issue no declara Gherkin verificable, registra WARNING tipo `Gherkin` "issue no declara criterios Gherkin verificables" y continua.
@@ -43,10 +44,10 @@ Si el issue no declara Gherkin verificable, registra WARNING tipo `Gherkin` "iss
 Por cada escenario, busca la logica concreta que lo implementa. No cumplido → CRITICO.
 
 ### 3.2 Ficha tecnica (`Ficha`)
-Endpoints (rutas/metodos coinciden; controllers con decoradores), Permisos (`AuthorizationGuard<TiposDePermisos>` correcto), Auditoria (`@AuditoriaApi`), Modelos (compartidos desde `modelos.alias`, no redeclarados), Sesion propagada controller → aplicacion → servicio. WARNING salvo que rompa un Gherkin.
+Endpoints: pega la tabla de `contrato_check.py`; cada `FAILED` es un hallazgo `Ficha` (CRITICO si el endpoint sostiene un Gherkin). Permisos (`AuthorizationGuard<TiposDePermisos>` correcto), Auditoria (`@AuditoriaApi`), Modelos (compartidos desde `modelos.alias`, no redeclarados), Sesion propagada controller → aplicacion → servicio. WARNING salvo que rompa un Gherkin.
 
 ### 3.3 Convenciones (`Convención`)
-No `any`; no `!` postfix; kebab-case; control flow nuevo (`@if/@for/@switch`); no negar async pipes; standalone; controllers solo delegan; imports limpios; printWidth 80; sin prefijo `I`. Todo WARNING. Agrega las reglas propias del `CLAUDE.md` del consumidor.
+Las reglas salen del `CLAUDE.md` / `.claude/rules/` del consumidor y, en lo no cubierto, de `heuristics/angular/convenciones-bitakora.md`. No mantengas listas de reglas en este skill. Todo WARNING.
 
 ### 3.4 Heuristicas (`Heurística`)
 `evitar-ifs`, `no-tipos-espejo`, `usar-pipes-existentes`. Omite las que no esten en disco. WARNING.
@@ -64,10 +65,11 @@ Si un error recurrente documentado se repite, registralo (WARNING salvo que viol
 ## Paso 5: Publicar en el issue
 
 1. Escribe el comentario con el formato exacto `timonel:review` de `marcadores.md` (YAML plano + Resumen + tabla Hallazgos + Veredicto + Pasos sugeridos si aplica) en un archivo temporal.
-2. `publicar_marcador <issue> review <archivo>` (receta del skill `github-issues`: edita si ya existe).
-3. Label exclusivo: `cambiar_label_exclusivo <issue> review <aprobado|observaciones|requiere-cambios>`.
-4. Marca `- [x] Code review` en `## Tareas`.
-5. **No hagas commit** de nada.
+2. **Valida**: `python3 <plugin_root>/scripts/validar_marcador.py <archivo> --tipo review`. Corrige hasta que salga 0 (conteos vs tabla, `bloquea_dod` coherente con el veredicto).
+3. `publicar_marcador <issue> review <archivo>` (receta del skill `github-issues`: edita si ya existe).
+4. Label exclusivo: `cambiar_label_exclusivo <issue> review <aprobado|observaciones|requiere-cambios>`.
+5. Marca `- [x] Code review` en `## Tareas`.
+6. **No hagas commit** de nada.
 
 ## Reporte de salida (obligatorio)
 
@@ -76,6 +78,8 @@ VEREDICTO: APROBADO | APROBADO CON OBSERVACIONES | REQUIERE CAMBIOS
 HALLAZGOS_CRITICOS: <n>
 HALLAZGOS_WARNING: <n>
 REVIEW_PUBLICADO: si | no
+REVIEW_VALIDO: si | no
+CONTRATO_CHECK: PASSED | FAILED | N/A
 BLOQUEA_DOD: si | no
 RESUMEN: <1-2 lineas>
 ```

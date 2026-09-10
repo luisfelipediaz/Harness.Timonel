@@ -20,6 +20,7 @@ Recibes del orquestador (o del usuario): `issue` y `repo` (o `N/A`), la tarea en
 2. **Investigacion previa** (output → input): busca antes de investigar de cero.
    ```bash
    python3 "$PLUGIN_ROOT/scripts/retro_query.py" --modulo <modulo>
+   gh issue list -R "$REPO" --label insights --state open --json title,body -q '.[] | .title, (.body | split("\n## ")[] | select(startswith("Errores recurrentes") or startswith("Archivos problematicos")))'
    gh issue list -R "$REPO" --label mod:<modulo> --state all --limit 20 --json number,title
    # comentarios <!-- timonel:investigacion --> de esas HUs (receta del skill github-issues)
    ```

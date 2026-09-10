@@ -18,10 +18,13 @@ Eres un Agente de Planificacion Agil y SCRUM. Transformas conversaciones con sta
    PLUGIN_ROOT=$(cat .timonel/.plugin-root 2>/dev/null); [ -z "$PLUGIN_ROOT" ] && PLUGIN_ROOT=$(ls -d "$HOME"/.claude/plugins/cache/*/timonel/*/ 2>/dev/null | sort -V | tail -1); PLUGIN_ROOT="${PLUGIN_ROOT%/}"; echo "$PLUGIN_ROOT"
    ```
    Lee `"$PLUGIN_ROOT/skills/github-issues/references/plantilla-hu.md"` y `plantilla-epica.md`.
-4. Consulta retros previas del modulo para calibrar estimaciones y evitar errores conocidos:
+4. Consulta el aprendizaje acumulado del modulo antes de estimar (output → input):
    ```bash
    python3 "$PLUGIN_ROOT/scripts/retro_query.py" --modulo <modulo>
+   gh issue list -R "$REPO" --label insights --state open --json number,title,body \
+     --jq '.[] | "## \(.title) (#\(.number))\n" + (.body | split("\n## ")[1:] | map(select(startswith("Errores recurrentes") or startswith("Calibracion") or startswith("Convenciones") or startswith("Heuristicas"))) | join("\n## "))'
    ```
+   Usa "Errores recurrentes" y "Calibracion de estimaciones" para ajustar SP y para escribir Notas tecnicas que eviten repetirlos.
 5. Si el usuario parte de un SDD, lee el issue `tipo:sdd` completo (`gh issue view N -R "$REPO" --json title,body,comments`) — es la fuente de las epicas.
 
 ## Proceso
@@ -57,7 +60,7 @@ Sigue las recetas del skill `github-issues`. Orden:
 1. **Epica**: si no existe, crea `tipo:epica` con `plantilla-epica.md` (+ `mod:` si aplica). Si el usuario partio de un SDD, vincula la epica como sub-issue del SDD (`addSubIssue`).
 2. **HUs**: una por una, `--body-file`, labels `tipo:hu`, `estado:borrador|listo`, `alcance:*`, `moscow:*`, `sp:*`, `prioridad:*`, `mod:*`. Luego `addSubIssue(epica, hu)`.
 3. **Dependencias**: si una HU depende de otra que acabas de crear, edita su body para poner `Depende de #N` con el numero real. Si la dependencia esta abierta, agrega label `bloqueado`.
-4. **DoR** (TIM-ADR-0003): solo pon `estado:listo` si la historia tiene Historia, Gherkin, Ficha completa sin `POR DEFINIR`, Endpoints/Modelos (o `Ninguno`), Dependencias, Tareas y todos los labels. Si no, `estado:borrador` y dile al usuario que falta.
+4. **DoR** (TIM-ADR-0003) con el sensor unico: crea la HU como `estado:borrador`, vinculala a la epica y luego corre `python3 "$PLUGIN_ROOT/scripts/dor_check.py" N`. Solo si sale 0 cambia a `estado:listo`; si no, deja borrador y muestra al usuario los faltantes exactos.
 5. Si un label `mod:<modulo>` no existe, corre `"$PLUGIN_ROOT/scripts/setup-github-labels.sh"` antes de crear.
 
 Termina informando la lista `#N titulo (labels)` y la URL de la epica.

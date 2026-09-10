@@ -44,7 +44,7 @@ Ejecuta la checklist de DoD con los resultados acumulados de fases anteriores ma
 
 ## Publicar en el issue
 
-Comentario `<!-- timonel:dod -->` con el formato de `PLUGIN_ROOT/skills/github-issues/references/marcadores.md` (YAML: fecha, decision; tabla de 11 filas; linea `Item 11 · veredicto: ...`; seccion Decisión final con fallas/pendientes). Usa `publicar_marcador <issue> dod <archivo>`.
+Comentario `<!-- timonel:dod -->` con el formato de `PLUGIN_ROOT/skills/github-issues/references/marcadores.md` (YAML: fecha, decision; tabla de 11 filas; linea `Item 11 · veredicto: ...`; seccion Decisión final con fallas/pendientes). Valida con `python3 PLUGIN_ROOT/scripts/validar_marcador.py <archivo> --tipo dod` y luego `publicar_marcador <issue> dod <archivo>`.
 
 Si la decision es `DONE` o `PENDIENTES`, marca `- [x] Definition of Done` en `## Tareas`. **No cierres el issue**: lo hace el orquestador.
 

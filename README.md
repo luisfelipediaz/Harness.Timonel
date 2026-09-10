@@ -13,7 +13,7 @@ El timonel gobierna el rumbo siguiendo la bitácora. Aquí la bitácora es el ba
 - **Comandos** `/timonel:*`: `onboard`, `sdd`, `plan`, `refine`, `draft`, `investigar`, `implement`, `hotfix`, `backlog`, `insights`, `audit`, `migrate`.
 - **Agentes**: `sdd-planner`, `user-story-planner`, `backlog-refiner`, `dora-exploradora` (investiga), `flechodiezx` (ejecuta historias), `flechodiezx-hotfix`, `harness-auditor`.
 - **Skills**: `github-issues` (plantillas + recetas `gh`), `implement-backend-story`, `implement-frontend-story`, `consolidate-story`, `code-review`, `generate-retro`, `verify-dod`, `retro-tools`, `ngrx-signal-store`, `interrogame`, `investigar`.
-- **Scripts** (stdlib + `gh`): labels idempotentes, query/destilado de retros y reviews, migración de backlog markdown.
+- **Scripts** (stdlib + `gh`): labels idempotentes, query/destilado de retros y reviews, métricas de flujo, migración de backlog markdown, y los **sensores** del flujo: `dor_check.py` (Definition of Ready), `validar_marcador.py` (formato de comentarios), `estado_historia.py` (reanudar `/implement`), `contrato_check.py` (contrato API vs controllers), `cosechar_retro.py` (ratchet retro → issues).
 - **Heurísticas** de código (`evitar-ifs`, `no-tipos-espejo`, `usar-pipes-existentes`) usadas por el code review.
 - **ADRs** `TIM-ADR-0001..0004` en `docs/adr/`.
 
@@ -65,9 +65,13 @@ Genera `.claude/timonel.config.json` inspeccionando `nx.json`, `tsconfig.base.js
   "frontends": [{ "project": "client", "path": "apps/client", "routesFile": "apps/client/src/app/app-routing.module.ts" }],
   "modelos": { "alias": "@bitakora.monorepo.portal/modelos", "path": "libs/modelos" },
   "modulos": ["mis-finanzas", "vacaciones"],
-  "heuristicsDir": null
+  "heuristicsDir": null,
+  "git": { "baseBranches": ["main", "develop"], "protectBase": true },
+  "timonel": { "repo": "luisfelipediaz/Harness.Timonel" }
 }
 ```
+
+`git.*` alimenta los guardrails (hooks): sin commits directos en la rama base, sin `push --force`, y en ramas `hu/N-*` cada commit referencia `#N`. `timonel.repo` es a donde el ratchet envía las mejoras que apuntan al plugin.
 
 ## Flujo
 
@@ -85,7 +89,7 @@ Genera `.claude/timonel.config.json` inspeccionando `nx.json`, `tsconfig.base.js
 /timonel:migrate --apply    → importa docs/user-stories del harness original
 ```
 
-Todo queda en el issue: labels facetados (`tipo:`, `estado:`, `alcance:`, `moscow:`, `sp:`, `prioridad:`, `mod:`, `review:`, `retro:`), checklist `## Tareas`, y comentarios con marcador (`<!-- timonel:contrato-api -->`, `consolidacion`, `review`, `retro`, `dod`, `refinamiento`). Ver `skills/github-issues/references/`.
+Cada fase deja su artefacto en el issue y la siguiente lo lee (output → input): Dora reutiliza investigaciones e insights, el contrato se contrasta con el código, la retro genera issues, `/implement` reanuda desde `## Tareas`. Todo queda en el issue: labels facetados (`tipo:`, `estado:`, `alcance:`, `moscow:`, `sp:`, `prioridad:`, `mod:`, `review:`, `retro:`), checklist `## Tareas`, y comentarios con marcador (`<!-- timonel:contrato-api -->`, `consolidacion`, `review`, `retro`, `dod`, `refinamiento`). Ver `skills/github-issues/references/`.
 
 ## Desarrollo del plugin
 

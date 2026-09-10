@@ -28,6 +28,8 @@ Carga el scope:
 gh issue view N -R "$REPO" --json number,title,body,labels,comments
 python3 "$PLUGIN_ROOT/scripts/retro_query.py" --modulo <m>
 python3 "$PLUGIN_ROOT/scripts/review_query.py" --modulo <m> --solo-bloqueantes
+python3 "$PLUGIN_ROOT/scripts/dor_check.py" N        # por cada issue del scope: la lista de faltantes es la evidencia de "Ficha incompleta"
+gh issue list -R "$REPO" --label insights --state open --json number,title,body -q '.[] | .title, (.body | split("\n## ")[] | select(startswith("Errores recurrentes")))'
 ```
 
 Clasifica cada issue abierto:
@@ -36,7 +38,7 @@ Clasifica cada issue abierto:
 | --- | --- | --- |
 | Historia gigante | `sp:13` o mayor | CRITICO |
 | Historia grande | `sp:8` con ≥2 escenarios Gherkin disjuntos | WARNING |
-| Ficha incompleta | `POR DEFINIR`, falta fila de la ficha, o falta algun label obligatorio del DoR | CRITICO |
+| Ficha incompleta | `dor_check.py N` devuelve faltantes (`POR DEFINIR`, secciones, labels, padre) | CRITICO |
 | Duplicado probable | titulo + Gherkin solapan ≥70% con otro issue abierto | WARNING |
 | Dependencia rota | `Depende de #N` con N inexistente, o `bloqueado` con todas las deps cerradas | CRITICO |
 | Obsoleta | referencia a algo ya reemplazado, o `moscow:wont` sin actividad >60 dias | WARNING |
@@ -53,7 +55,7 @@ Presenta el reporte con secciones fijas: Resumen (N problemas: X criticos, Y war
 - **Division**: crea las nuevas HUs con `plantilla-hu.md` como sub-issues de la misma epica (labels completos, `estado:borrador` salvo que cumplan DoR); edita la original: baja `sp:`, recorta Gherkin, agrega en Notas técnicas `Dividida en: #X, #Y`.
 - **Repriorizacion**: labels exclusivos `moscow:`/`prioridad:` (receta `cambiar_label_exclusivo`) + comentario corto `Repriorizada YYYY-MM-DD: <motivo>`.
 - **Duplicado**: label `duplicada` en la redundante, comentario `Duplicada de #A`, `gh issue close --reason "not planned"`. Conserva la mas madura.
-- **Ficha incompleta**: pregunta al usuario los valores faltantes uno por uno; edita solo esa seccion del body y agrega los labels que falten. Si queda completa, `estado:listo`.
+- **Ficha incompleta**: pregunta al usuario los valores faltantes uno por uno; edita solo esa seccion del body y agrega los labels que falten. Vuelve a correr `dor_check.py N`; solo con salida 0 pon `estado:listo`.
 - **Obsoleta**: label `obsoleta`, comentario `Reemplazada por #E (YYYY-MM-DD)`, cierre `not planned`.
 - **Dependencia rota**: pregunta si actualizar a otro issue, quitar la linea o dejar `bloqueado`; aplica. Si todas las deps estan cerradas, quita `bloqueado`.
 - **Sin padre**: pregunta a que epica pertenece y vincula con `addSubIssue`.
