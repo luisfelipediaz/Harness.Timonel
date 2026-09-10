@@ -5,6 +5,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 import smoke_harness as sh  # noqa: E402
+import timonel_gh as tg  # noqa: E402
 
 ISSUE_COMPLETO = {
     "number": 27,
@@ -118,6 +119,18 @@ class TablaDisparosTests(unittest.TestCase):
         m = sh.medir_issue(ISSUE_COMPLETO, DERIVADOS, COMMITS)
         tabla = sh.tabla_disparos([m], {"gh": 5, "raiz-editada": 0})
         self.assertIn("sí", tabla)
+
+
+class OrigenRetroTests(unittest.TestCase):
+    def test_extrae_numero_de_hu_origen(self):
+        body = "Origen: retro #27 (1) — luisfelipediaz/Harness.Timonel\n\n## Historia"
+        self.assertEqual(tg.origen_retro(body), 27)
+
+    def test_body_sin_ancla_devuelve_none(self):
+        self.assertIsNone(tg.origen_retro("## Historia\n\nSin marcador de origen"))
+
+    def test_ancla_sin_numero_devuelve_none(self):
+        self.assertIsNone(tg.origen_retro("Origen: retro sin numero"))
 
 
 if __name__ == "__main__":

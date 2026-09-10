@@ -200,6 +200,16 @@ def label_value(labels: list[str], prefix: str) -> str:
     return next((l.split(":", 1)[1] for l in labels if l.startswith(prefix + ":")), "")
 
 
+ORIGEN_RETRO_RE = re.compile(r"Origen: retro #(\d+)\b")
+
+
+def origen_retro(body: str) -> int | None:
+    """Numero de HU origen si `body` es un issue derivado de una retro
+    (`cosechar_retro.py` lo marca con `Origen: retro #N (k) — <repo>`)."""
+    match = ORIGEN_RETRO_RE.search(body)
+    return int(match.group(1)) if match else None
+
+
 # ---------------------------------------------------------------------------
 # Modelos
 # ---------------------------------------------------------------------------

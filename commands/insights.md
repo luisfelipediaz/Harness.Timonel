@@ -16,7 +16,11 @@ Segun `$ARGUMENTS`:
 
 - Sin `--solo-review`: `python3 "$S/retro_distill.py" --publish` (sin `--publish` si viene `--no-publicar`).
 - Sin `--solo-retro`: `python3 "$S/review_distill.py" --publish` (idem).
-- Siempre: `python3 "$S/metricas_flujo.py" --publish` (issue "Métricas de flujo": cobertura de artefactos, review a la primera, precision, lead time, backlog por estado).
+- Siempre:
+  ```bash
+  EVENTS_FLAG=""; [ -f .timonel/events.log ] && EVENTS_FLAG="--events-log .timonel/events.log"
+  ```
+  `python3 "$S/metricas_flujo.py" --publish $EVENTS_FLAG` (issue "Métricas de flujo": cobertura de artefactos, review a la primera, precision, lead time, backlog por estado, ratchet de issues derivados por retro y disparos de hooks).
 
 Si publico, pinnea los issues (`gh issue pin N -R "$REPO"`; ignora el error si ya estan pinneados o si hay mas de 3 pins).
 

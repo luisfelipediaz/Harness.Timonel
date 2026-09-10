@@ -269,7 +269,7 @@ class MetricasTests(unittest.TestCase):
         self.assertEqual(m["review"]["aprobado"], 1)
         self.assertAlmostEqual(m["lead_time_prom"], 1.5)
         self.assertEqual(m["bloqueadas"], 1)
-        self.assertIn("50%", mf.reporte(m))
+        self.assertIn("50%", mf.reporte(m, mf.calcular_ratchet(cerradas, abiertas), None))
 
 
 if __name__ == "__main__":

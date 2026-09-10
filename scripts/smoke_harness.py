@@ -20,7 +20,7 @@ import re
 import subprocess
 from pathlib import Path
 
-from timonel_gh import find_marker_comment, gh_json, label_value, parse_secciones, repo_from_config
+from timonel_gh import find_marker_comment, gh_json, label_value, origen_retro, parse_secciones, repo_from_config
 
 MARCADORES = ["investigacion", "contrato-api", "consolidacion", "review", "retro", "dod"]
 
@@ -41,8 +41,7 @@ def medir_issue(issue: dict, derivados: list[dict], commits: list[str]) -> dict:
     label_names = issue.get("label_names") or [l["name"] for l in issue.get("labels") or []]
     marcadores = {m: bool(find_marker_comment(comments, m)) for m in MARCADORES}
 
-    origen = re.compile(rf"Origen: retro #{numero}\b")
-    derivados_por_origen = sorted(d["number"] for d in derivados if origen.search(d.get("body") or ""))
+    derivados_por_origen = sorted(d["number"] for d in derivados if origen_retro(d.get("body") or "") == numero)
 
     retro_body = find_marker_comment(comments, "retro") or ""
     secciones = parse_secciones(retro_body)
@@ -74,7 +73,7 @@ def contar_eventos(lineas: list[str]) -> dict:
     }
 
 
-def _fila_hook(nombre: str, n: int | None, texto_en_cero: str) -> FilaDisparo:
+def fila_hook(nombre: str, n: int | None, texto_en_cero: str) -> FilaDisparo:
     """Una fila de hook a partir del conteo de eventos: None (sin events.log) y
     0 (perfil sin ese consumidor) son casos distintos de 'no disparo'."""
     if n is None:
@@ -116,10 +115,10 @@ def _filas_disparo(mediciones: list[dict], eventos: dict | None) -> list[FilaDis
     filas.append(("commits `#N` en git log", evidencia_commits or "sin datos", SI_NO[any(m["commits"] for m in validas)]))
 
     n_gh = eventos.get("gh") if eventos is not None else None
-    filas.append(_fila_hook("hook PostToolUse `[gh]`", n_gh, "no"))
+    filas.append(fila_hook("hook PostToolUse `[gh]`", n_gh, "no"))
 
     n_raiz = eventos.get("raiz-editada") if eventos is not None else None
-    filas.append(_fila_hook("hook `raiz-editada`", n_raiz, "N/A en perfil plugin (sin consumidor)"))
+    filas.append(fila_hook("hook `raiz-editada`", n_raiz, "N/A en perfil plugin (sin consumidor)"))
 
     return filas
 
@@ -159,8 +158,7 @@ def _medir_con_gh(repo: str, numero: int) -> dict:
         "issue", "list", "-R", repo, "--search", f"Origen: retro #{numero}",
         "--state", "all", "--json", "number,body", "--limit", "50",
     )
-    ancla = re.compile(rf"Origen: retro #{numero}\b")
-    derivados = [d for d in candidatos if ancla.search(d.get("body") or "")]
+    derivados = [d for d in candidatos if origen_retro(d.get("body") or "") == numero]
     proc = subprocess.run(
         ["git", "log", "--oneline", "--all", "--grep", f"#{numero}"], capture_output=True, text=True,
     )
