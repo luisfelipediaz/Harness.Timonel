@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import re
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -78,15 +79,19 @@ def datos_remote(url: str) -> dict[str, str]:
     raise ValueError(f"tipo de remote desconocido: {url!r}")
 
 
+# Todo valor interpolado pasa por shlex.quote: el agente ejecuta el comando con `eval`,
+# y un titulo con apostrofo (o un cuerpo con `$(...)`) no debe romperlo ni ejecutarse.
 def _cmd_gh(datos: dict[str, str], rama: str, base: str, titulo: str, body_file: str) -> str:
-    return f"gh pr create --base {base} --head {rama} --title '{titulo}' --body-file {body_file}"
+    q = shlex.quote
+    return f"gh pr create --base {q(base)} --head {q(rama)} --title {q(titulo)} --body-file {q(body_file)}"
 
 
 def _cmd_az(datos: dict[str, str], rama: str, base: str, titulo: str, body_file: str) -> str:
+    q = shlex.quote
     return (
-        f"az repos pr create --source-branch {rama} --target-branch {base} "
-        f"--title '{titulo}' --description \"$(cat {body_file})\" "
-        f"--repository {datos['repo']} --organization {datos['organization_url']} --project {datos['project']}"
+        f"az repos pr create --source-branch {q(rama)} --target-branch {q(base)} "
+        f"--title {q(titulo)} --description {q('@' + body_file)} "
+        f"--repository {q(datos['repo'])} --organization {q(datos['organization_url'])} --project {q(datos['project'])}"
     )
 
 

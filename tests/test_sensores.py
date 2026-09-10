@@ -311,6 +311,24 @@ class IntegracionTests(unittest.TestCase):
         cmd = ig.comando_pr("https://org.visualstudio.com/proj/_git/repo", "hu/31-x", "main", "Titulo (#31)", "/tmp/pr-31.md")
         self.assertIn("--organization https://org.visualstudio.com", cmd)
 
+    def test_comando_pr_azure_ssh(self):
+        cmd = ig.comando_pr("git@ssh.dev.azure.com:v3/org/proj/repo", "hu/31-x", "main", "Titulo (#31)", "/tmp/pr-31.md")
+        for esperado in ("az repos pr create", "--organization https://dev.azure.com/org", "--project proj", "--repository repo"):
+            self.assertIn(esperado, cmd)
+
+    def test_comando_pr_escapa_titulo_con_apostrofo(self):
+        import shlex
+        titulo = "Fase 8: abrir el PR de 'hu/N-slug' y registrarlo (#31)"
+        for url in ("https://github.com/o/r.git", "https://dev.azure.com/org/proj/_git/repo"):
+            cmd = ig.comando_pr(url, "hu/31-x", "main", titulo, "/tmp/pr-31.md")
+            partes = shlex.split(cmd)
+            self.assertIn(titulo, partes, "el titulo debe sobrevivir intacto a shlex.split (eval en la Fase 8)")
+
+    def test_comando_pr_azure_no_usa_command_substitution(self):
+        cmd = ig.comando_pr("https://dev.azure.com/org/proj/_git/repo", "hu/31-x", "main", "Titulo (#31)", "/tmp/pr-31.md")
+        self.assertNotIn("$(", cmd)
+        self.assertIn("--description @/tmp/pr-31.md", cmd)
+
     def test_comando_pr_desconocido_lanza(self):
         with self.assertRaises(ValueError):
             ig.comando_pr("https://gitlab.com/o/r", "hu/31-x", "main", "Titulo (#31)", "/tmp/pr-31.md")
