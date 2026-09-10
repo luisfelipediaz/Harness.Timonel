@@ -19,10 +19,13 @@ import subprocess
 from timonel_gh import find_marker_comment, gh_json, label_value, repo_from_config
 
 TAREAS = ["Contrato API aprobado", "Modelos compartidos", "Backend", "Frontend",
-          "Consolidación (lint + tests)", "Code review", "Retrospectiva", "Definition of Done"]
+          "Consolidación (lint + tests)", "Code review", "Retrospectiva", "Definition of Done",
+          "PR abierto"]
 MARCADORES = ["investigacion", "contrato-api", "consolidacion", "review", "retro", "dod"]
 
 # Orden de fases y la condicion (tareas/marcadores) que indica que ya se hizo.
+# "PR abierto" ausente del checklist (issues viejos, o `git.integracion: merge`) cuenta
+# como hecha (SKIPPED): el default `True` de `.get` es a proposito.
 FASES = [
     ("1.5 Investigacion",      lambda e: "investigacion" in e["marcadores"]),
     ("2 Contrato API",         lambda e: e["tareas"].get("Contrato API aprobado") or "contrato-api" in e["marcadores"]),
@@ -32,6 +35,7 @@ FASES = [
     ("5.5 Code review",        lambda e: e["tareas"].get("Code review") or "review" in e["marcadores"]),
     ("6 Retrospectiva",        lambda e: e["tareas"].get("Retrospectiva") or "retro" in e["marcadores"]),
     ("7 Definition of Done",   lambda e: e["tareas"].get("Definition of Done") or "dod" in e["marcadores"]),
+    ("8 PR/Integración",       lambda e: e["tareas"].get("PR abierto", True)),
 ]
 
 
@@ -70,7 +74,7 @@ def estado(issue: dict, rama: str | None = None) -> dict:
     pendientes = [nombre for nombre, cond in FASES if not cond(e)]
     e["fases_hechas"] = hechas
     e["fases_pendientes"] = pendientes
-    cerrada = e["state"].upper() == "CLOSED" or "dod" in e["marcadores"]
+    cerrada = e["state"].upper() == "CLOSED" or ("dod" in e["marcadores"] and FASES[-1][1](e))
     e["reanudar_en"] = "cerrar" if cerrada else (pendientes[0] if pendientes else "cerrar")
     hay_trabajo = bool(e["marcadores"]) or any(e["tareas"].values()) or rama is not None or e["estado_label"] == "en-progreso"
     e["nueva"] = not cerrada and not hay_trabajo
