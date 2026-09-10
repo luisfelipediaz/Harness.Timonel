@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.5.0 — en desarrollo
+## 0.5.0 — 2026-09-10
 
 Épica #26: el harness aplicado a sí mismo.
 
