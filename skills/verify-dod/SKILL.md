@@ -19,7 +19,7 @@ Ejecuta la checklist de DoD con los resultados acumulados de fases anteriores ma
 | `veredicto_code_review` | `APROBADO` \| `APROBADO CON OBSERVACIONES` \| `REQUIERE CAMBIOS` \| `NO_GENERADO` |
 | `perfil` | `consumidor` (default) \| `plugin` |
 
-**Perfil plugin**: items 5, 6 y 7 son `SKIPPED`; item 3 usa `git diff --name-only --diff-filter=AM main...HEAD -- tests/`; `<rama-base>` es `main`. El item 11 **nunca** es SKIPPED: en el plugin tambien hay code review.
+**Perfil plugin**: items 5, 6 y 7 son `SKIPPED`; en el item 8 las tareas `Contrato API aprobado`, `Modelos compartidos` y `Frontend` cuentan como SKIPPED si no estan marcadas; item 3 usa `git diff --name-only --diff-filter=AM main...HEAD -- tests/`; `<rama-base>` es `main`. El item 11 **nunca** es SKIPPED: en el plugin tambien hay code review.
 
 ## Checklist
 
