@@ -112,15 +112,20 @@ def titulo_pr(titulo_issue: str, issue: int) -> str:
     return f"{titulo_issue} (#{issue})"
 
 
-_SECCION_CONTRATO = re.compile(r"^### (?:Contrato de cambio|Endpoints)\s*\n(.*?)(?=^##\s|\Z)", re.MULTILINE | re.DOTALL)
+# Corta en el siguiente encabezado de nivel 2 o 3 (las secciones hermanas del contrato son `###`).
+# Orden de preferencia: el contrato de cambio (perfil plugin) y, si no, los endpoints (consumidor).
+_SECCIONES_CONTRATO = [
+    re.compile(rf"^### {nombre}\s*\n(.*?)(?=^#{{2,3}}\s|\Z)", re.MULTILINE | re.DOTALL)
+    for nombre in ("Contrato de cambio", "Endpoints")
+]
 _FILA_DOD = re.compile(r"^\|\s*\d+\s*\|.*\|\s*$", re.MULTILINE)
 
 
 def _seccion_contrato(contrato: str | None) -> str:
     if not contrato:
         return "Sin contrato publicado"
-    m = _SECCION_CONTRATO.search(contrato)
-    return m.group(1).strip() if m else "Sin contrato publicado"
+    hallazgos = (m.group(1).strip() for m in (r.search(contrato) for r in _SECCIONES_CONTRATO) if m)
+    return next((h for h in hallazgos if h), "Sin contrato publicado")
 
 
 def _tabla_dod(dod: str | None) -> str:

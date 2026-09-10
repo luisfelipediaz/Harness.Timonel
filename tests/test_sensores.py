@@ -339,6 +339,15 @@ class IntegracionTests(unittest.TestCase):
         self.assertIn("Sin contrato publicado", cuerpo)
         self.assertIn("| 1 |", cuerpo)
 
+    def test_cuerpo_pr_corta_en_seccion_hermana_y_prefiere_contrato_de_cambio(self):
+        contrato = ("<!-- timonel:contrato-api -->\n## Contrato API aprobado\n\n### Modelos compartidos\n\nNinguno.\n\n"
+                    "### Endpoints\n\nNinguno — explícito.\n\n### Contrato de cambio\n\n| Archivo | Cambio |\n| --- | --- |\n| a.py | x |\n\n"
+                    "### Invariantes nuevas\n\n- una invariante\n")
+        cuerpo = ig.cuerpo_pr(31, "o/r", "Titulo", contrato, None)
+        self.assertIn("| a.py | x |", cuerpo)
+        self.assertNotIn("una invariante", cuerpo)
+        self.assertNotIn("Ninguno — explícito", cuerpo)
+
     def test_cuerpo_pr_sin_dod(self):
         cuerpo = ig.cuerpo_pr(31, "luisfelipediaz/Harness.Timonel", "Titulo", "### Contrato de cambio\n\nTabla.", None)
         self.assertIn("Sin DoD publicado", cuerpo)
