@@ -97,7 +97,7 @@ auditoria_anterior: #N | ninguna
 [URLs de literatura o ADRs que sustentan las recomendaciones, si aplica]
 ````
 
-Titulo: `Harness Audit YYYY-MM-DD — <areas> (<score>/10)`. Score = proporcion ponderada de HARNESS sobre el total (impacto alto pesa 3, medio 2, bajo 1).
+Antes de crear el issue: `python3 "$PLUGIN_ROOT/scripts/validar_marcador.py" <archivo> --tipo harness-audit`. Titulo: `Harness Audit YYYY-MM-DD — <areas> (<score>/10)`. Score = proporcion ponderada de HARNESS sobre el total (impacto alto pesa 3, medio 2, bajo 1).
 
 ## Fase 4: Conversacion
 

@@ -94,6 +94,19 @@ class MarcadoresTests(unittest.TestCase):
         self.assertFalse(faltan, f"marcadores sin contrato en validar_marcador.py: {sorted(faltan)}")
 
 
+class InvocadoresTests(unittest.TestCase):
+    def test_cada_contrato_del_validador_tiene_invocador(self):
+        import validar_marcador as vm
+        textos = "\n".join(f.read_text(encoding="utf-8") for f in list((ROOT / "agents").glob("*.md")) + list((ROOT / "skills").glob("*/SKILL.md")) + COMMANDS)
+        sin = [t for t in vm.CONTRATOS if f"--tipo {t}" not in textos]
+        self.assertFalse(sin, f"contratos de validar_marcador sin ningun agente/skill que los invoque: {sin}")
+
+    def test_scripts_documentados_en_claude_md(self):
+        claude = (ROOT / "CLAUDE.md").read_text(encoding="utf-8") + (ROOT / "README.md").read_text(encoding="utf-8")
+        sin = [p.name for p in (ROOT / "scripts").glob("*.py") if p.name not in claude and p.stem not in claude]
+        self.assertFalse(sin, f"scripts sin mencion en CLAUDE.md/README.md: {sin}")
+
+
 class VersionTests(unittest.TestCase):
     def test_version_plugin_coincide_con_changelog(self):
         version = json.loads((ROOT / ".claude-plugin/plugin.json").read_text())["version"]

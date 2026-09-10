@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.1 — 2026-09-10
+
+Corrige los defectos que la re-auditoría #24 encontró en los sensores de 0.4.0 (#25).
+
+### Corregido
+
+- `estado_historia.py`: un issue `CLOSED` o con `timonel:dod` devuelve `REANUDAR_EN: cerrar`; una historia nueva de `alcance:backend` ya no se confunde con "en curso" por las fases N/A.
+- `contrato_check.py`: recorta query string y fragmento antes de comparar rutas (falsos FAILED en Organigrama).
+- `validar_marcador.py` contrato `dod`: exige las 11 filas, la línea `Item 11 · veredicto:` y, con `decision: DONE`, las filas críticas 1, 2, 4, 8 y 11 en PASSED (el code review nunca es SKIPPED en `tipo:hu`/`hotfix`).
+- Validador invocado también para `contrato-api` (flechodiezx), `investigacion` (dora-exploradora), `refinamiento` (backlog-refiner) y `harness-audit` (harness-auditor); `test_consistencia` exige un invocador por contrato y que cada script esté documentado en CLAUDE.md/README.
+- CLAUDE.md: tabla de `scripts/`, `hooks/` y CI al día.
+
 ## 0.4.0 — 2026-09-10
 
 Épica #12: cierra los gaps 1–9, 13, 14 y 15 de la auditoría #11 (score 4/10). El loop se cierra: cada fase produce un artefacto que la siguiente lee y verifica.

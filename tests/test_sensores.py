@@ -86,6 +86,38 @@ class ValidarMarcadorTests(unittest.TestCase):
         self.assertIn("la primera linea debe ser el marcador `<!-- timonel:<tipo> -->`", vm.validar("hola"))
 
 
+DOD_OK = """<!-- timonel:dod -->
+## Definition of Done
+
+```yaml
+fecha: 2026-09-10
+decision: DONE
+```
+
+| # | Item | Estado |
+| --- | --- | --- |
+""" + "\n".join(f"| {i} | Item {i} | {'SKIPPED' if i in (5, 7) else 'PASSED'} |" for i in range(1, 12)) + """
+
+Item 11 · veredicto: APROBADO
+
+### Decisión final
+
+**DONE**
+"""
+
+
+class ValidarDodTests(unittest.TestCase):
+    def test_dod_completo_valido(self):
+        self.assertEqual(vm.validar(DOD_OK), [])
+
+    def test_dod_con_6_filas_y_review_skipped_es_invalido(self):
+        malo = "<!-- timonel:dod -->\n## DoD\n\n```yaml\nfecha: 2026-09-10\ndecision: DONE\n```\n\n| # | Item | Estado |\n| --- | --- | --- |\n| 1 | a | PASSED |\n| 2 | b | PASSED |\n| 4 | c | PASSED |\n| 8 | d | PASSED |\n| 10 | e | PASSED |\n| 11 | Code review | SKIPPED |\n\n### Decisión final\n**DONE**\n"
+        problemas = vm.validar(malo)
+        self.assertTrue(any("11 filas" in p for p in problemas))
+        self.assertTrue(any("Item 11 · veredicto" in p for p in problemas))
+        self.assertTrue(any("fila 11 en PASSED" in p for p in problemas))
+
+
 class DorCheckTests(unittest.TestCase):
     def test_hu_completa(self):
         self.assertEqual(dc.check(HU_OK), [])
@@ -140,6 +172,19 @@ class EstadoHistoriaTests(unittest.TestCase):
         self.assertEqual(e["reanudar_en"], "4-5 Consolidacion")
 
 
+    def test_cerrada_no_reanuda(self):
+        issue = dict(HU_OK, state="CLOSED", comments=[{"body": "<!-- timonel:dod -->\nx"}])
+        e = eh.estado(issue, rama=None)
+        self.assertEqual(e["reanudar_en"], "cerrar")
+        self.assertFalse(e["nueva"])
+
+    def test_nueva_backend_sin_tareas(self):
+        body = HU_OK["body"].replace("- [x]", "- [ ]")
+        issue = dict(HU_OK, body=body, state="OPEN", comments=[], label_names=[l.replace("full-stack", "backend").replace("estado:listo", "estado:listo") for l in HU_OK["label_names"]])
+        e = eh.estado(issue, rama=None)
+        self.assertTrue(e["nueva"], "una HU backend sin trabajo debe ser nueva aunque Frontend cuente como N/A")
+
+
 class CosecharRetroTests(unittest.TestCase):
     def test_extrae_mejoras_y_omite_ninguno(self):
         retro = RETRO_COMMENT + "\n### Harness engineering\n\n- ¿Surgió un patrón repetitivo? → Ninguno\n- ¿Un proceso manual se ejecutó 2+ veces? → Agregar hook que corra prettier tras Edit\n"
@@ -164,6 +209,11 @@ class ContratoCheckTests(unittest.TestCase):
         self.assertEqual([r[2] for r in res], ["PASSED", "PASSED"])
         res2 = cc.verificar([("DELETE", "/api/mis-finanzas/movimientos/:id")], indice)
         self.assertEqual(res2[0][2], "FAILED")
+
+    def test_query_string_no_rompe(self):
+        indice = [("c.ts", "organigrama", [("GET", "empleados")])]
+        res = cc.verificar([("GET", "/api/organigrama/empleados?area=1&sede=2")], indice)
+        self.assertEqual(res[0][2], "PASSED")
 
 
 class MetricasTests(unittest.TestCase):

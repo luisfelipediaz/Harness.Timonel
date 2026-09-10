@@ -70,8 +70,10 @@ def estado(issue: dict, rama: str | None = None) -> dict:
     pendientes = [nombre for nombre, cond in FASES if not cond(e)]
     e["fases_hechas"] = hechas
     e["fases_pendientes"] = pendientes
-    e["reanudar_en"] = pendientes[0] if pendientes else "cerrar"
-    e["nueva"] = not hechas and e["estado_label"] != "en-progreso" and rama is None
+    cerrada = e["state"].upper() == "CLOSED" or "dod" in e["marcadores"]
+    e["reanudar_en"] = "cerrar" if cerrada else (pendientes[0] if pendientes else "cerrar")
+    hay_trabajo = bool(e["marcadores"]) or any(e["tareas"].values()) or rama is not None or e["estado_label"] == "en-progreso"
+    e["nueva"] = not cerrada and not hay_trabajo
     return e
 
 
@@ -81,7 +83,12 @@ def formato(e: dict) -> str:
     lines.append("Marcadores publicados: " + (", ".join(e["marcadores"]) or "ninguno"))
     lines.append("Tareas: " + ", ".join(f"[{'x' if v else ' '}] {k}" for k, v in e["tareas"].items()))
     lines.append("Fases hechas: " + (", ".join(e["fases_hechas"]) or "ninguna"))
-    lines.append(f"REANUDAR_EN: {e['reanudar_en']}" if not e["nueva"] else "REANUDAR_EN: inicio (historia sin empezar)")
+    if e["nueva"]:
+        lines.append("REANUDAR_EN: inicio (historia sin empezar)")
+    elif e["reanudar_en"] == "cerrar":
+        lines.append("REANUDAR_EN: cerrar (historia terminada o issue cerrado; no relanzar fases)")
+    else:
+        lines.append(f"REANUDAR_EN: {e['reanudar_en']}")
     return "\n".join(lines)
 
 

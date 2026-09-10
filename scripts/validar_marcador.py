@@ -16,7 +16,7 @@ import re
 import sys
 from pathlib import Path
 
-from timonel_gh import parse_secciones, parse_tabla, parse_yaml_plano
+from timonel_gh import _split_row, parse_secciones, parse_tabla, parse_yaml_plano
 
 # Contrato por tipo: claves YAML obligatorias, valores permitidos, secciones `### ` obligatorias.
 CONTRATOS: dict[str, dict] = {
@@ -42,6 +42,7 @@ CONTRATOS: dict[str, dict] = {
         "yaml": ["fecha", "decision"],
         "valores": {"decision": {"DONE", "FALLAS_CRITICAS", "PENDIENTES"}},
         "secciones": ["Decisión final"],
+        "tabla": "dod",
     },
     "consolidacion": {
         "yaml": ["fecha", "lint", "tests", "providers_registrados", "rutas_registradas"],
@@ -142,6 +143,22 @@ def validar(texto: str, tipo: str | None = None) -> list[str]:
             problemas.append("REQUIERE CAMBIOS exige `bloquea_dod: si`")
         if meta.get("veredicto") in {"APROBADO", "APROBADO CON OBSERVACIONES"} and meta.get("bloquea_dod") == "si":
             problemas.append("solo REQUIERE CAMBIOS puede llevar `bloquea_dod: si`")
+
+    if contrato.get("tabla") == "dod":
+        filas = [_split_row(l) for l in texto.splitlines() if re.match(r"^\|\s*\d+\s*\|", l)]
+        numeros = sorted({int(f[0]) for f in filas if f and f[0].isdigit()})
+        if numeros != list(range(1, 12)):
+            problemas.append(f"DoD: la tabla debe tener las 11 filas (1..11); tiene {numeros or 'ninguna'}")
+        estados = {int(f[0]): f[2].upper() for f in filas if len(f) >= 3 and f[0].isdigit()}
+        for n, est in estados.items():
+            if not est.startswith(("PASSED", "FAILED", "SKIPPED")):
+                problemas.append(f"DoD: fila {n} con estado invalido `{est}` (PASSED|FAILED|SKIPPED)")
+        if not re.search(r"^Item 11 · veredicto:", texto, re.MULTILINE):
+            problemas.append("DoD: falta la linea `Item 11 · veredicto: <valor>`")
+        if meta.get("decision") == "DONE":
+            for n in (1, 2, 4, 8, 11):
+                if not estados.get(n, "").startswith("PASSED"):
+                    problemas.append(f"DoD: decision DONE exige la fila {n} en PASSED (tiene `{estados.get(n, 'ausente')}`); el code review nunca es SKIPPED en tipo:hu/hotfix")
 
     if tipo == "retro":
         secciones = parse_secciones(texto)

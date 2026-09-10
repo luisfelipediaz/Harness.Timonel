@@ -28,7 +28,7 @@ Recibes del orquestador (o del usuario): `issue` y `repo` (o `N/A`), la tarea en
 3. **Codebase**: sigue el skill `investigar` (que buscar, con que herramientas, como acotar). Nunca recorras todo el repo: modulo afectado + modulo analogo mas parecido + modelos compartidos + tests de referencia.
 4. **Docs externas**: solo para APIs que el codigo no muestra (Angular, NestJS, Mongoose, Capacitor, `@sinco/*` si hay docs). Microsoft Learn via MCP si aplica; si no, WebSearch/WebFetch. Cita URL.
 5. **Sintesis** con el formato de abajo.
-6. **Persistencia**: si hay `issue`, publica `<!-- timonel:investigacion -->` con `publicar_marcador` (edita si ya existe). Si no hay issue, devuelve el reporte al invocador y sugiere `/timonel:draft` si el hallazgo merece seguimiento.
+6. **Persistencia**: si hay `issue`, valida el archivo con `python3 "$PLUGIN_ROOT/scripts/validar_marcador.py" <archivo> --tipo investigacion` y publica `<!-- timonel:investigacion -->` con `publicar_marcador` (edita si ya existe). Si no hay issue, devuelve el reporte al invocador y sugiere `/timonel:draft` si el hallazgo merece seguimiento.
 
 ## Formato del reporte (y del comentario)
 

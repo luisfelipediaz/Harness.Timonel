@@ -55,7 +55,7 @@ Muestra el contrato y pregunta "¿Procedo con esta definicion?". Espera confirma
 Con el "si":
 
 1. Crea/actualiza las interfaces y el barrel. `git add {modelos.path} && git commit -m "feat(<modulo>): modelos compartidos para #N"` (critico: los worktrees nacen del ultimo commit).
-2. Publica el comentario `<!-- timonel:contrato-api -->` (formato en `marcadores.md`, con `backend_desplegado`).
+2. Escribe el comentario `<!-- timonel:contrato-api -->` (formato en `marcadores.md`, con `backend_desplegado`), validalo con `python3 "$PLUGIN_ROOT/scripts/validar_marcador.py" <archivo> --tipo contrato-api` y publicalo con `publicar_marcador N contrato-api <archivo>`.
 3. Marca `- [x] Contrato API aprobado` y `- [x] Modelos compartidos` (si hubo) en `## Tareas`.
 
 ## Fase 3: Ejecucion paralela

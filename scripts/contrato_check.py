@@ -27,6 +27,7 @@ def extraer_endpoints(contrato: str) -> list[tuple[str, str]]:
 
 
 def _segmentos(ruta: str) -> list[str]:
+    ruta = ruta.split("?", 1)[0].split("#", 1)[0]
     ruta = re.sub(r"^/?api/", "", ruta.strip("/"))
     return [s for s in ruta.split("/") if s]
 

@@ -62,7 +62,7 @@ Presenta el reporte con secciones fijas: Resumen (N problemas: X criticos, Y war
 
 ## Fase 5: Bitacora
 
-Publica (o agrega, nunca edites el anterior) el comentario `<!-- timonel:refinamiento -->` en la epica con el formato de `marcadores.md`: YAML (fecha, modo, problemas_detectados, cambios_aplicados) + Resumen, Cambios aplicados, Cambios NO aplicados, Siguiente revision sugerida.
+Valida el archivo con `python3 "$PLUGIN_ROOT/scripts/validar_marcador.py" <archivo> --tipo refinamiento` y publica (agrega, nunca edites el anterior) el comentario `<!-- timonel:refinamiento -->` en la epica con el formato de `marcadores.md`: YAML (fecha, modo, problemas_detectados, cambios_aplicados) + Resumen, Cambios aplicados, Cambios NO aplicados, Siguiente revision sugerida.
 
 ## Reglas duras
 
