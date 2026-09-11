@@ -24,14 +24,19 @@ NO se juzga por la rama actual sino por si PUEDE CREAR INTEGRACION NUEVA.
     (misma familia -- los tres crean un commit nuevo directo en la base sin
     pasar por PR, no hay equivalente de ref segura); sus formas de control
     (`--continue`, `--abort`, `--skip`, `--quit`) se permiten siempre.
-  - `reset` estando en una rama base: se permite SOLO si la ref es vacia o
-    el equivalente remoto de esa misma base (mismo criterio de ref segura que
-    `merge`/`rebase`/`pull`, reutilizado sin agregar uno nuevo). `git reset
+  - `reset` estando en una rama base: se permite si la ref es vacia, el
+    equivalente remoto de esa misma base (mismo criterio de ref segura que
+    `merge`/`rebase`/`pull`), o `HEAD` exacto -- a diferencia del resto de la
+    familia, en `reset` (y solo ahi) `HEAD` no mueve el ref de la rama a nada
+    nuevo (`HEAD~1`, `HEAD^` y `HEAD@{1}` si mueven, y siguen bloqueados).
+    Tambien se permite la forma con pathspec (`git reset [<ref>] [--]
+    <paths>...`): si aparece `--` o hay mas de un argumento no-flag, es un
+    unstage y nunca mueve el ref sin importar cual sea la ref. `git reset
     --hard origin/main` en `main` sincroniza y se permite; `git reset --hard
-    hu/x` mueve `main` a codigo no revisado y bloquea. Aplica a cualquier
-    modo (`--hard`, `--soft`, `--mixed`): lo que importa es la ref, no el
-    modo -- `git reset --soft HEAD~1` en la base tambien bloquea porque
-    `HEAD~1` no es una ref segura.
+    hu/x` mueve `main` a codigo no revisado y bloquea. Fuera de esos casos
+    aplica a cualquier modo (`--hard`, `--soft`, `--mixed`): lo que importa es
+    la ref, no el modo -- `git reset --soft HEAD~1` en la base tambien
+    bloquea porque `HEAD~1` no es una ref segura.
   - `gh pr merge`: siempre bloqueado, el merge del PR es de un humano.
   - `gh api` hacia una ruta cuyo segmento final (quitando el query string y
     la barra final) es `merge` o `merges`: siempre bloqueado sin importar el
@@ -166,7 +171,6 @@ _ALTERNATIVAS_DE_SINCRONIA = {
     "merge": "`git merge --ff-only origin/{base}` (o `git pull --ff-only`)",
     "pull": "`git pull --ff-only`",
     "rebase": "`git rebase origin/{base}`",
-    "reset": "`git reset --hard origin/{base}`",
 }
 
 
@@ -176,6 +180,19 @@ def _mensaje_integracion_en_base(base: str, verbo: str) -> str:
         f"{PREFIJO}en la rama base '{base}' no se permite crear integracion "
         "nueva (TIM-ADR-0005, epica #79/#80). Para sincronizar tu copia "
         f"local si podes: {alternativa}."
+    )
+
+
+def _mensaje_reset_mueve_base(base: str) -> str:
+    """`reset` con una ref no segura no "crea integracion nueva" (no hay nada que
+    revisar en un PR): lo que hace es mover el ref de la rama base a un commit
+    que nadie reviso. Mensaje propio -- reusar `_mensaje_integracion_en_base`
+    diria algo falso aca."""
+    return (
+        f"{PREFIJO}en la rama base '{base}' no se permite mover el ref de la "
+        "rama a un commit que nadie reviso (TIM-ADR-0005, epica #79/#80). "
+        f"Para sincronizar tu copia local si podes: `git reset --hard "
+        f"origin/{base}`."
     )
 
 
@@ -270,19 +287,34 @@ def _revisar_commit_directo(resto: list[str], rama: str, bases: list[str]) -> st
 
 
 def _revisar_reset(resto: list[str], rama: str, bases: list[str]) -> str | None:
-    """Mismo criterio de ref segura que merge/rebase/pull, reutilizado sin
-    codigo nuevo: vacia o equivalente remoto de la propia base -> permitido;
-    cualquier otra -> bloqueado. No distingue --hard/--soft/--mixed a proposito:
-    lo que mueve la base a codigo no revisado es la REF, no el modo (decision
-    documentada: `git reset --soft HEAD~1` en la base tambien bloquea, aunque
-    --soft no toque el working tree, porque HEAD~1 no es una ref segura)."""
+    """Ref segura de merge/rebase/pull (vacia o equivalente remoto de la propia
+    base), MAS dos casos propios de `reset` que no aplican al resto de la
+    familia (ver docstring del modulo, ronda de falsos positivos de #82):
+
+    - `HEAD` exacto: no mueve el ref de la rama a nada nuevo. `HEAD~1`,
+      `HEAD^` y `HEAD@{1}` si lo mueven y siguen bloqueados -- por eso NO se
+      delega a `_es_ref_segura` (esa sigue sin conocer `HEAD` para
+      merge/rebase/pull, a proposito).
+    - forma con pathspec (`git reset [<ref>] [--] <paths>...`): es un unstage,
+      nunca mueve el ref sin importar cual sea la ref. Se detecta por `--`
+      literal en `resto`, o por haber mas de un argumento no-flag (ref +
+      al menos un path).
+
+    No distingue --hard/--soft/--mixed a proposito: lo que mueve la base a
+    codigo no revisado es la REF, no el modo (decision documentada: `git
+    reset --soft HEAD~1` en la base tambien bloquea, aunque --soft no toque
+    el working tree, porque HEAD~1 no es una ref segura)."""
     if rama not in bases:
         return None
-    refs = _tokens_no_flag(resto)
-    ref = refs[0] if refs else ""
-    if _es_ref_segura(ref, rama):
+    if "--" in resto:
+        return None  # `git reset [<ref>] -- <paths>...`: unstage, no mueve el ref
+    no_flags = _tokens_no_flag(resto)
+    if len(no_flags) >= 2:
+        return None  # `git reset <ref> <paths>...`: idem, unstage
+    ref = no_flags[0] if no_flags else ""
+    if ref == "HEAD" or _es_ref_segura(ref, rama):
         return None
-    return _mensaje_integracion_en_base(rama, "reset")
+    return _mensaje_reset_mueve_base(rama)
 
 
 def _revisar_pull(resto: list[str], rama: str, bases: list[str]) -> str | None:

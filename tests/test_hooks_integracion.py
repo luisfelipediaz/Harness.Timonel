@@ -176,6 +176,25 @@ TABLA_DE_CASOS = [
     # distingue modo, solo ref -- HEAD~1 no es vacia ni origin/main, bloquea
     # igual que --hard aunque --soft no toque el working tree.
     (107, "main", "git reset --soft HEAD~1", BLOQUEADO),
+
+    # --- fix de falsos positivos de `reset` (#82): HEAD exacto y pathspec ---
+    # `git reset --hard HEAD` no mueve el ref (queda donde estaba) y descarta
+    # el working tree: sin integracion posible, no debe bloquear.
+    (108, "main", "git reset --hard HEAD", PERMITIDO),
+    (109, "main", "git reset", PERMITIDO),
+    (110, "main", "git reset --hard", PERMITIDO),
+    # `git reset [<ref>] [--] <paths>...` es un unstage: nunca mueve el ref,
+    # sin importar la ref.
+    (111, "main", "git reset HEAD archivo.py", PERMITIDO),
+    (112, "main", "git reset -- archivo.py", PERMITIDO),
+    # HEAD~1, HEAD^ y HEAD@{1} SI mueven el ref -- no se aflojan por este fix,
+    # ninguna forma de HEAD "compuesta" es segura, solo HEAD exacto.
+    (113, "main", "git reset --hard HEAD~1", BLOQUEADO),
+    (114, "main", "git reset --hard HEAD^", BLOQUEADO),
+    (115, "main", "git reset --hard HEAD@{1}", BLOQUEADO),
+    # riesgo explicito de este cambio: HEAD no se vuelve ref segura para el
+    # resto de la familia (`_es_ref_segura` global no cambia).
+    (116, "main", "git push origin HEAD", BLOQUEADO),
 ]
 
 BASES = ["main", "master", "develop"]
@@ -215,6 +234,16 @@ class GuardIntegracionPuroTests(unittest.TestCase):
     def test_mensaje_reset_ofrece_reset_hard_origin_base(self):
         mensaje = gi.decidir("git reset --hard hu/x", "main", BASES)
         self.assertIn("git reset --hard origin/main", mensaje)
+
+    def test_mensaje_reset_habla_de_mover_el_ref_no_de_integracion_nueva(self):
+        """Asercion no vacia (#82, fix de falsos positivos): `reset` no crea
+        integracion nueva, mueve el ref de la base. Si el mensaje vuelve a
+        reusar el generico de `_mensaje_integracion_en_base`, este test debe
+        fallar -- ver mutacion obligatoria."""
+        mensaje = gi.decidir("git reset --hard hu/x", "main", BASES)
+        self.assertIn("mover el ref", mensaje)
+        self.assertIn("git reset --hard origin/main", mensaje)
+        self.assertNotIn("crear integracion nueva", mensaje)
 
     def test_mensaje_cherry_pick_revert_am_ofrece_pr_no_ff_only(self):
         """Aserciones no vacias (#82 ronda final): a quien quiere llevar un commit a
