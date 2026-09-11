@@ -80,6 +80,48 @@ TABLA_DE_CASOS = [
     (44, "main", "git pull --rebase", BLOQUEADO),
     (45, "main", "git push --mirror origin", BLOQUEADO),
     (46, "hu/82-x", "git switch main && git merge hu/x", BLOQUEADO),
+    # --- review ronda 2 de #82: CRITICO, separadores no tratados evaden el guard ---
+    # salto de linea: como Bash entrega comandos multilinea todo el tiempo (no una
+    # evasion deliberada) -- el mas grave de los cuatro.
+    (47, "hu/82-x", "git checkout main\ngit merge hu/x", BLOQUEADO),  # \n pegado
+    (48, "hu/82-x", "git checkout main \n git merge hu/x", BLOQUEADO),  # \n separado
+    (49, "hu/82-x", "git checkout main\r\ngit merge hu/x", BLOQUEADO),  # \r\n pegado
+    (50, "hu/82-x", "git checkout main \r\n git merge hu/x", BLOQUEADO),  # \r\n separado
+    (51, "hu/82-x", "git status\ngit checkout main\ngit merge hu/82-x", BLOQUEADO),  # multilinea realista de 3 lineas
+    # de fondo (&)
+    (52, "hu/82-x", "git checkout main&git merge hu/x", BLOQUEADO),  # & pegado
+    (53, "hu/82-x", "git checkout main & git merge hu/x", BLOQUEADO),  # & separado
+    # pipe simple (|)
+    (54, "hu/82-x", "git checkout main|git merge hu/x", BLOQUEADO),  # | pegado
+    (55, "hu/82-x", "git checkout main | git merge hu/x", BLOQUEADO),  # | separado
+    # agrupacion (...)
+    (56, "hu/82-x", "(git checkout main && git merge hu/x)", BLOQUEADO),  # agrupado
+    # \n dentro de comillas NO es separador
+    (57, "hu/82-x", 'git commit -m "linea1\nlinea2"', PERMITIDO),
+    # --- warnings ronda 2: flag-skip pegado ---
+    (58, "hu/82-x", "git -Cpath push origin main", BLOQUEADO),  # -C pegado
+    (59, "main", "git -c user.name=x merge hu/z", BLOQUEADO),  # -c global rompia la deteccion del subcomando
+    (60, "main", "git -cuser.name=x merge hu/z", BLOQUEADO),  # -c pegado
+    # --- warning ronda 2: casos limite de escapes (fijan el comportamiento actual) ---
+    (61, "hu/82-x", 'git commit -m "cita \\"escapada\\" adentro"', PERMITIDO),  # backslash antes de comilla
+    (63, "main", "git merge \\;hu/x", BLOQUEADO),  # backslash antes de separador: no evade, ref insegura en base
+    (64, "hu/82-x", "git commit -m 'a;b'\\''c;d'", PERMITIDO),  # comillas anidadas simples (idioma it's)
+    (65, "hu/82-x", 'git commit -m "mix \'single\' and \\"double\\""', PERMITIDO),  # comillas mixtas
+    # el que SI resulto explotable (ver mutacion/reporte): comilla escapada + && sin espacio
+    # -> en Bash real corre igual (`"a\"b"&&git merge x` ejecuta las dos), y el tracker
+    # simple (sin reconocer el escape) lo dejaba pasar. Ya corregido arriba.
+    (66, "main", 'git commit -m "a\\"b"&&git merge hu/x', BLOQUEADO),  # explotable, corregido
+    (67, "main", 'git commit -m "a\\"b";git merge hu/x', BLOQUEADO),  # idem con ;
+    # --- limitacion aceptada y documentada (NO perseguir): evasion deliberada ---
+    # guard != sandbox; cada capa de parser nueva para cubrir esto es superficie de
+    # bug nueva (ver docstring del modulo y CHANGELOG). Si este test empieza a fallar
+    # porque alguien "lo arreglo", que sea una decision, no un descuido.
+    (68, "main", 'eval "git merge hu/x"', PERMITIDO),  # limite conocido: eval
+    (69, "main", 'bash -c "git merge hu/x"', PERMITIDO),  # limite conocido: bash -c
+    # rama de partida NO es base: el guard no simula el efecto del `$(git checkout
+    # main)` (no entra al command substitution), asi que la deteccion de "estoy
+    # parado en una base" no se dispara -- ese es exactamente el limite aceptado.
+    (70, "hu/82-x", "$(git checkout main) && git merge hu/x", PERMITIDO),  # limite conocido: command substitution
 ]
 
 BASES = ["main", "master", "develop"]

@@ -26,6 +26,18 @@ error inesperado (JSON invalido, `shlex` invalido, `git`/config ilegibles)
 sale 0: fail-open deliberado, preferible que se cuele un merge -reversible-
 a que el harness se trabe. La unica proteccion incondicional (no fail-open)
 es `git push --force`, y esa vive inline en `hooks/hooks.json`, no aqui.
+
+Limitacion conocida y aceptada (revision #2 de #82): el guard cubre TODAS las
+formas naturales de escribir el comando -- `;`, `&&`, `||`, salto de linea
+(`\n`/`\r\n`, la forma en que Bash entrega comandos multilinea todo el
+tiempo), `&` de fondo, `|` (pipe simple) y agrupacion `(...)` -- pero NO
+persigue la evasion deliberada: `eval "git merge hu/x"`, `bash -c "git merge
+hu/x"` o `$(git checkout main) && git merge hu/x` quedan PERMITIDOS a
+proposito y no se les agrega codigo. Un guard de hook no puede ser un
+sandbox: quien quiera evadirlo siempre va a poder, y cada capa nueva de
+parser para perseguir estas formas es superficie nueva de bug (la propia
+razon de ser de este modulo: el criterio de frontera importa mas que
+acumular parsers).
 """
 
 from __future__ import annotations
@@ -198,11 +210,16 @@ MANEJADORES = {
     ("gh", "pr", "merge"): _manejar_gh_pr_merge,
 }
 
-SEPARADORES_DE_SEGMENTO = {"&&", "||", ";"}
+SEPARADORES_DE_SEGMENTO = {"&&", "||", ";", "&", "|", "(", ")"}
 
 # Flags globales de `git` que van ANTES del subcomando y que hay que saltear para
 # no confundir su argumento (o el propio flag) con el subcomando real.
-_FLAGS_GLOBALES_GIT_CON_VALOR = {"-C", "--git-dir", "--work-tree"}
+# Cortos (`-C`, `-c`): admiten forma pegada (`-Cpath`, `-cclave=valor`) ademas de
+# la separada (`-C path`, `-c clave=valor`); `-c` siempre lleva un valor `clave=valor`,
+# sea pegado o como token propio.
+_FLAGS_GLOBALES_GIT_CORTOS_CON_VALOR = {"-C", "-c"}
+# Largos: solo forma separada o con `=` (`--git-dir=valor`), nunca pegada sin `=`.
+_FLAGS_GLOBALES_GIT_LARGOS_CON_VALOR = {"--git-dir", "--work-tree"}
 
 
 def _descartar_asignaciones_env(segmento: list[str]) -> list[str]:
@@ -215,18 +232,22 @@ def _descartar_asignaciones_env(segmento: list[str]) -> list[str]:
 
 
 def _indice_subcomando_git(segmento: list[str]) -> int | None:
-    """Salta flags globales de `git` (`-C <path>`, `--git-dir[=valor]`,
-    `--work-tree[=valor]`) y devuelve el indice del subcomando real, o None si no
-    hay ninguno (p. ej. `git` solo, o `git -C` sin subcomando)."""
+    """Salta flags globales de `git` (`-C <path>`/`-Cpath`, `-c clave=valor`/
+    `-cclave=valor`, `--git-dir[=valor]`, `--work-tree[=valor]`) y devuelve el
+    indice del subcomando real, o None si no hay ninguno (p. ej. `git` solo, o
+    `git -C` sin subcomando)."""
     i = 1
     n = len(segmento)
     while i < n:
         token = segmento[i]
-        if token in _FLAGS_GLOBALES_GIT_CON_VALOR:
-            i += 2
+        if token in _FLAGS_GLOBALES_GIT_CORTOS_CON_VALOR or token in _FLAGS_GLOBALES_GIT_LARGOS_CON_VALOR:
+            i += 2  # forma separada: el token siguiente es el valor
             continue
-        if any(token.startswith(f"{flag}=") for flag in _FLAGS_GLOBALES_GIT_CON_VALOR):
+        if any(token.startswith(f"{flag}=") for flag in _FLAGS_GLOBALES_GIT_LARGOS_CON_VALOR):
             i += 1
+            continue
+        if any(token.startswith(flag) and token != flag for flag in _FLAGS_GLOBALES_GIT_CORTOS_CON_VALOR):
+            i += 1  # forma pegada: el valor va en el mismo token que el flag
             continue
         return i
     return None
@@ -248,21 +269,53 @@ def _clave_y_resto(segmento: list[str]) -> tuple[tuple[str, ...] | None, list[st
 
 
 def _normalizar_separadores(cmd: str) -> str:
-    """Inserta espacios alrededor de `;`, `&&`, `||` para que salgan como tokens
-    propios de `shlex.split`, sin tocar lo que este dentro de comillas simples o
-    dobles (si no, `git commit -m "fix; ver #82"` perderia la comilla de cierre y
-    `shlex` fallaria: un fail-open silencioso y evadible a proposito)."""
+    """Inserta espacios alrededor de `;`, `&&`, `||`, `&`, `|`, `(`, `)` y trata
+    `\\n`/`\\r\\n` como `;` para que salgan como tokens propios de `shlex.split`,
+    sin tocar lo que este dentro de comillas simples o dobles (si no, `git commit
+    -m "fix; ver #82"` perderia la comilla de cierre y `shlex` fallaria: un
+    fail-open silencioso y evadible a proposito). El salto de linea es el
+    separador critico (#82 ronda 2): es como Bash entrega comandos multilinea
+    todo el tiempo, no una evasion deliberada como `eval`/`bash -c`/`$(...)`
+    (ver docstring del modulo).
+
+    Reconoce el escape de comillas fuera y dentro de comillas dobles (`\\"`,
+    `\\\\`) igual que `shlex`: sin esto, un `\\"` dentro de un mensaje de commit
+    hace que el tracker de comillas -mas simple que `shlex`- cierre la comilla
+    antes de tiempo, y un `&&`/`;` que en Bash real SIGUE ejecutandose como
+    comando nuevo (no hace falta espacio alrededor: `"a\\"b"&&git merge x` corre
+    igual) quedaria escondido dentro de lo que el tracker cree que sigue
+    citado -- un bypass real, no solo una divergencia cosmetica."""
     resultado: list[str] = []
     comilla: str | None = None
     i = 0
     n = len(cmd)
     while i < n:
         ch = cmd[i]
-        if comilla:
+        if comilla == "'":
+            # dentro de comillas simples nada escapa: todo literal hasta el cierre.
             resultado.append(ch)
-            if ch == comilla:
+            if ch == "'":
                 comilla = None
             i += 1
+            continue
+        if comilla == '"':
+            if ch == "\\" and i + 1 < n and cmd[i + 1] in ('"', "\\"):
+                # `\"` / `\\` dentro de comillas dobles: escapado, no cierra la comilla.
+                resultado.append(ch)
+                resultado.append(cmd[i + 1])
+                i += 2
+                continue
+            resultado.append(ch)
+            if ch == '"':
+                comilla = None
+            i += 1
+            continue
+        if ch == "\\" and i + 1 < n:
+            # fuera de comillas, backslash escapa literalmente el caracter siguiente
+            # (comilla o separador): no abre comillas ni cuenta como separador.
+            resultado.append(ch)
+            resultado.append(cmd[i + 1])
+            i += 2
             continue
         if ch in ("'", '"'):
             comilla = ch
@@ -274,8 +327,26 @@ def _normalizar_separadores(cmd: str) -> str:
             resultado.append(f" {dos} ")
             i += 2
             continue
-        if ch == ";":
+        if dos == "\r\n":
             resultado.append(" ; ")
+            i += 2
+            continue
+        if ch == "\n":
+            resultado.append(" ; ")
+            i += 1
+            continue
+        if ch == "(" and i > 0 and cmd[i - 1] == "$":
+            # `$(...)` es command substitution, no agrupacion: la limitacion aceptada
+            # (docstring del modulo) dice explicitamente que no se persigue -- si la
+            # tratamos como separador aca, el simulador de rama SI entra al `$(git
+            # checkout main)` de casos como `$(git checkout main) && git merge hu/x`
+            # y termina bloqueando un caso que la decision de alcance deja afuera
+            # a proposito.
+            resultado.append(ch)
+            i += 1
+            continue
+        if ch in (";", "&", "|", "(", ")"):
+            resultado.append(f" {ch} ")
             i += 1
             continue
         resultado.append(ch)
