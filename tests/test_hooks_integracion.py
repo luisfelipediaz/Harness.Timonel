@@ -154,6 +154,28 @@ TABLA_DE_CASOS = [
     (92, "hu/82-x", "gh api repos/o/r/pulls/94/merge", BLOQUEADO),  # sin metodo, igual bloqueado
     (93, "hu/82-x", "gh api repos/o/r/pulls/94", PERMITIDO),  # sin /merge: solo lectura
     (94, "hu/82-x", "gh api user", PERMITIDO),
+
+    # --- ronda final de #82: gh api /merges (Merge a branch, sin PR) ---
+    (95, "hu/82-x", "gh api -X POST repos/o/r/merges -f base=main -f head=hu/x", BLOQUEADO),
+    (96, "hu/82-x", "gh api repos/o/r/merges", BLOQUEADO),
+    (97, "hu/82-x", "gh api repos/o/merged-stuff/pulls/1", PERMITIDO),  # "merge" no es el segmento final
+
+    # --- ronda final de #82: git revert / git am, misma familia que cherry-pick ---
+    (98, "main", "git revert abc1234", BLOQUEADO),
+    (99, "main", "git am /tmp/p.patch", BLOQUEADO),
+    (100, "hu/82-x", "git revert abc1234", PERMITIDO),  # fuera de base, normal
+    (101, "hu/82-x", "git am /tmp/p.patch", PERMITIDO),  # fuera de base, normal
+    (102, "main", "git revert --abort", PERMITIDO),  # forma de control
+    (103, "main", "git am --continue", PERMITIDO),  # forma de control
+
+    # --- ronda final de #82: git reset --hard a una ref no segura ---
+    (104, "main", "git reset --hard hu/x", BLOQUEADO),  # mueve main a codigo no revisado
+    (105, "main", "git reset --hard origin/main", PERMITIDO),  # sync, ref segura
+    (106, "hu/82-x", "git reset --hard hu/x", PERMITIDO),  # fuera de base, normal
+    # decision documentada (ver _revisar_reset): el criterio de ref segura no
+    # distingue modo, solo ref -- HEAD~1 no es vacia ni origin/main, bloquea
+    # igual que --hard aunque --soft no toque el working tree.
+    (107, "main", "git reset --soft HEAD~1", BLOQUEADO),
 ]
 
 BASES = ["main", "master", "develop"]
@@ -185,6 +207,25 @@ class GuardIntegracionPuroTests(unittest.TestCase):
     def test_mensaje_pull_sin_ff_only_incluye_literal(self):
         mensaje = gi.decidir("git pull", "main", BASES)
         self.assertIn("git pull --ff-only", mensaje)
+
+    def test_mensaje_rebase_ofrece_rebase_no_generico_de_merge(self):
+        mensaje = gi.decidir("git rebase hu/x", "main", BASES)
+        self.assertIn("git rebase origin/main", mensaje)
+
+    def test_mensaje_reset_ofrece_reset_hard_origin_base(self):
+        mensaje = gi.decidir("git reset --hard hu/x", "main", BASES)
+        self.assertIn("git reset --hard origin/main", mensaje)
+
+    def test_mensaje_cherry_pick_revert_am_ofrece_pr_no_ff_only(self):
+        """Aserciones no vacias (#82 ronda final): a quien quiere llevar un commit a
+        la base, sincronizar no le sirve. Si el mensaje vuelve al generico de
+        `merge` (`--ff-only`), este test debe fallar -- ver mutacion obligatoria."""
+        for cmd in ("git cherry-pick abc1234", "git revert abc1234", "git am /tmp/p.patch"):
+            with self.subTest(cmd=cmd):
+                mensaje = gi.decidir(cmd, "main", BASES)
+                self.assertIn("abri el PR", mensaje)
+                self.assertIn("git checkout hu/<issue>-<slug>", mensaje)
+                self.assertNotIn("--ff-only", mensaje)
 
     def test_mensaje_gh_pr_merge_explica_via_humana(self):
         mensaje = gi.decidir("gh pr merge 1", "main", BASES)

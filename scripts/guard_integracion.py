@@ -4,9 +4,10 @@
 La politica de integracion por PR (TIM-ADR-0005, #80) dice que el merge a la
 rama base lo hace un humano al aprobar el PR. Este script es el guard
 `PreToolUse` que la hace cumplir: bloquea `git push` a la rama base, `git
-merge`/`git pull`/`git rebase`/`git cherry-pick` que integrarian algo que
-nadie reviso estando parado en la rama base, y `gh pr merge`/`gh api
-.../merge` siempre.
+merge`/`git pull`/`git rebase`/`git reset` que integrarian o moverian la base
+a algo que nadie reviso estando parado en ella, `git cherry-pick`/`git
+revert`/`git am` que crean un commit directo en la base sin pasar por PR, y
+`gh pr merge`/`gh api .../merge(s)` siempre.
 
 Criterio de frontera (no confundir con "en que rama estoy parado"): un comando
 NO se juzga por la rama actual sino por si PUEDE CREAR INTEGRACION NUEVA.
@@ -19,15 +20,24 @@ NO se juzga por la rama actual sino por si PUEDE CREAR INTEGRACION NUEVA.
     `main` es el agujero de la HU #30 y sigue bloqueado. Las formas de
     control de `rebase` (`--continue`, `--abort`, `--skip`, `--quit`) se
     permiten siempre, no integran nada nuevo.
-  - `cherry-pick` estando en una rama base: bloqueado siempre (cualquier ref
-    mete un commit nuevo directo, no hay equivalente de ref segura); sus
-    formas de control (`--continue`, `--abort`, `--skip`, `--quit`) se
-    permiten siempre.
+  - `cherry-pick`/`revert`/`am` estando en una rama base: bloqueados siempre
+    (misma familia -- los tres crean un commit nuevo directo en la base sin
+    pasar por PR, no hay equivalente de ref segura); sus formas de control
+    (`--continue`, `--abort`, `--skip`, `--quit`) se permiten siempre.
+  - `reset` estando en una rama base: se permite SOLO si la ref es vacia o
+    el equivalente remoto de esa misma base (mismo criterio de ref segura que
+    `merge`/`rebase`/`pull`, reutilizado sin agregar uno nuevo). `git reset
+    --hard origin/main` en `main` sincroniza y se permite; `git reset --hard
+    hu/x` mueve `main` a codigo no revisado y bloquea. Aplica a cualquier
+    modo (`--hard`, `--soft`, `--mixed`): lo que importa es la ref, no el
+    modo -- `git reset --soft HEAD~1` en la base tambien bloquea porque
+    `HEAD~1` no es una ref segura.
   - `gh pr merge`: siempre bloqueado, el merge del PR es de un humano.
-  - `gh api` hacia una ruta que (quitando el query string) termina en
-    `/merge`: siempre bloqueado sin importar el metodo -- es el mismo merge
-    por la API REST (patron simple y deliberado sobre la ruta, no un parser
-    de metodos HTTP).
+  - `gh api` hacia una ruta cuyo segmento final (quitando el query string y
+    la barra final) es `merge` o `merges`: siempre bloqueado sin importar el
+    metodo -- `/merges` es la API *Merge a branch*, tan directa como `/merge`
+    (patron simple y deliberado sobre la ruta, no un parser de metodos
+    HTTP).
 
 Flags globales de `git` (los que van ANTES del subcomando, p. ej. `git
 --no-pager push ...`): la regla es "todo token que empiece con `-` entre
@@ -65,6 +75,22 @@ no puede ser un sandbox: quien quiera evadirlo siempre va a poder, y cada
 capa nueva de parser para perseguir estas formas es superficie nueva de bug
 (la propia razon de ser de este modulo: el criterio de frontera importa mas
 que acumular parsers).
+
+Criterio de alcance de la tabla (ronda final de #82, cierre de la lista): un
+vector nuevo entra a este guard si se arregla agregando FILAS a
+`MANEJADORES`/la tabla de lookup -- datos, no codigo nuevo de parseo. Si
+arreglarlo pide tocar el parser (`_normalizar_separadores`,
+`_indice_subcomando_git`, `_clave_y_resto`), NO entra: cada capa nueva de
+parser es superficie nueva de bug, no una mejora gratis -- ya paso en esta
+misma HU, el arreglo del pre-parser de separadores introdujo un caso
+explotable (comilla escapada + `&&` sin espacio) que solo aparecio al
+escribir sus tests (ver caso 66 en `tests/test_hooks_integracion.py`).
+
+La proteccion REAL de la rama base es server-side (branch protection en
+GitHub, #85), no este guard. Este guard es defensa en profundidad contra el
+error honesto y contra que el propio orquestador se autoautorice un merge sin
+PR: atrapa la equivocacion, no al adversario. No debe pretender ser un
+sandbox ni perseguir cada evasion deliberada (ver limitacion de arriba).
 """
 
 from __future__ import annotations
@@ -133,12 +159,35 @@ def _mensaje_push(base: str) -> str:
     )
 
 
-def _mensaje_integracion_en_base(base: str) -> str:
+#  Alternativa de sincronizacion por verbo: el comando ofrecido es el que el
+# usuario tipeo, no siempre el de `merge` (ronda final de #82). `{base}` se
+# interpola despues.
+_ALTERNATIVAS_DE_SINCRONIA = {
+    "merge": "`git merge --ff-only origin/{base}` (o `git pull --ff-only`)",
+    "pull": "`git pull --ff-only`",
+    "rebase": "`git rebase origin/{base}`",
+    "reset": "`git reset --hard origin/{base}`",
+}
+
+
+def _mensaje_integracion_en_base(base: str, verbo: str) -> str:
+    alternativa = _ALTERNATIVAS_DE_SINCRONIA[verbo].format(base=base)
     return (
         f"{PREFIJO}en la rama base '{base}' no se permite crear integracion "
         "nueva (TIM-ADR-0005, epica #79/#80). Para sincronizar tu copia "
-        f"local si podes: `git merge --ff-only origin/{base}` (o `git pull "
-        "--ff-only`)."
+        f"local si podes: {alternativa}."
+    )
+
+
+def _mensaje_commit_directo_en_base(base: str) -> str:
+    """cherry-pick/revert/am en la base: a diferencia de merge/pull/rebase/reset,
+    sincronizar no le sirve a quien quiere llevar un commit a la base -- la
+    alternativa real es commitear en la rama de la historia y abrir el PR."""
+    return (
+        f"{PREFIJO}en la rama base '{base}' no se permite crear integracion "
+        "nueva (TIM-ADR-0005, epica #79/#80). Hacelo en la rama de la "
+        "historia (`git checkout hu/<issue>-<slug>`) y abri el PR: el "
+        f"cambio llega a '{base}' cuando un humano lo mergea."
     )
 
 
@@ -152,11 +201,11 @@ def _mensaje_gh_pr_merge() -> str:
 
 def _mensaje_gh_api_merge() -> str:
     return (
-        f"{PREFIJO}gh api hacia una ruta que termina en /merge esta "
-        "bloqueado: es el equivalente exacto de `gh pr merge` por la API "
-        "REST y el merge del PR lo hace un humano (epica #79). Si solo "
-        "queres consultar el estado, usa `gh pr view <numero> --json "
-        "mergeable,mergeStateStatus`."
+        f"{PREFIJO}gh api hacia una ruta que termina en /merge o /merges "
+        "esta bloqueado: es el equivalente exacto de `gh pr merge` (o del "
+        "merge de una rama del lado del servidor) por la API REST, y el "
+        "merge lo hace un humano (epica #79). Si solo queres consultar el "
+        "estado, usa `gh pr view <numero> --json mergeable,mergeStateStatus`."
     )
 
 
@@ -194,7 +243,7 @@ def _revisar_merge(resto: list[str], rama: str, bases: list[str]) -> str | None:
     ref = refs[0] if refs else ""
     if ff_only and _es_ref_segura(ref, rama):
         return None
-    return _mensaje_integracion_en_base(rama)
+    return _mensaje_integracion_en_base(rama, "merge")
 
 
 def _revisar_rebase(resto: list[str], rama: str, bases: list[str]) -> str | None:
@@ -206,15 +255,34 @@ def _revisar_rebase(resto: list[str], rama: str, bases: list[str]) -> str | None
     ref = refs[0] if refs else ""
     if _es_ref_segura(ref, rama):
         return None  # sync con el remoto de la misma base: `git rebase origin/main`
-    return _mensaje_integracion_en_base(rama)
+    return _mensaje_integracion_en_base(rama, "rebase")
 
 
-def _revisar_cherry_pick(resto: list[str], rama: str, bases: list[str]) -> str | None:
+def _revisar_commit_directo(resto: list[str], rama: str, bases: list[str]) -> str | None:
+    """cherry-pick/revert/am: misma familia, bloqueadas siempre en la base (cualquier
+    ref mete un commit nuevo directo, no hay equivalente de ref segura). Sus formas
+    de control (`--continue`, `--abort`, `--skip`, `--quit`) se permiten siempre."""
     if any(f in resto for f in ("--abort", "--continue", "--skip", "--quit")):
-        return None  # formas de control: no integran nada nuevo
+        return None
     if rama not in bases:
         return None  # el criterio de frontera solo aplica parado en una base
-    return _mensaje_integracion_en_base(rama)  # cualquier ref mete un commit nuevo
+    return _mensaje_commit_directo_en_base(rama)
+
+
+def _revisar_reset(resto: list[str], rama: str, bases: list[str]) -> str | None:
+    """Mismo criterio de ref segura que merge/rebase/pull, reutilizado sin
+    codigo nuevo: vacia o equivalente remoto de la propia base -> permitido;
+    cualquier otra -> bloqueado. No distingue --hard/--soft/--mixed a proposito:
+    lo que mueve la base a codigo no revisado es la REF, no el modo (decision
+    documentada: `git reset --soft HEAD~1` en la base tambien bloquea, aunque
+    --soft no toque el working tree, porque HEAD~1 no es una ref segura)."""
+    if rama not in bases:
+        return None
+    refs = _tokens_no_flag(resto)
+    ref = refs[0] if refs else ""
+    if _es_ref_segura(ref, rama):
+        return None
+    return _mensaje_integracion_en_base(rama, "reset")
 
 
 def _revisar_pull(resto: list[str], rama: str, bases: list[str]) -> str | None:
@@ -229,7 +297,7 @@ def _revisar_pull(resto: list[str], rama: str, bases: list[str]) -> str | None:
         ref_efectiva = ""  # sin refspec, o solo remoto sin rama: se asume seguro
     if ff_only and _es_ref_segura(ref_efectiva, rama):
         return None
-    return _mensaje_integracion_en_base(rama)
+    return _mensaje_integracion_en_base(rama, "pull")
 
 
 def _rama_tras_checkout(resto: list[str], rama_actual: str) -> str:
@@ -262,7 +330,19 @@ def _manejar_rebase(resto, rama, bases):
 
 
 def _manejar_cherry_pick(resto, rama, bases):
-    return _revisar_cherry_pick(resto, rama, bases), rama
+    return _revisar_commit_directo(resto, rama, bases), rama
+
+
+def _manejar_revert(resto, rama, bases):
+    return _revisar_commit_directo(resto, rama, bases), rama
+
+
+def _manejar_am(resto, rama, bases):
+    return _revisar_commit_directo(resto, rama, bases), rama
+
+
+def _manejar_reset(resto, rama, bases):
+    return _revisar_reset(resto, rama, bases), rama
 
 
 # Flags de `gh api` que llevan valor separado: hay que saltearlos junto con su
@@ -292,9 +372,13 @@ def _ruta_gh_api(resto: list[str]) -> str:
 
 def _es_ruta_merge(ruta: str) -> bool:
     """Patron deliberadamente simple (no un parser de metodos HTTP): quita el
-    query string y mira si lo que queda termina en `/merge`."""
-    sin_query = ruta.split("?", 1)[0]
-    return sin_query.rstrip("/").endswith("/merge")
+    query string y mira si el segmento FINAL de la ruta es `merge` o `merges`
+    -- `/merges` es la API *Merge a branch* (POST repos/{o}/{r}/merges), tan
+    directa como `/merge` y con el mismo sufijo mal cubierto por un simple
+    `endswith("/merge")` (ronda final de #82: `.../merges` no matcheaba)."""
+    sin_query = ruta.split("?", 1)[0].rstrip("/")
+    segmento_final = sin_query.rsplit("/", 1)[-1]
+    return segmento_final in ("merge", "merges")
 
 
 def _manejar_gh_api(resto, rama, bases):  # noqa: ARG001 - firma uniforme para el lookup map
@@ -311,6 +395,9 @@ MANEJADORES = {
     ("git", "pull"): _manejar_pull,
     ("git", "rebase"): _manejar_rebase,
     ("git", "cherry-pick"): _manejar_cherry_pick,
+    ("git", "am"): _manejar_am,
+    ("git", "revert"): _manejar_revert,
+    ("git", "reset"): _manejar_reset,
     ("git", "checkout"): _manejar_checkout,
     ("git", "switch"): _manejar_checkout,
     ("gh", "pr", "merge"): _manejar_gh_pr_merge,
