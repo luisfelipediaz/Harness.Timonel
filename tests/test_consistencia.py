@@ -97,8 +97,8 @@ class MarcadoresTests(unittest.TestCase):
 class PerfilPluginTests(unittest.TestCase):
     def test_flechodiezx_tiene_perfil_plugin(self):
         texto = (ROOT / "agents/flechodiezx.md").read_text(encoding="utf-8")
-        for frase in ("Perfil plugin", "implement-plugin-change", "git merge --no-ff", "contrato de cambio",
-                      "verify-dod", "perfil", "git.integracion", "integracion.py"):
+        for frase in ("Perfil plugin", "implement-plugin-change", "contrato de cambio",
+                      "verify-dod", "perfil", "integracion.py"):
             self.assertIn(frase, texto, f"flechodiezx.md debe describir el perfil plugin: falta `{frase}`")
         self.assertIn("implement-plugin-change", SKILLS)
 
@@ -107,6 +107,21 @@ class PerfilPluginTests(unittest.TestCase):
         guard = hooks["hooks"]["PreToolUse"][0]["hooks"][0]["command"]
         self.assertIn('"$branch" = main', guard)
         self.assertIn("exit 2", guard)
+
+
+class IntegracionPorPrTests(unittest.TestCase):
+    """El PR es la unica via de integracion (#80): sin merge directo a la rama base."""
+
+    def test_flechodiezx_no_menciona_merge_directo(self):
+        texto = (ROOT / "agents/flechodiezx.md").read_text(encoding="utf-8")
+        prohibidas = ('git.integracion: "merge"', "git merge --no-ff", "git push origin main",
+                      "merge --ff-only", "git checkout main", "gh issue close")
+        for cadena in prohibidas:
+            self.assertNotIn(cadena, texto, f"flechodiezx.md no debe mencionar `{cadena}`: la unica via de integracion es el PR")
+
+    def test_flechodiezx_declara_regla_dura_de_via_unica(self):
+        texto = (ROOT / "agents/flechodiezx.md").read_text(encoding="utf-8")
+        self.assertIn("Una sola vía de integración", texto)
 
 
 class DodEstrictoTests(unittest.TestCase):
