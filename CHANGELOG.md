@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.0 — en desarrollo
+
+- El PR es la única vía de integración en ambos perfiles: `git.integracion: "merge"` queda deprecado e ignorado desde esta versión (ya no hay `git merge --no-ff` a `main`/rama base); la apertura del PR se adelanta a la nueva **Fase 6.5**, que corre tras el review (5.5) y la retro (6) pero **antes** del DoD (Fase 7), en vez de después; `flechodiezx` ya no cierra el issue en ninguna fase — `scripts/integracion.py` arma el cuerpo del PR con la keyword real `Closes #N` y es GitHub quien cierra el issue al mergear; `scripts/estado_historia.py` reordena la fase del PR antes del DoD (`6.5 PR/Integración`) y `plantilla-hu.md`/`TAREAS` quedan alineadas con ese orden; `_tabla_dod` devuelve "DoD pendiente" en vez de "Sin DoD publicado" cuando aún no hay marcador; label nuevo `estado:en-revision` para la ventana entre PR abierto y merge; `test_consistencia.py` suma invariantes que prohíben tanto las cadenas de integración directa (`git merge --no-ff` a la base) como `gh issue close` dentro del agente (#80)
+
 ## 0.5.0 — 2026-09-10
 
 Épica #26: el harness aplicado a sí mismo.

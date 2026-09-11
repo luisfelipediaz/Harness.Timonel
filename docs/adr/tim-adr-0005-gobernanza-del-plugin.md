@@ -17,7 +17,7 @@ Timonel exige a sus consumidores que el backlog viva en GitHub Issues (TIM-ADR-0
 
 ## Control de cambios
 
-- 2026-09-10 (#27): el plugin se desarrolla con su propio flujo (perfil `plugin` de `flechodiezx`). `main` queda protegida tambien en el plugin: el trabajo va en ramas `hu/N-*` y se integra con `git merge --no-ff`; la release se etiqueta al cerrar la epica.
+- 2026-09-10 (#27): el plugin se desarrolla con su propio flujo (perfil `plugin` de `flechodiezx`). `main` queda protegida tambien en el plugin: el trabajo va en ramas `hu/N-*` y se integra por PR con merge humano; la release se etiqueta al cerrar la epica.
 
 ## Consecuencias
 

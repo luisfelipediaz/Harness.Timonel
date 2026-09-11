@@ -271,26 +271,35 @@ class EstadoHistoriaTests(unittest.TestCase):
         self.assertTrue(e["nueva"], "una HU backend sin trabajo debe ser nueva aunque Frontend cuente como N/A")
 
     COMENTARIOS_HASTA_DOD = [{"body": "<!-- timonel:investigacion -->\nx"}, {"body": "<!-- timonel:dod -->\nx"}]
+    COMENTARIOS_SIN_DOD = [{"body": "<!-- timonel:investigacion -->\nx"}]
 
-    def test_pr_pendiente_tras_dod(self):
-        body = HU_OK["body"].replace("- [ ]", "- [x]") + "\n- [ ] PR abierto"
-        issue = dict(HU_OK, body=body, state="OPEN", comments=self.COMENTARIOS_HASTA_DOD)
+    def test_pr_pendiente_antes_de_dod(self):
+        """Con el DoD y el PR ambos pendientes, la fase activa es 6.5 PR/Integración: el PR se abre antes del DoD."""
+        body = HU_OK["body"].replace(
+            "- [ ] Frontend\n- [ ] Consolidación (lint + tests)\n- [ ] Code review\n- [ ] Retrospectiva\n- [ ] Definition of Done",
+            "- [x] Frontend\n- [x] Consolidación (lint + tests)\n- [x] Code review\n- [x] Retrospectiva\n- [ ] Definition of Done\n- [ ] PR abierto",
+        )
+        issue = dict(HU_OK, body=body, state="OPEN", comments=self.COMENTARIOS_SIN_DOD)
         e = eh.estado(issue, rama="hu/42-registrar-gasto")
-        self.assertEqual(e["reanudar_en"], "8 PR/Integración")
+        self.assertEqual(e["reanudar_en"], "6.5 PR/Integración")
         self.assertFalse(e["nueva"])
 
-    def test_pr_marcado_cierra(self):
-        body = HU_OK["body"].replace("- [ ]", "- [x]") + "\n- [x] PR abierto"
-        issue = dict(HU_OK, body=body, state="OPEN", comments=self.COMENTARIOS_HASTA_DOD)
+    def test_pr_marcado_dod_pendiente(self):
+        """Con el PR ya marcado pero el DoD pendiente, la fase activa es 7 Definition of Done."""
+        body = HU_OK["body"].replace(
+            "- [ ] Frontend\n- [ ] Consolidación (lint + tests)\n- [ ] Code review\n- [ ] Retrospectiva\n- [ ] Definition of Done",
+            "- [x] Frontend\n- [x] Consolidación (lint + tests)\n- [x] Code review\n- [x] Retrospectiva\n- [ ] Definition of Done\n- [x] PR abierto",
+        )
+        issue = dict(HU_OK, body=body, state="OPEN", comments=self.COMENTARIOS_SIN_DOD)
         e = eh.estado(issue, rama="hu/42-registrar-gasto")
-        self.assertEqual(e["reanudar_en"], "cerrar")
+        self.assertEqual(e["reanudar_en"], "7 Definition of Done")
 
     def test_sin_linea_pr_es_skipped(self):
         body = HU_OK["body"].replace("- [ ]", "- [x]")
         issue = dict(HU_OK, body=body, state="OPEN", comments=self.COMENTARIOS_HASTA_DOD)
         e = eh.estado(issue, rama="hu/42-registrar-gasto")
         self.assertEqual(e["reanudar_en"], "cerrar")
-        self.assertIn("8 PR/Integración", e["fases_hechas"])
+        self.assertIn("6.5 PR/Integración", e["fases_hechas"])
 
 
 class CosecharRetroTests(unittest.TestCase):
@@ -379,7 +388,7 @@ class IntegracionTests(unittest.TestCase):
 
     def test_cuerpo_pr_sin_contrato(self):
         cuerpo = ig.cuerpo_pr(31, "luisfelipediaz/Harness.Timonel", "Titulo", None, DOD_OK)
-        self.assertIn("Cierra #31", cuerpo)
+        self.assertIn("Closes #31", cuerpo)
         self.assertIn("Sin contrato publicado", cuerpo)
         self.assertIn("| 1 |", cuerpo)
 
@@ -394,8 +403,29 @@ class IntegracionTests(unittest.TestCase):
 
     def test_cuerpo_pr_sin_dod(self):
         cuerpo = ig.cuerpo_pr(31, "luisfelipediaz/Harness.Timonel", "Titulo", "### Contrato de cambio\n\nTabla.", None)
-        self.assertIn("Sin DoD publicado", cuerpo)
+        self.assertIn("DoD pendiente", cuerpo)
+        self.assertNotIn("Sin DoD publicado", cuerpo)
         self.assertIn("Tabla.", cuerpo)
+
+    def test_cuerpo_pr_primera_linea_es_keyword_y_cuerpo_cita_el_titulo(self):
+        cuerpo = ig.cuerpo_pr(31, "o/r", "Abrir el PR antes del DoD", None, None)
+        self.assertEqual(cuerpo.splitlines()[0], "Closes #31",
+                         "la primera linea debe ser la keyword de cierre de GitHub; `Cierra #N` es prosa y no cierra nada")
+        self.assertIn("Abrir el PR antes del DoD", cuerpo,
+                      "el cuerpo debe decir que historia trae el PR, usando el titulo que `cuerpo_pr` ya recibe")
+        self.assertNotIn("Cierra #31", cuerpo, "no se repite el cierre en prosa: duplica la referencia al issue")
+
+    def test_cuerpo_pr_dod_none_contiene_keyword_contrato_y_dod_pendiente(self):
+        contrato = "### Contrato de cambio\n\n| Archivo | Cambio |\n| --- | --- |\n| agents/flechodiezx.md | Fase 6.5 nueva |\n"
+        cuerpo = ig.cuerpo_pr(80, "o/r", "Titulo", contrato, None)
+        self.assertIn("Closes #80", cuerpo)
+        self.assertIn("agents/flechodiezx.md", cuerpo)
+        self.assertIn("DoD pendiente", cuerpo)
+
+    def test_cuerpo_pr_con_dod_con_filas_sigue_rindiendo_tabla(self):
+        cuerpo = ig.cuerpo_pr(31, "luisfelipediaz/Harness.Timonel", "Titulo", None, DOD_OK)
+        self.assertIn("| 1 |", cuerpo)
+        self.assertNotIn("DoD pendiente", cuerpo)
 
 
 class MetricasTests(unittest.TestCase):

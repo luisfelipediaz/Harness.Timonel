@@ -8,10 +8,11 @@ Uso:
 
 Detecta si el remote es GitHub o Azure DevOps y arma (imprime, no ejecuta) el
 comando `gh pr create` o `az repos pr create` correspondiente. Con `--body-out`
-ademas arma el cuerpo del PR (Cierra #N, contrato de cambio, tabla del DoD) leyendo
-los comentarios `timonel:contrato-api`/`timonel:dod` del issue y lo escribe en ese
-archivo. El agente (flechodiezx, Fase 8) es quien ejecuta el comando impreso: este
-script, como `contrato_check.py`/`validar_marcador.py`, solo lee e imprime.
+ademas arma el cuerpo del PR (keyword de cierre `Closes #N`, contrato de cambio,
+tabla del DoD o "DoD pendiente" si aun no se publico) leyendo los comentarios
+`timonel:contrato-api`/`timonel:dod` del issue y lo escribe en ese archivo. El
+agente (flechodiezx, Fase 6.5) es quien ejecuta el comando impreso: este script,
+como `contrato_check.py`/`validar_marcador.py`, solo lee e imprime.
 """
 
 from __future__ import annotations
@@ -128,19 +129,23 @@ def _seccion_contrato(contrato: str | None) -> str:
     return next((h for h in hallazgos if h), "Sin contrato publicado")
 
 
+_DOD_PENDIENTE = "DoD pendiente — se publicará como comentario al terminar verify-dod"
+
+
 def _tabla_dod(dod: str | None) -> str:
     if not dod:
-        return "Sin DoD publicado"
+        return _DOD_PENDIENTE
     filas = _FILA_DOD.findall(dod)
     if not filas:
-        return "Sin DoD publicado"
+        return _DOD_PENDIENTE
     return "\n".join(["| # | Item | Estado |", "| --- | --- | --- |", *filas])
 
 
 def cuerpo_pr(issue: int, repo: str, titulo: str, contrato: str | None, dod: str | None) -> str:
     link = f"https://github.com/{repo}/issues/{issue}"
     return (
-        f"Cierra #{issue} ({link})\n\n"
+        f"Closes #{issue}\n\n"
+        f"Implementa la historia [#{issue}]({link}): {titulo}\n\n"
         f"## Contrato de cambio\n\n{_seccion_contrato(contrato)}\n\n"
         f"## Definition of Done\n\n{_tabla_dod(dod)}\n"
     )

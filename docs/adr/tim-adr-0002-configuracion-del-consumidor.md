@@ -23,7 +23,7 @@ Todo dato específico del proyecto vive en `.claude/timonel.config.json` del con
 | `heuristicsDir` | `null` → `heuristics/` del plugin; ruta → carpeta propia |
 | `git.baseBranches` (opcional) | Ramas protegidas por el hook `PreToolUse` (default `["main","master","develop"]`): no se permite `git commit` directo durante el trabajo del harness |
 | `git.protectBase` (opcional) | `true` (default) activa ese bloqueo; `false` lo desactiva en repos que commitean a main |
-| `git.integracion` (opcional) | `"pr"` (default en consumidores) abre PR en la Fase 8 (GitHub con `gh`, Azure DevOps con `az repos`); `"merge"` integra con `git merge --no-ff` (default en el propio plugin) |
+| `git.integracion` (opcional) | Unico valor valido: `"pr"` (default y unica via desde v0.6.0) abre PR en la Fase 6.5, antes del DoD (GitHub con `gh`, Azure DevOps con `az repos`). `"merge"` queda **deprecado e ignorado** desde v0.6.0: ya no existe camino de merge directo a la rama base, ni en el consumidor ni en el propio plugin |
 | `timonel.repo` (opcional) | Repo del plugin al que `cosechar_retro.py` envia las mejoras que apuntan al harness (default `luisfelipediaz/Harness.Timonel`) |
 
 `/timonel:onboard` genera el archivo por inspección (`nx.json`, `tsconfig.base.json.paths`, `apps/*/project.json`, `git remote`) y pide confirmación. Los agentes lo leen al inicio y fallan con mensaje claro si falta.
@@ -34,6 +34,7 @@ Se nombra `timonel.config.json` y no `harness.config.json` para convivir con Mef
 
 - 2026-09-10 (v0.4.0, #15 #13): se agregan `git.baseBranches`, `git.protectBase` y `timonel.repo`.
 - 2026-09-10 (v0.5.0, #31): se agrega `git.integracion`.
+- 2026-09-11 (v0.6.0, #80): `git.integracion` pasa a tener un unico valor valido, `"pr"`; `"merge"` queda deprecado e ignorado — el PR es la unica via de integracion, tambien en el perfil plugin.
 
 ## Consecuencias
 
