@@ -145,7 +145,7 @@ def cuerpo_pr(issue: int, repo: str, titulo: str, contrato: str | None, dod: str
     link = f"https://github.com/{repo}/issues/{issue}"
     return (
         f"Closes #{issue}\n\n"
-        f"Cierra #{issue} ({link})\n\n"
+        f"Implementa la historia [#{issue}]({link}): {titulo}\n\n"
         f"## Contrato de cambio\n\n{_seccion_contrato(contrato)}\n\n"
         f"## Definition of Done\n\n{_tabla_dod(dod)}\n"
     )

@@ -388,7 +388,7 @@ class IntegracionTests(unittest.TestCase):
 
     def test_cuerpo_pr_sin_contrato(self):
         cuerpo = ig.cuerpo_pr(31, "luisfelipediaz/Harness.Timonel", "Titulo", None, DOD_OK)
-        self.assertIn("Cierra #31", cuerpo)
+        self.assertIn("Closes #31", cuerpo)
         self.assertIn("Sin contrato publicado", cuerpo)
         self.assertIn("| 1 |", cuerpo)
 
@@ -407,9 +407,13 @@ class IntegracionTests(unittest.TestCase):
         self.assertNotIn("Sin DoD publicado", cuerpo)
         self.assertIn("Tabla.", cuerpo)
 
-    def test_cuerpo_pr_emite_keyword_de_cierre_real(self):
-        cuerpo = ig.cuerpo_pr(31, "o/r", "Titulo", None, None)
-        self.assertIn("Closes #31", cuerpo, "la keyword real de GitHub debe estar presente, no solo 'Cierra #N' en prosa")
+    def test_cuerpo_pr_primera_linea_es_keyword_y_cuerpo_cita_el_titulo(self):
+        cuerpo = ig.cuerpo_pr(31, "o/r", "Abrir el PR antes del DoD", None, None)
+        self.assertEqual(cuerpo.splitlines()[0], "Closes #31",
+                         "la primera linea debe ser la keyword de cierre de GitHub; `Cierra #N` es prosa y no cierra nada")
+        self.assertIn("Abrir el PR antes del DoD", cuerpo,
+                      "el cuerpo debe decir que historia trae el PR, usando el titulo que `cuerpo_pr` ya recibe")
+        self.assertNotIn("Cierra #31", cuerpo, "no se repite el cierre en prosa: duplica la referencia al issue")
 
     def test_cuerpo_pr_dod_none_contiene_keyword_contrato_y_dod_pendiente(self):
         contrato = "### Contrato de cambio\n\n| Archivo | Cambio |\n| --- | --- |\n| agents/flechodiezx.md | Fase 6.5 nueva |\n"
