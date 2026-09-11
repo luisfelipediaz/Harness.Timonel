@@ -19,12 +19,12 @@ import subprocess
 from timonel_gh import find_marker_comment, gh_json, label_value, repo_from_config
 
 TAREAS = ["Contrato API aprobado", "Modelos compartidos", "Backend", "Frontend",
-          "Consolidación (lint + tests)", "Code review", "Retrospectiva", "Definition of Done",
-          "PR abierto"]
+          "Consolidación (lint + tests)", "Code review", "Retrospectiva", "PR abierto",
+          "Definition of Done"]
 MARCADORES = ["investigacion", "contrato-api", "consolidacion", "review", "retro", "dod"]
 
 # Orden de fases y la condicion (tareas/marcadores) que indica que ya se hizo.
-# "PR abierto" ausente del checklist (issues viejos, o `git.integracion: merge`) cuenta
+# "PR abierto" ausente del checklist (issues anteriores a v0.6.0) cuenta
 # como hecha (SKIPPED): el default `True` de `.get` es a proposito.
 FASES = [
     ("1.5 Investigacion",      lambda e: "investigacion" in e["marcadores"]),
@@ -34,8 +34,8 @@ FASES = [
     ("4-5 Consolidacion",      lambda e: e["tareas"].get("Consolidación (lint + tests)") or "consolidacion" in e["marcadores"]),
     ("5.5 Code review",        lambda e: e["tareas"].get("Code review") or "review" in e["marcadores"]),
     ("6 Retrospectiva",        lambda e: e["tareas"].get("Retrospectiva") or "retro" in e["marcadores"]),
+    ("6.5 PR/Integración",     lambda e: e["tareas"].get("PR abierto", True)),
     ("7 Definition of Done",   lambda e: e["tareas"].get("Definition of Done") or "dod" in e["marcadores"]),
-    ("8 PR/Integración",       lambda e: e["tareas"].get("PR abierto", True)),
 ]
 
 

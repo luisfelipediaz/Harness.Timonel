@@ -79,8 +79,8 @@ Depende de #N
 - [ ] Consolidación (lint + tests)
 - [ ] Code review
 - [ ] Retrospectiva
-- [ ] Definition of Done
 - [ ] PR abierto
+- [ ] Definition of Done
 ````
 
 ## Reglas

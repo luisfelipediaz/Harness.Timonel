@@ -11,6 +11,7 @@ Provisionados por `scripts/setup-github-labels.sh` (idempotente). Los ejes `tipo
 | `estado:borrador` | `EDEDED` | Capturado, no cumple DoR |
 | `estado:listo` | `0E8A16` | Cumple DoR; puede implementarse |
 | `estado:en-progreso` | `FBCA04` | En implementación |
+| `estado:en-revision` | `1D76DB` | PR abierto, pendiente de merge humano |
 | `alcance:backend` | `C2E0C6` | Solo API |
 | `alcance:frontend` | `BFD4F2` | Solo cliente |
 | `alcance:full-stack` | `D4C5F9` | API + cliente |

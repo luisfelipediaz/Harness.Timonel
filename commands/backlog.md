@@ -22,7 +22,7 @@ gh api graphql -f query='query($o:String!,$r:String!){ repository(owner:$o,name:
 2. HUs por estado (conteo y lista corta):
 
 ```bash
-for e in listo en-progreso borrador; do echo "== estado:$e"; gh issue list -R "$REPO" --label tipo:hu --label "estado:$e" --state open --limit 100 --json number,title,labels -q '.[] | "#\(.number) \(.title) [\([.labels[].name | select(startswith("sp:") or startswith("mod:"))] | join(" "))]"'; done
+for e in listo en-progreso en-revision borrador; do echo "== estado:$e"; gh issue list -R "$REPO" --label tipo:hu --label "estado:$e" --state open --limit 100 --json number,title,labels -q '.[] | "#\(.number) \(.title) [\([.labels[].name | select(startswith("sp:") or startswith("mod:"))] | join(" "))]"'; done
 echo "== bloqueadas"; gh issue list -R "$REPO" --label bloqueado --state open --json number,title -q '.[] | "#\(.number) \(.title)"'
 ```
 

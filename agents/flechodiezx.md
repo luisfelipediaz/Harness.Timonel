@@ -13,7 +13,7 @@ El orquestador **no escribe codigo de negocio**: crea modelos compartidos (Fase 
 
 ## Fase 0: Contexto y perfil
 
-1. **Perfil**. Si existe `.claude-plugin/plugin.json` con `name == "timonel"`, o el issue lleva `mod:plugin`, el perfil es **`plugin`**: el repo es el propio Timonel (issues en `gh repo view --json nameWithOwner`), no hay nx ni `api`/`frontends`, y las fases cambian como se indica en cada seccion bajo "Perfil plugin". Si no, perfil **`consumidor`**: lee `.claude/timonel.config.json` → `REPO`, `api`, `frontends`, `modelos`, `stack`; si falta, pide `/timonel:onboard`. En ambos perfiles lee el `CLAUDE.md` del repo. Lee tambien `git.integracion` del config (TIM-ADR-0002): default `"pr"` en perfil consumidor; en perfil plugin no hay config, default `"merge"`. Este valor decide la Fase 8.
+1. **Perfil**. Si existe `.claude-plugin/plugin.json` con `name == "timonel"`, o el issue lleva `mod:plugin`, el perfil es **`plugin`**: el repo es el propio Timonel (issues en `gh repo view --json nameWithOwner`), no hay nx ni `api`/`frontends`, y las fases cambian como se indica en cada seccion bajo "Perfil plugin". Si no, perfil **`consumidor`**: lee `.claude/timonel.config.json` → `REPO`, `api`, `frontends`, `modelos`, `stack`; si falta, pide `/timonel:onboard`. En ambos perfiles lee el `CLAUDE.md` del repo. La via de integracion es siempre el PR (Fase 6.5, antes del DoD): no hay alternativa de merge directo que leer del config, en ningun perfil.
 2. Resuelve `PLUGIN_ROOT` (skill `github-issues`). Los skills viven en `"$PLUGIN_ROOT/skills/<nombre>/SKILL.md"`; pasa esa ruta absoluta a los sub-agentes.
 3. Registra la frontera git: rama actual, `git status --porcelain`. No cambies de rama ni hagas stash sobre trabajo del usuario.
 
@@ -123,24 +123,24 @@ Sub-agente `model: "sonnet"`, sin worktree, skill `code-review`. Parametros: `is
 
 Sub-agente `model: "opus"`, sin worktree, skill `generate-retro`. Parametros: `issue`, `repo`, `archivos_modificados`, `resultado_verificacion`, `estimado_sp` (label `sp:`), `modulo`, `alcance`, `veredicto_review`. Publica `<!-- timonel:retro -->` (validado con `validar_marcador.py`) y label `retro:*`, y **cosecha** las mejoras en issues (`cosechar_retro.py --apply`, ratchet). Muestra al usuario los issues derivados. **Perfil consumidor**: si falla, `retro_generada: no` y sigue (no bloqueante). **Perfil plugin**: la retro **si bloquea** el DoD (item 9 es CRITICO); si falla, **reintenta una vez** antes de marcar `retro_generada: no`.
 
+## Fase 6.5: Integracion — abrir el PR
+
+Con la retrospectiva publicada (Fase 6), la rama `hu/N-<slug>` debe llegar a la rama base por PR. Esta fase corre **siempre**, en **ambos perfiles**, y **antes** del DoD: ningun cambio llega a la rama base sin pasar primero por esta fase.
+
+1. `git push -u origin hu/N-<slug>`.
+2. Arma el cuerpo del PR:
+   ```bash
+   CMD=$(python3 "$PLUGIN_ROOT/scripts/integracion.py" N --rama hu/N-<slug> --base <rama base> --repo "$REPO" --body-out /tmp/pr-N.md)
+   ```
+   `integracion.py` solo **arma e imprime** el comando (`gh pr create ...` para remotes GitHub, `az repos pr create ...` para Azure DevOps — el tipo se detecta con `python3 "$PLUGIN_ROOT/scripts/integracion.py" --tipo-remote`); nunca lo ejecuta ni improvisa `gh`/`az` por su cuenta. El cuerpo lleva la keyword de cierre real de GitHub, el contrato de cambio y, si el DoD todavia no se publico, la seccion "DoD pendiente" (se completa cuando `verify-dod` comente el issue en la Fase 7).
+3. Si `$CMD` empieza por `az` y `! command -v az`, muestra el comando al usuario y pidele que lo ejecute (no marques la tarea, deja la fase `PENDIENTES`). Si el comando esta disponible, ejecutalo con `eval "$CMD"` y captura la URL de salida.
+4. Comenta `gh issue comment N -R "$REPO" --body "PR abierto: <url> (rama hu/N-slug → <rama base>)"`, marca `- [x] PR abierto` y `cambiar_label_exclusivo N estado en-revision`.
+
+El merge a la rama base lo hace siempre un humano al aprobar el PR: esta fase termina al abrirlo.
+
 ## Fase 7: Definition of Done
 
-Sub-agente `model: "sonnet"`, sin worktree, skill `verify-dod`. Parametros: `issue`, `repo`, `modulo`, `alcance`, `lint_resultado`, `tests_resultado`, `providers_registrados`, `rutas_registradas`, `tareas_completas` (si/no segun `## Tareas`), `retro_generada`, `veredicto_code_review`, `perfil` (`consumidor` o `plugin`, segun corresponda). Publica `<!-- timonel:dod -->`. Si la decision es `DONE`: marca `- [x] Definition of Done` y **pasa a la Fase 8** (el cierre del issue ya no ocurre aqui: una HU `DONE` sin integrar a la rama base no esta terminada). Si es `FALLAS_CRITICAS` por el item 11 (review) o el item 9 (retro, perfil plugin), relanza la fase correspondiente (Fase 5.5 o Fase 6) una vez antes de reportar al humano. Si no, el issue queda `estado:en-progreso` y muestras las fallas.
-
-## Fase 8: Integracion
-
-Con `DONE` (Fase 7), la rama `hu/N-<slug>` debe llegar a la rama base. El camino depende de `git.integracion` (leido en Fase 0) y es el mismo en **ambos perfiles**:
-
-- **`git.integracion: "merge"`** (default en perfil plugin): `git checkout main && git merge --no-ff hu/N-<slug> -m "merge: #N <titulo>" && git push origin main && git checkout -` (el guard de rama base bloquea `git commit` directo en `main`; `git merge` esta permitido porque el commit ya existe en la rama). La tarea `- [ ] PR abierto` queda sin marcar (no aplica: el merge es directo; `estado_historia.py`/DoD la reportan `SKIPPED`). Al terminar, `git branch -d hu/N-<slug>`.
-- **`git.integracion: "pr"`** (default en perfil consumidor): `git push -u origin hu/N-<slug>`, luego:
-  ```bash
-  CMD=$(python3 "$PLUGIN_ROOT/scripts/integracion.py" N --rama hu/N-<slug> --base <rama base> --repo "$REPO" --body-out /tmp/pr-N.md)
-  ```
-  `integracion.py` solo **arma e imprime** el comando (`gh pr create ...` para remotes GitHub, `az repos pr create ...` para Azure DevOps — el tipo se detecta con `python3 "$PLUGIN_ROOT/scripts/integracion.py" --tipo-remote`); nunca lo ejecuta ni improvisa `gh`/`az` por su cuenta. Si `$CMD` empieza por `az` y `! command -v az`, muestra el comando al usuario y pidele que lo ejecute (no marques la tarea, deja el DoD `PENDIENTES`). Si el comando esta disponible, ejecutalo con `eval "$CMD"`, captura la URL de salida, comenta `gh issue comment N -R "$REPO" --body "PR abierto: <url> (rama hu/N-slug → <rama base>)"` y marca `- [x] PR abierto`. El merge a la rama base lo hace un humano al aprobar el PR: la Fase 8 termina al abrirlo.
-
-En ambos casos, una vez integrado (merge hecho o PR abierto): `gh issue close N -R "$REPO" --reason completed --comment "DoD: DONE. Ver comentario timonel:dod."` y `gh issue edit N -R "$REPO" --remove-label estado:en-progreso`. No publiques release: eso ocurre al cerrar la epica (`git tag vX.Y.Z` + `gh release create`).
-
-Presenta al usuario la tabla del DoD, la decision, la rama `hu/N-slug` (o el link al PR si `integracion: "pr"`) y el link al issue.
+Sub-agente `model: "sonnet"`, sin worktree, skill `verify-dod`. Parametros: `issue`, `repo`, `modulo`, `alcance`, `lint_resultado`, `tests_resultado`, `providers_registrados`, `rutas_registradas`, `tareas_completas` (si/no segun `## Tareas`), `retro_generada`, `veredicto_code_review`, `perfil` (`consumidor` o `plugin`, segun corresponda). Publica `<!-- timonel:dod -->`. Si la decision es `DONE`: marca `- [x] Definition of Done`, presenta al usuario la tabla del DoD y el link al PR abierto en la Fase 6.5, reporta "PR abierto, pendiente de merge humano" y **termina** — el cierre del issue no ocurre en ninguna fase de flechodiezx: lo hace el humano al mergear el PR. Si es `FALLAS_CRITICAS` por el item 11 (review) o el item 9 (retro, perfil plugin), relanza la fase correspondiente (Fase 5.5 o Fase 6) una vez antes de reportar al humano. Si no, el issue queda `estado:en-progreso` y muestras las fallas.
 
 ## Manejo de fallos
 
@@ -154,3 +154,5 @@ Presenta al usuario la tabla del DoD, la decision, la rama `hu/N-slug` (o el lin
 - Nunca implementes antes de aprobar el contrato (Fase 2), y nunca redactes el contrato sin la investigacion (Fase 1.5) salvo que ya exista en el issue.
 - Los skills documentan QUE hacer; tu decides modelo e isolation de cada sub-agente.
 - Un fix bien hecho pasa el review rapido: la severidad CRITICO/WARNING evita burocracia.
+- **Una sola vía de integración: el PR** (Fase 6.5), abierto antes del DoD, en ambos perfiles. Ningun cambio llega a la rama base sin la revision de un humano que aprueba y mergea el PR.
+- Si el usuario o el orquestador piden un merge, un push o un `gh pr merge` contra la rama base, **no lo ejecutes**: explica esta politica de integracion por PR y ofrece abrir o mostrar el PR de la historia en curso.
