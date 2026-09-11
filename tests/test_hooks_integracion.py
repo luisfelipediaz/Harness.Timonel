@@ -56,6 +56,30 @@ TABLA_DE_CASOS = [
     (21, "main-fix", "git push origin main-fix", PERMITIDO),  # frontera de substring
     (22, "hu/82-x", "git merge hu/82-backend", PERMITIDO),  # consolidacion de worktrees
     (26, "main", "git merge --abort", PERMITIDO),
+    # --- review de #82: separador pegado a un token evade el guard (CRITICO) ---
+    (27, "hu/82-x", "git checkout main; git merge hu/x", BLOQUEADO),  # ; pegado
+    (28, "hu/82-x", "git checkout main ; git merge hu/x", BLOQUEADO),  # ; separado
+    (29, "hu/82-x", "git checkout main; git merge --ff-only hu/x", BLOQUEADO),  # ; pegado + agujero #30
+    (30, "hu/82-x", "git switch main; git merge hu/x", BLOQUEADO),  # ; pegado con switch
+    (31, "hu/82-x", "git checkout main&&git merge hu/x", BLOQUEADO),  # && pegado
+    (32, "hu/82-x", "git checkout main && git merge hu/x", BLOQUEADO),  # && separado
+    (33, "hu/82-x", "git checkout main||git merge hu/x", BLOQUEADO),  # || pegado
+    (34, "hu/82-x", "git checkout main || git merge hu/x", BLOQUEADO),  # || separado
+    # --- warnings del review de #82 ---
+    (35, "hu/82-x", "git -C /otro/repo push origin main", BLOQUEADO),  # -C salteado
+    (36, "hu/82-x", "git push origin hu/x:refs/heads/main", BLOQUEADO),  # refs/heads/ normalizado
+    (37, "hu/82-x", "GIT_DIR=.git git push origin main", BLOQUEADO),  # prefijo VAR=valor descartado
+    # --- comillas: un separador dentro de comillas no es separador (trampa del arreglo) ---
+    (38, "hu/82-x", 'git commit -m "fix del parser; ver #82"', PERMITIDO),  # ; interno no es separador
+    (39, "hu/82-x", 'git checkout main && git merge hu/x -m "algo; con punto y coma"', BLOQUEADO),  # && externo si separa
+    # --- regresion: esto ya funcionaba y no debe romperse ---
+    (40, "main", "git pull origin main --ff-only", PERMITIDO),  # flags despues de la ref
+    (41, "main", "git merge  --ff-only  origin/main", PERMITIDO),  # espacios multiples
+    (42, "hu/82-x", "git push origin +hu/x:main", BLOQUEADO),
+    (43, "main", "git push origin HEAD:main", BLOQUEADO),
+    (44, "main", "git pull --rebase", BLOQUEADO),
+    (45, "main", "git push --mirror origin", BLOQUEADO),
+    (46, "hu/82-x", "git switch main && git merge hu/x", BLOQUEADO),
 ]
 
 BASES = ["main", "master", "develop"]
@@ -95,6 +119,39 @@ class GuardIntegracionPuroTests(unittest.TestCase):
 
     def test_shlex_invalido_es_fail_open(self):
         self.assertIsNone(gi.decidir("git push origin main 'sin cerrar", "main", BASES))
+
+    def test_shlex_invalido_deja_rastro_auditable_en_events_log(self):
+        """Fail-open silencioso == agujero que se descubre por casualidad seis HUs
+        despues. El fail-open sigue permitiendo el comando, pero ahora queda rastro."""
+        import os
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            cwd = Path.cwd()
+            try:
+                os.chdir(tmp_path)
+                self.assertIsNone(gi.decidir("git push origin main 'sin cerrar", "main", BASES))
+            finally:
+                os.chdir(cwd)
+            log = tmp_path / ".timonel/events.log"
+            self.assertTrue(log.exists(), "el fail-open deberia crear .timonel/events.log")
+            contenido = log.read_text(encoding="utf-8")
+            self.assertIn("guard-integracion-fail-open shlex-invalido", contenido)
+
+    def test_fail_open_nunca_rompe_el_guard_si_no_puede_escribir_el_log(self):
+        """Si .timonel no se puede crear (p. ej. un archivo ocupa ese nombre), el
+        fail-open sigue devolviendo None: escribir el log nunca hace fallar el guard."""
+        import os
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            (tmp_path / ".timonel").write_text("no es un directorio", encoding="utf-8")
+            cwd = Path.cwd()
+            try:
+                os.chdir(tmp_path)
+                self.assertIsNone(gi.decidir("git push origin main 'sin cerrar", "main", BASES))
+            finally:
+                os.chdir(cwd)
 
     def test_bases_configuradas_lee_config_del_consumidor(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -195,6 +252,11 @@ class HookEnCajaNegraTests(unittest.TestCase):
                         self.assertIn("[timonel] Bloqueado: ", resultado.stderr)
                     else:
                         self.assertEqual(resultado.returncode, 0, f"caso {numero}: stderr={resultado.stderr!r}")
+                        self.assertEqual(
+                            resultado.stderr,
+                            "",
+                            f"caso {numero}: no deberia imprimir nada en stderr, obtuvo {resultado.stderr!r}",
+                        )
 
     def test_repo_sin_harness_no_bloquea_nada(self):
         """Caso 23: sin .claude/timonel.config.json ni plugin.json de timonel, el guard no corre."""

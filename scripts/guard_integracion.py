@@ -30,7 +30,9 @@ es `git push --force`, y esa vive inline en `hooks/hooks.json`, no aqui.
 
 from __future__ import annotations
 
+import datetime
 import json
+import re
 import shlex
 import subprocess
 import sys
@@ -44,6 +46,11 @@ REFS_DE_SINCRONIA = {"", "@{u}", "@{upstream}"}
 CONFIG_CONSUMIDOR = Path(".claude/timonel.config.json")
 BASES_POR_DEFECTO = ["main", "master", "develop"]
 
+EVENTS_LOG = Path(".timonel/events.log")
+
+# Asignacion de variable de entorno delante del programa (`GIT_DIR=.git git ...`).
+_RE_ASIGNACION_ENV = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+
 
 def _es_flag(token: str) -> bool:
     return token.startswith("-")
@@ -55,6 +62,27 @@ def _tokens_no_flag(tokens: list[str]) -> list[str]:
 
 def _es_ref_segura(ref: str, base: str) -> bool:
     return ref in REFS_DE_SINCRONIA or ref == f"origin/{base}"
+
+
+def _normalizar_referencia_destino(ref: str) -> str:
+    """`refs/heads/<x>` y `<x>` son el mismo destino para `git push`; normaliza antes
+    de comparar contra `bases` (si no, `hu/x:refs/heads/main` evade el guard aunque
+    `hu/x:main` sí bloquee)."""
+    prefijo = "refs/heads/"
+    return ref[len(prefijo):] if ref.startswith(prefijo) else ref
+
+
+def _registrar_fail_open(motivo: str) -> None:
+    """Deja rastro de un fail-open en `.timonel/events.log`, mismo estilo que ya
+    escriben los hooks `PostToolUse` de `hooks/hooks.json` (hora + evento). Nunca debe
+    hacer fallar el guard: si el directorio no existe o no se puede escribir, sigue."""
+    try:
+        EVENTS_LOG.parent.mkdir(parents=True, exist_ok=True)
+        hora = datetime.datetime.now().strftime("%H:%M:%S")
+        with EVENTS_LOG.open("a", encoding="utf-8") as f:
+            f.write(f"{hora} guard-integracion-fail-open {motivo}\n")
+    except Exception:
+        pass
 
 
 def _mensaje_push(base: str) -> str:
@@ -96,8 +124,10 @@ def _destino_push(resto: list[str], rama: str) -> str:
         return rama
     if ":" in refspec:
         _, _, destino = refspec.partition(":")
-        return destino or rama
-    return refspec
+        destino = destino or rama
+    else:
+        destino = refspec
+    return _normalizar_referencia_destino(destino)
 
 
 def _revisar_push(resto: list[str], rama: str, bases: list[str]) -> str | None:
@@ -138,27 +168,27 @@ def _rama_tras_checkout(resto: list[str], rama_actual: str) -> str:
     return no_flags[-1] if no_flags else rama_actual
 
 
-def _manejar_push(tokens, rama, bases):
-    return _revisar_push(tokens[2:], rama, bases), rama
+def _manejar_push(resto, rama, bases):
+    return _revisar_push(resto, rama, bases), rama
 
 
-def _manejar_merge(tokens, rama, bases):
-    return _revisar_merge(tokens[2:], rama, bases), rama
+def _manejar_merge(resto, rama, bases):
+    return _revisar_merge(resto, rama, bases), rama
 
 
-def _manejar_pull(tokens, rama, bases):
-    return _revisar_pull(tokens[2:], rama, bases), rama
+def _manejar_pull(resto, rama, bases):
+    return _revisar_pull(resto, rama, bases), rama
 
 
-def _manejar_checkout(tokens, rama, bases):  # noqa: ARG001 - firma uniforme para el lookup map
-    return None, _rama_tras_checkout(tokens[2:], rama)
+def _manejar_checkout(resto, rama, bases):  # noqa: ARG001 - firma uniforme para el lookup map
+    return None, _rama_tras_checkout(resto, rama)
 
 
-def _manejar_gh_pr_merge(tokens, rama, bases):  # noqa: ARG001 - firma uniforme para el lookup map
+def _manejar_gh_pr_merge(resto, rama, bases):  # noqa: ARG001 - firma uniforme para el lookup map
     return _mensaje_gh_pr_merge(), rama
 
 
-# Lookup map: subcomando -> manejador(tokens_del_segmento, rama, bases) -> (mensaje|None, rama_siguiente)
+# Lookup map: subcomando -> manejador(resto_tras_subcomando, rama, bases) -> (mensaje|None, rama_siguiente)
 MANEJADORES = {
     ("git", "push"): _manejar_push,
     ("git", "merge"): _manejar_merge,
@@ -170,16 +200,87 @@ MANEJADORES = {
 
 SEPARADORES_DE_SEGMENTO = {"&&", "||", ";"}
 
+# Flags globales de `git` que van ANTES del subcomando y que hay que saltear para
+# no confundir su argumento (o el propio flag) con el subcomando real.
+_FLAGS_GLOBALES_GIT_CON_VALOR = {"-C", "--git-dir", "--work-tree"}
 
-def _clave(segmento: list[str]) -> tuple[str, ...] | None:
-    if not segmento:
-        return None
-    programa = segmento[0]
-    if programa == "git" and len(segmento) >= 2:
-        return ("git", segmento[1])
-    if programa == "gh" and len(segmento) >= 3 and segmento[1] == "pr":
-        return ("gh", "pr", segmento[2])
+
+def _descartar_asignaciones_env(segmento: list[str]) -> list[str]:
+    """`GIT_DIR=.git git push ...`: descarta los tokens `NOMBRE=valor` que preceden
+    al programa real, tal como lo haria el shell al armar el entorno del comando."""
+    i = 0
+    while i < len(segmento) and _RE_ASIGNACION_ENV.match(segmento[i]):
+        i += 1
+    return segmento[i:]
+
+
+def _indice_subcomando_git(segmento: list[str]) -> int | None:
+    """Salta flags globales de `git` (`-C <path>`, `--git-dir[=valor]`,
+    `--work-tree[=valor]`) y devuelve el indice del subcomando real, o None si no
+    hay ninguno (p. ej. `git` solo, o `git -C` sin subcomando)."""
+    i = 1
+    n = len(segmento)
+    while i < n:
+        token = segmento[i]
+        if token in _FLAGS_GLOBALES_GIT_CON_VALOR:
+            i += 2
+            continue
+        if any(token.startswith(f"{flag}=") for flag in _FLAGS_GLOBALES_GIT_CON_VALOR):
+            i += 1
+            continue
+        return i
     return None
+
+
+def _clave_y_resto(segmento: list[str]) -> tuple[tuple[str, ...] | None, list[str]]:
+    segmento = _descartar_asignaciones_env(segmento)
+    if not segmento:
+        return None, []
+    programa = segmento[0]
+    if programa == "git":
+        idx = _indice_subcomando_git(segmento)
+        if idx is None:
+            return None, []
+        return ("git", segmento[idx]), segmento[idx + 1:]
+    if programa == "gh" and len(segmento) >= 3 and segmento[1] == "pr":
+        return ("gh", "pr", segmento[2]), segmento[3:]
+    return None, []
+
+
+def _normalizar_separadores(cmd: str) -> str:
+    """Inserta espacios alrededor de `;`, `&&`, `||` para que salgan como tokens
+    propios de `shlex.split`, sin tocar lo que este dentro de comillas simples o
+    dobles (si no, `git commit -m "fix; ver #82"` perderia la comilla de cierre y
+    `shlex` fallaria: un fail-open silencioso y evadible a proposito)."""
+    resultado: list[str] = []
+    comilla: str | None = None
+    i = 0
+    n = len(cmd)
+    while i < n:
+        ch = cmd[i]
+        if comilla:
+            resultado.append(ch)
+            if ch == comilla:
+                comilla = None
+            i += 1
+            continue
+        if ch in ("'", '"'):
+            comilla = ch
+            resultado.append(ch)
+            i += 1
+            continue
+        dos = cmd[i:i + 2]
+        if dos in ("&&", "||"):
+            resultado.append(f" {dos} ")
+            i += 2
+            continue
+        if ch == ";":
+            resultado.append(" ; ")
+            i += 1
+            continue
+        resultado.append(ch)
+        i += 1
+    return "".join(resultado)
 
 
 def _partir_en_segmentos(tokens: list[str]) -> list[list[str]]:
@@ -198,20 +299,23 @@ def decidir(cmd: str, rama: str, bases: list[str]) -> str | None:
     entre segmentos (`git checkout <base> && ...`) para que el compuesto no evada
     el guard. Devuelve el mensaje de bloqueo, o None si el comando se permite."""
     try:
-        tokens = shlex.split(cmd, posix=True)
+        tokens = shlex.split(_normalizar_separadores(cmd), posix=True)
     except ValueError:
+        _registrar_fail_open("shlex-invalido")
         return None  # shlex invalido (comillas sin cerrar, etc.): fail-open
     try:
         rama_actual = rama
         for segmento in _partir_en_segmentos(tokens):
-            manejador = MANEJADORES.get(_clave(segmento))
+            clave, resto = _clave_y_resto(segmento)
+            manejador = MANEJADORES.get(clave)
             if manejador is None:
                 continue
-            mensaje, rama_actual = manejador(segmento, rama_actual, bases)
+            mensaje, rama_actual = manejador(resto, rama_actual, bases)
             if mensaje:
                 return mensaje
         return None
     except Exception:
+        _registrar_fail_open("error-inesperado")
         return None  # error inesperado: fail-open
 
 
@@ -240,6 +344,7 @@ def main() -> int:
         cmd = payload.get("tool_input", {}).get("command", "")
         mensaje = decidir(cmd, _rama_git_actual(), _bases_configuradas())
     except Exception:
+        _registrar_fail_open("payload-o-entorno-invalido")
         return 0  # payload roto o entorno inesperado: fail-open
     if mensaje:
         print(mensaje, file=sys.stderr)
