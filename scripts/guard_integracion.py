@@ -4,19 +4,40 @@
 La politica de integracion por PR (TIM-ADR-0005, #80) dice que el merge a la
 rama base lo hace un humano al aprobar el PR. Este script es el guard
 `PreToolUse` que la hace cumplir: bloquea `git push` a la rama base, `git
-merge`/`git pull` que integrarian algo que nadie reviso estando parado en la
-rama base, y `gh pr merge` siempre.
+merge`/`git pull`/`git rebase`/`git cherry-pick` que integrarian algo que
+nadie reviso estando parado en la rama base, y `gh pr merge`/`gh api
+.../merge` siempre.
 
 Criterio de frontera (no confundir con "en que rama estoy parado"): un comando
 NO se juzga por la rama actual sino por si PUEDE CREAR INTEGRACION NUEVA.
   - `push`: el destino del refspec, no la rama actual. `git push -u origin
     hu/N-slug` (Fase 6.5, abre el PR) nunca se bloquea.
-  - `merge`/`pull` estando en una rama base: se permite SOLO si la ref es
-    vacia o el equivalente remoto de esa misma base (`origin/<base>`, `@{u}`,
-    `@{upstream}`, o `origin <base>` en `pull`). `--ff-only` por si solo NO
-    alcanza: `git merge --ff-only hu/N-x` en `main` es el agujero de la HU
-    #30 y sigue bloqueado.
+  - `merge`/`pull`/`rebase` estando en una rama base: se permite SOLO si la
+    ref es vacia o el equivalente remoto de esa misma base (`origin/<base>`,
+    `@{u}`, `@{upstream}`, o `origin <base>` en `pull`). `--ff-only` por si
+    solo NO alcanza para `merge`/`pull`: `git merge --ff-only hu/N-x` en
+    `main` es el agujero de la HU #30 y sigue bloqueado. Las formas de
+    control de `rebase` (`--continue`, `--abort`, `--skip`, `--quit`) se
+    permiten siempre, no integran nada nuevo.
+  - `cherry-pick` estando en una rama base: bloqueado siempre (cualquier ref
+    mete un commit nuevo directo, no hay equivalente de ref segura); sus
+    formas de control (`--continue`, `--abort`, `--skip`, `--quit`) se
+    permiten siempre.
   - `gh pr merge`: siempre bloqueado, el merge del PR es de un humano.
+  - `gh api` hacia una ruta que (quitando el query string) termina en
+    `/merge`: siempre bloqueado sin importar el metodo -- es el mismo merge
+    por la API REST (patron simple y deliberado sobre la ruta, no un parser
+    de metodos HTTP).
+
+Flags globales de `git` (los que van ANTES del subcomando, p. ej. `git
+--no-pager push ...`): la regla es "todo token que empiece con `-` entre
+`git` y el subcomando es un flag global", no una lista cerrada. Los que
+llevan valor SEPARADO (`-C`, `-c`, `--git-dir`, `--work-tree`, `--namespace`,
+`--exec-path`) consumen ademas el token siguiente, salvo que el valor venga
+pegado al mismo token (`-Cpath`, `-cclave=valor`, `--git-dir=valor`).
+Cualquier otro flag -- booleano, conocido o no (`--no-pager`, `--paginate`,
+`-P`, `--bare`, `--literal-pathspecs`, ...) -- consume solo su propio token:
+la regla los cubre a todos sin necesidad de enumerarlos.
 
 Uso (stdin = payload de un hook PreToolUse de Claude Code):
     echo '{"tool_input": {"command": "git push origin main"}}' | python3 guard_integracion.py
@@ -26,18 +47,24 @@ error inesperado (JSON invalido, `shlex` invalido, `git`/config ilegibles)
 sale 0: fail-open deliberado, preferible que se cuele un merge -reversible-
 a que el harness se trabe. La unica proteccion incondicional (no fail-open)
 es `git push --force`, y esa vive inline en `hooks/hooks.json`, no aqui.
+Todo fail-open deja rastro auditable en `.timonel/events.log` (linea `<hora>
+guard-integracion-fail-open <motivo>`): nunca es silencioso.
 
 Limitacion conocida y aceptada (revision #2 de #82): el guard cubre TODAS las
 formas naturales de escribir el comando -- `;`, `&&`, `||`, salto de linea
 (`\n`/`\r\n`, la forma en que Bash entrega comandos multilinea todo el
 tiempo), `&` de fondo, `|` (pipe simple) y agrupacion `(...)` -- pero NO
-persigue la evasion deliberada: `eval "git merge hu/x"`, `bash -c "git merge
-hu/x"` o `$(git checkout main) && git merge hu/x` quedan PERMITIDOS a
-proposito y no se les agrega codigo. Un guard de hook no puede ser un
-sandbox: quien quiera evadirlo siempre va a poder, y cada capa nueva de
-parser para perseguir estas formas es superficie nueva de bug (la propia
-razon de ser de este modulo: el criterio de frontera importa mas que
-acumular parsers).
+persigue la evasion deliberada: `eval "git merge hu/x"` y `bash -c "git merge
+hu/x"` quedan PERMITIDOS a proposito y no se les agrega codigo. Con `$(...)`
+pasa algo mas preciso, no "permitido a secas": lo de ADENTRO del `$()` no se
+inspecciona, pero lo que queda AFUERA se juzga normalmente contra la rama
+real. Por eso `$(git checkout main) && git merge hu/x` parado en una base
+BLOQUEA (el `&& git merge hu/x` es visible fuera del command substitution);
+lo que NO se cubre es `$()` envolviendo el comando ENTERO. Un guard de hook
+no puede ser un sandbox: quien quiera evadirlo siempre va a poder, y cada
+capa nueva de parser para perseguir estas formas es superficie nueva de bug
+(la propia razon de ser de este modulo: el criterio de frontera importa mas
+que acumular parsers).
 """
 
 from __future__ import annotations
@@ -123,6 +150,16 @@ def _mensaje_gh_pr_merge() -> str:
     )
 
 
+def _mensaje_gh_api_merge() -> str:
+    return (
+        f"{PREFIJO}gh api hacia una ruta que termina en /merge esta "
+        "bloqueado: es el equivalente exacto de `gh pr merge` por la API "
+        "REST y el merge del PR lo hace un humano (epica #79). Si solo "
+        "queres consultar el estado, usa `gh pr view <numero> --json "
+        "mergeable,mergeStateStatus`."
+    )
+
+
 def _destino_push(resto: list[str], rama: str) -> str:
     """resto = tokens luego de `push`. Devuelve la rama remota destino."""
     no_flags = _tokens_no_flag(resto)
@@ -158,6 +195,26 @@ def _revisar_merge(resto: list[str], rama: str, bases: list[str]) -> str | None:
     if ff_only and _es_ref_segura(ref, rama):
         return None
     return _mensaje_integracion_en_base(rama)
+
+
+def _revisar_rebase(resto: list[str], rama: str, bases: list[str]) -> str | None:
+    if any(f in resto for f in ("--abort", "--continue", "--skip", "--quit")):
+        return None  # formas de control: no integran nada nuevo
+    if rama not in bases:
+        return None  # el criterio de frontera solo aplica parado en una base
+    refs = _tokens_no_flag(resto)
+    ref = refs[0] if refs else ""
+    if _es_ref_segura(ref, rama):
+        return None  # sync con el remoto de la misma base: `git rebase origin/main`
+    return _mensaje_integracion_en_base(rama)
+
+
+def _revisar_cherry_pick(resto: list[str], rama: str, bases: list[str]) -> str | None:
+    if any(f in resto for f in ("--abort", "--continue", "--skip", "--quit")):
+        return None  # formas de control: no integran nada nuevo
+    if rama not in bases:
+        return None  # el criterio de frontera solo aplica parado en una base
+    return _mensaje_integracion_en_base(rama)  # cualquier ref mete un commit nuevo
 
 
 def _revisar_pull(resto: list[str], rama: str, bases: list[str]) -> str | None:
@@ -200,26 +257,76 @@ def _manejar_gh_pr_merge(resto, rama, bases):  # noqa: ARG001 - firma uniforme p
     return _mensaje_gh_pr_merge(), rama
 
 
+def _manejar_rebase(resto, rama, bases):
+    return _revisar_rebase(resto, rama, bases), rama
+
+
+def _manejar_cherry_pick(resto, rama, bases):
+    return _revisar_cherry_pick(resto, rama, bases), rama
+
+
+# Flags de `gh api` que llevan valor separado: hay que saltearlos junto con su
+# valor para no confundir ese valor (p. ej. el `PUT` de `-X PUT`) con la ruta.
+_FLAGS_GH_API_CON_VALOR = {
+    "-X", "--method", "-H", "--header", "--hostname", "--input", "--cache",
+    "-f", "--raw-field", "-F", "--field", "-t", "--template", "-q", "--jq",
+}
+
+
+def _ruta_gh_api(resto: list[str]) -> str:
+    """Primer argumento posicional de `gh api` (la ruta del endpoint), salteando
+    flags y sus valores separados."""
+    i = 0
+    n = len(resto)
+    while i < n:
+        token = resto[i]
+        if token in _FLAGS_GH_API_CON_VALOR:
+            i += 2
+            continue
+        if _es_flag(token):
+            i += 1
+            continue
+        return token
+    return ""
+
+
+def _es_ruta_merge(ruta: str) -> bool:
+    """Patron deliberadamente simple (no un parser de metodos HTTP): quita el
+    query string y mira si lo que queda termina en `/merge`."""
+    sin_query = ruta.split("?", 1)[0]
+    return sin_query.rstrip("/").endswith("/merge")
+
+
+def _manejar_gh_api(resto, rama, bases):  # noqa: ARG001 - firma uniforme para el lookup map
+    ruta = _ruta_gh_api(resto)
+    if _es_ruta_merge(ruta):
+        return _mensaje_gh_api_merge(), rama
+    return None, rama
+
+
 # Lookup map: subcomando -> manejador(resto_tras_subcomando, rama, bases) -> (mensaje|None, rama_siguiente)
 MANEJADORES = {
     ("git", "push"): _manejar_push,
     ("git", "merge"): _manejar_merge,
     ("git", "pull"): _manejar_pull,
+    ("git", "rebase"): _manejar_rebase,
+    ("git", "cherry-pick"): _manejar_cherry_pick,
     ("git", "checkout"): _manejar_checkout,
     ("git", "switch"): _manejar_checkout,
     ("gh", "pr", "merge"): _manejar_gh_pr_merge,
+    ("gh", "api"): _manejar_gh_api,
 }
 
 SEPARADORES_DE_SEGMENTO = {"&&", "||", ";", "&", "|", "(", ")"}
 
-# Flags globales de `git` que van ANTES del subcomando y que hay que saltear para
-# no confundir su argumento (o el propio flag) con el subcomando real.
-# Cortos (`-C`, `-c`): admiten forma pegada (`-Cpath`, `-cclave=valor`) ademas de
-# la separada (`-C path`, `-c clave=valor`); `-c` siempre lleva un valor `clave=valor`,
-# sea pegado o como token propio.
-_FLAGS_GLOBALES_GIT_CORTOS_CON_VALOR = {"-C", "-c"}
-# Largos: solo forma separada o con `=` (`--git-dir=valor`), nunca pegada sin `=`.
-_FLAGS_GLOBALES_GIT_LARGOS_CON_VALOR = {"--git-dir", "--work-tree"}
+# Flags globales de `git` que van ANTES del subcomando y llevan valor SEPARADO
+# (el token siguiente), salvo que el valor venga pegado al mismo token
+# (`-Cpath`, `-cclave=valor`, `--git-dir=valor`). Cualquier OTRO flag que
+# empiece con `-` en esa zona es booleano y no consume nada mas -- esa parte
+# es la regla, no una lista (ver `_indice_subcomando_git`).
+_FLAGS_GLOBALES_GIT_CON_VALOR_SEPARADO = {
+    "-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path",
+}
 
 
 def _descartar_asignaciones_env(segmento: list[str]) -> list[str]:
@@ -232,24 +339,35 @@ def _descartar_asignaciones_env(segmento: list[str]) -> list[str]:
 
 
 def _indice_subcomando_git(segmento: list[str]) -> int | None:
-    """Salta flags globales de `git` (`-C <path>`/`-Cpath`, `-c clave=valor`/
-    `-cclave=valor`, `--git-dir[=valor]`, `--work-tree[=valor]`) y devuelve el
-    indice del subcomando real, o None si no hay ninguno (p. ej. `git` solo, o
-    `git -C` sin subcomando)."""
+    """Salta flags globales de `git` y devuelve el indice del subcomando real,
+    o None si no hay ninguno (p. ej. `git` solo, o `git -C` sin subcomando).
+
+    Regla (no lista): entre `git` y el subcomando, TODO token que empiece con
+    `-` es un flag global. Los que llevan valor separado
+    (`_FLAGS_GLOBALES_GIT_CON_VALOR_SEPARADO`) consumen ademas el token
+    siguiente, salvo que el valor venga pegado al mismo token (`-Cpath`,
+    `-cclave=valor`, `--git-dir=valor`) -- ahi no se consume nada extra.
+    Cualquier otro flag -- booleano, conocido o no (`--no-pager`,
+    `--paginate`, `-P`, `--bare`, `--literal-pathspecs`, ...) -- consume solo
+    su propio token: no hace falta enumerarlos, la regla los cubre a todos
+    por igual."""
     i = 1
     n = len(segmento)
     while i < n:
         token = segmento[i]
-        if token in _FLAGS_GLOBALES_GIT_CORTOS_CON_VALOR or token in _FLAGS_GLOBALES_GIT_LARGOS_CON_VALOR:
-            i += 2  # forma separada: el token siguiente es el valor
+        if not _es_flag(token):
+            return i
+        if "=" in token:
+            i += 1  # valor pegado con `=` (largo): --git-dir=valor
             continue
-        if any(token.startswith(f"{flag}=") for flag in _FLAGS_GLOBALES_GIT_LARGOS_CON_VALOR):
-            i += 1
+        base_corta = token[:2]
+        if base_corta in _FLAGS_GLOBALES_GIT_CON_VALOR_SEPARADO and token != base_corta:
+            i += 1  # valor pegado (corto): -Cpath, -cclave=valor
             continue
-        if any(token.startswith(flag) and token != flag for flag in _FLAGS_GLOBALES_GIT_CORTOS_CON_VALOR):
-            i += 1  # forma pegada: el valor va en el mismo token que el flag
+        if token in _FLAGS_GLOBALES_GIT_CON_VALOR_SEPARADO:
+            i += 2  # valor separado: el token siguiente es el valor
             continue
-        return i
+        i += 1  # flag booleano: no consume nada mas
     return None
 
 
@@ -265,6 +383,8 @@ def _clave_y_resto(segmento: list[str]) -> tuple[tuple[str, ...] | None, list[st
         return ("git", segmento[idx]), segmento[idx + 1:]
     if programa == "gh" and len(segmento) >= 3 and segmento[1] == "pr":
         return ("gh", "pr", segmento[2]), segmento[3:]
+    if programa == "gh" and len(segmento) >= 2 and segmento[1] == "api":
+        return ("gh", "api"), segmento[2:]
     return None, []
 
 

@@ -118,10 +118,42 @@ TABLA_DE_CASOS = [
     # porque alguien "lo arreglo", que sea una decision, no un descuido.
     (68, "main", 'eval "git merge hu/x"', PERMITIDO),  # limite conocido: eval
     (69, "main", 'bash -c "git merge hu/x"', PERMITIDO),  # limite conocido: bash -c
-    # rama de partida NO es base: el guard no simula el efecto del `$(git checkout
-    # main)` (no entra al command substitution), asi que la deteccion de "estoy
-    # parado en una base" no se dispara -- ese es exactamente el limite aceptado.
-    (70, "hu/82-x", "$(git checkout main) && git merge hu/x", PERMITIDO),  # limite conocido: command substitution
+    # $(...) no se inspecciona por dentro, pero lo que queda AFUERA del `$()` se
+    # juzga normalmente contra la rama REAL: parado en "main" (base), el
+    # "&& git merge hu/x" es visible fuera del command substitution y bloquea.
+    # Lo que NO se cubre es `$()` envolviendo el comando ENTERO (eso si seguiria
+    # evadiendo, pero no es este caso).
+    (70, "main", "$(git checkout main) && git merge hu/x", BLOQUEADO),  # $(...) no oculta lo de afuera
+
+    # --- review #4 de #82: flags globales booleanos, la REGLA no una lista ---
+    (71, "hu/82-x", "git --no-pager push origin main", BLOQUEADO),
+    (72, "hu/82-x", "git --paginate push origin main", BLOQUEADO),
+    (73, "hu/82-x", "git -P push origin main", BLOQUEADO),
+    (74, "hu/82-x", "git --bare push origin main", BLOQUEADO),
+    (75, "hu/82-x", "git --literal-pathspecs push origin main", BLOQUEADO),
+    (76, "hu/82-x", "git --flag-que-no-existe push origin main", BLOQUEADO),  # inventado: prueba la regla, no la lista
+    (77, "hu/82-x", "git --no-pager -C /otro push origin main", BLOQUEADO),  # booleano + con-valor combinados
+    (78, "main", "git -c user.name=x --no-pager merge hu/z", BLOQUEADO),  # idem, con merge en base
+
+    # --- review #2 de #82: rebase y cherry-pick sobre la rama base ---
+    (79, "main", "git rebase hu/x", BLOQUEADO),
+    (80, "main", "git cherry-pick abc1234", BLOQUEADO),
+    (81, "hu/82-x", "git rebase hu/x", PERMITIDO),  # fuera de base, normal
+    (82, "hu/82-x", "git cherry-pick abc1234", PERMITIDO),  # fuera de base, normal
+    (83, "main", "git rebase origin/main", PERMITIDO),  # ref segura: sync
+    (84, "main", "git rebase --continue", PERMITIDO),
+    (85, "main", "git rebase --abort", PERMITIDO),
+    (86, "main", "git rebase --skip", PERMITIDO),
+    (87, "main", "git rebase --quit", PERMITIDO),
+    (88, "main", "git cherry-pick --continue", PERMITIDO),
+    (89, "main", "git cherry-pick --abort", PERMITIDO),
+
+    # --- review #3 de #82: gh api como puerta trasera de gh pr merge ---
+    (90, "hu/82-x", "gh api -X PUT repos/o/r/pulls/94/merge", BLOQUEADO),
+    (91, "hu/82-x", "gh api --method PUT repos/o/r/pulls/94/merge", BLOQUEADO),
+    (92, "hu/82-x", "gh api repos/o/r/pulls/94/merge", BLOQUEADO),  # sin metodo, igual bloqueado
+    (93, "hu/82-x", "gh api repos/o/r/pulls/94", PERMITIDO),  # sin /merge: solo lectura
+    (94, "hu/82-x", "gh api user", PERMITIDO),
 ]
 
 BASES = ["main", "master", "develop"]
