@@ -1,6 +1,8 @@
+import subprocess
 import sys
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
@@ -57,6 +59,51 @@ Ninguna
 - [ ] Consolidación (lint + tests)
 - [ ] Code review
 - [ ] Retrospectiva
+- [ ] Definition of Done
+""",
+}
+
+
+HOTFIX_OK = {
+    "number": 83, "title": "Aislar flechodiezx-hotfix con worktree y PR",
+    "label_names": ["tipo:hotfix", "estado:listo", "alcance:backend", "sp:2", "mod:plugin"],
+    "body": """## Historia
+
+Corrige que flechodiezx-hotfix integraba directo a la rama actual.
+
+## Criterios de aceptación
+
+```gherkin
+DADO QUE se invoca /timonel:hotfix N
+CUANDO flechodiezx-hotfix arranca
+ENTONCES crea fix/N-slug en un worktree aislado y abre PR
+```
+
+## Ficha técnica
+
+| Campo | Valor |
+| --- | --- |
+| Alcance | Backend |
+| Módulo destino | plugin |
+
+## Endpoints
+
+Ninguno
+
+## Modelos compartidos
+
+Ninguno
+
+## Dependencias
+
+Ninguna
+
+## Tareas
+
+- [ ] Implementación
+- [ ] Lint + tests afectados
+- [ ] Code review
+- [ ] PR abierto
 - [ ] Definition of Done
 """,
 }
@@ -294,12 +341,136 @@ class EstadoHistoriaTests(unittest.TestCase):
         e = eh.estado(issue, rama="hu/42-registrar-gasto")
         self.assertEqual(e["reanudar_en"], "7 Definition of Done")
 
-    def test_sin_linea_pr_es_skipped(self):
+    def test_sin_linea_pr_es_pendiente(self):
+        """Decision aprobada del humano (#83): 'PR abierto' esta declarada en el checklist
+        de tipo:hu, asi que su ausencia en el body (HUs anteriores a v0.6.0) ya no cuenta
+        como hecha/SKIPPED por defecto -- cuenta como pendiente. Antes de #83 esta misma
+        entrada (con el `.get(..., True)` viejo) marcaba la fase como hecha y la historia
+        como `cerrar`; la semantica cambio con ella, por eso el test se reescribe en vez
+        de solo actualizar el nombre."""
         body = HU_OK["body"].replace("- [ ]", "- [x]")
         issue = dict(HU_OK, body=body, state="OPEN", comments=self.COMENTARIOS_HASTA_DOD)
         e = eh.estado(issue, rama="hu/42-registrar-gasto")
+        self.assertEqual(e["reanudar_en"], "6.5 PR/Integración")
+        self.assertNotIn("6.5 PR/Integración", e["fases_hechas"])
+
+
+class RamaLocalTests(unittest.TestCase):
+    """rama_local() itera PREFIJOS_RAMA (#83): antes solo miraba `hu/<N>-*`, asi que una
+    rama `fix/N-slug` (creada por el hotfix aislado) se reportaba como 'ninguna'."""
+
+    @staticmethod
+    def _fake_run(salidas_por_patron: dict[str, str]):
+        def run(cmd, capture_output=True, text=True):
+            patron = cmd[-1]
+            return subprocess.CompletedProcess(cmd, 0, stdout=salidas_por_patron.get(patron, ""), stderr="")
+        return run
+
+    def test_solo_rama_hu(self):
+        with mock.patch.object(eh.subprocess, "run", side_effect=self._fake_run({"hu/83-*": "  hu/83-x\n"})):
+            self.assertEqual(eh.rama_local(83), "hu/83-x")
+
+    def test_solo_rama_fix(self):
+        with mock.patch.object(eh.subprocess, "run", side_effect=self._fake_run({"fix/83-*": "  fix/83-x\n"})):
+            self.assertEqual(eh.rama_local(83), "fix/83-x")
+
+    def test_ambas_ramas_prefiere_la_primera_del_orden(self):
+        with mock.patch.object(
+            eh.subprocess, "run",
+            side_effect=self._fake_run({"hu/83-*": "  hu/83-x\n", "fix/83-*": "  fix/83-y\n"}),
+        ):
+            self.assertEqual(eh.rama_local(83), "hu/83-x")
+
+    def test_ninguna_rama(self):
+        with mock.patch.object(eh.subprocess, "run", side_effect=self._fake_run({})):
+            self.assertIsNone(eh.rama_local(83))
+
+    def test_fix_de_otro_issue_no_matchea(self):
+        with mock.patch.object(eh.subprocess, "run", side_effect=self._fake_run({"fix/8-*": "  fix/8-x\n"})):
+            self.assertIsNone(eh.rama_local(83))
+
+
+class TipoChecklistTests(unittest.TestCase):
+    """label_value(labels, 'tipo') despacha al checklist/fases del tipo (#83); tipo
+    ausente o desconocido cae al de `hu`."""
+
+    def test_tipo_hotfix_usa_checklist_de_hotfix(self):
+        issue = dict(HOTFIX_OK, state="OPEN", comments=[])
+        e = eh.estado(issue, rama=None)
+        self.assertEqual(e["fases_pendientes"][0], "2 Implementacion")
+
+    def test_tipo_hu_no_regresion(self):
+        issue = dict(HU_OK, state="OPEN", comments=[])
+        e = eh.estado(issue, rama=None)
+        self.assertIn("6.5 PR/Integración", e["fases_hechas"] + e["fases_pendientes"])
+
+    def test_sin_label_tipo_cae_a_hu(self):
+        labels = [l for l in HOTFIX_OK["label_names"] if not l.startswith("tipo:")]
+        issue = dict(HOTFIX_OK, label_names=labels, state="OPEN", comments=[])
+        e = eh.estado(issue, rama=None)
+        self.assertIn("6.5 PR/Integración", e["fases_hechas"] + e["fases_pendientes"])
+
+    def test_tipo_desconocido_cae_a_hu(self):
+        labels = [l if not l.startswith("tipo:") else "tipo:epica" for l in HOTFIX_OK["label_names"]]
+        issue = dict(HOTFIX_OK, label_names=labels, state="OPEN", comments=[])
+        e = eh.estado(issue, rama=None)
+        self.assertIn("6.5 PR/Integración", e["fases_hechas"] + e["fases_pendientes"])
+
+
+class EstadoHistoriaHotfixTests(unittest.TestCase):
+    def test_sin_pr_marcar_reanuda_en_pr(self):
+        body = (HOTFIX_OK["body"]
+                .replace("- [ ] Implementación", "- [x] Implementación")
+                .replace("- [ ] Lint + tests afectados", "- [x] Lint + tests afectados")
+                .replace("- [ ] Code review", "- [x] Code review"))
+        issue = dict(HOTFIX_OK, body=body, state="OPEN", comments=[])
+        e = eh.estado(issue, rama="fix/83-worktree-pr")
+        self.assertEqual(e["reanudar_en"], "5 PR/Integración")
+
+    def test_pr_marcado_con_dod_pendiente_reanuda_en_dod(self):
+        body = HOTFIX_OK["body"].replace("- [ ]", "- [x]").replace("- [x] Definition of Done", "- [ ] Definition of Done")
+        issue = dict(HOTFIX_OK, body=body, state="OPEN", comments=[])
+        e = eh.estado(issue, rama="fix/83-worktree-pr")
+        self.assertEqual(e["reanudar_en"], "6 DoD reducido")
+
+    def test_todo_marcado_cierra(self):
+        body = HOTFIX_OK["body"].replace("- [ ]", "- [x]")
+        issue = dict(HOTFIX_OK, body=body, state="OPEN", comments=[{"body": "<!-- timonel:dod -->\nx"}])
+        e = eh.estado(issue, rama="fix/83-worktree-pr")
         self.assertEqual(e["reanudar_en"], "cerrar")
-        self.assertIn("6.5 PR/Integración", e["fases_hechas"])
+
+    def test_linea_pr_ausente_es_pendiente_no_skipped(self):
+        """Decision aprobada del humano (#83): con PR obligatorio, una linea 'PR abierto'
+        ausente del body ya no cuenta como SKIPPED/hecha -- cuenta como pendiente."""
+        body = (HOTFIX_OK["body"]
+                .replace("- [ ] Implementación", "- [x] Implementación")
+                .replace("- [ ] Lint + tests afectados", "- [x] Lint + tests afectados")
+                .replace("- [ ] Code review", "- [x] Code review")
+                .replace("- [ ] PR abierto\n", "")
+                .replace("- [ ] Definition of Done", "- [x] Definition of Done"))
+        issue = dict(HOTFIX_OK, body=body, state="OPEN", comments=[{"body": "<!-- timonel:dod -->\nx"}])
+        e = eh.estado(issue, rama="fix/83-worktree-pr")
+        self.assertEqual(e["reanudar_en"], "5 PR/Integración")
+        self.assertNotIn("5 PR/Integración", e["fases_hechas"])
+
+
+class FasesAusentesEnHotfixTests(unittest.TestCase):
+    """El hotfix no tiene contrato, modelos, backend/frontend separados ni retro como
+    fase del sensor (la retro es opcional y no forma parte del checklist)."""
+
+    def test_hotfix_no_tiene_fases_de_hu(self):
+        issue = dict(HOTFIX_OK, state="OPEN", comments=[])
+        e = eh.estado(issue, rama=None)
+        todas = e["fases_hechas"] + e["fases_pendientes"]
+        for prohibida in ("Contrato API", "Backend", "Frontend", "Consolidacion", "Retrospectiva"):
+            for nombre in todas:
+                self.assertNotIn(prohibida, nombre, f"la fase `{nombre}` de hotfix no deberia mencionar `{prohibida}`")
+
+    def test_checklist_hotfix_no_declara_tareas_de_hu(self):
+        prohibidas = ("Contrato API aprobado", "Modelos compartidos", "Backend", "Frontend",
+                      "Consolidación (lint + tests)", "Retrospectiva")
+        for tarea in prohibidas:
+            self.assertNotIn(tarea, eh.CHECKLISTS["hotfix"])
 
 
 class CosecharRetroTests(unittest.TestCase):
