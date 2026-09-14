@@ -123,6 +123,31 @@ class IntegracionPorPrTests(unittest.TestCase):
         texto = (ROOT / "agents/flechodiezx.md").read_text(encoding="utf-8")
         self.assertIn("Una sola vía de integración", texto)
 
+    def test_ningun_hook_propone_merge_no_ff(self):
+        """El mensaje viejo del guard de commits del plugin proponia `git merge --no-ff`
+        (TIM-ADR-0005, #27); #80 lo derogo: ahora la integracion es por PR (#82)."""
+        texto = (ROOT / "hooks/hooks.json").read_text(encoding="utf-8")
+        self.assertNotIn("git merge --no-ff", texto)
+
+    def test_hooks_referencian_guard_integracion_existente(self):
+        hooks = json.loads((ROOT / "hooks/hooks.json").read_text(encoding="utf-8"))
+        comandos = "\n".join(
+            hook["command"]
+            for bloque in hooks["hooks"]["PreToolUse"]
+            for hook in bloque["hooks"]
+        )
+        self.assertIn("guard_integracion.py", comandos)
+        self.assertTrue((ROOT / "scripts/guard_integracion.py").exists())
+
+    def test_guard_integracion_documentado(self):
+        claude = (ROOT / "CLAUDE.md").read_text(encoding="utf-8")
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        self.assertIn("guard_integracion.py", claude, "CLAUDE.md debe documentar scripts/guard_integracion.py")
+        self.assertTrue(
+            "guard_integracion.py" in readme or "guard_integracion" in readme,
+            "README.md debe documentar scripts/guard_integracion.py",
+        )
+
 
 class DodEstrictoTests(unittest.TestCase):
     """DoD estricto (gap 3 de la auditoria #24, issue #28): sin autoevaluacion sin evaluador."""
