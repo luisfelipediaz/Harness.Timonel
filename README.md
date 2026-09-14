@@ -82,7 +82,7 @@ Genera `.claude/timonel.config.json` inspeccionando `nx.json`, `tsconfig.base.js
 /timonel:refine #epica      → dividir / repriorizar / deduplicar / completar
 /timonel:investigar #hu     → Dora publica hallazgos (archivos de referencia, patrón, riesgos)
 /timonel:implement #hu      → investigación → contrato API → backend ∥ frontend (worktrees) → consolidación → review → retro → DoD → close
-/timonel:hotfix #n | "fix"  → un sub-agente, sin worktree, DoD reducido
+/timonel:hotfix #n | "fix"  → un sub-agente en worktree, PR obligatorio, DoD reducido
 /timonel:backlog            → estado por épica
 /timonel:insights           → issues "Insights destilados" (retros / reviews)
 /timonel:audit              → issue harness-audit (madurez del harness, gaps priorizados)

@@ -1,5 +1,5 @@
 ---
-description: "Implementa un hotfix (≤2 SP) desde un issue tipo:hotfix o una descripcion libre, sin worktrees y con DoD reducido."
+description: "Implementa un hotfix (≤2 SP) desde un issue tipo:hotfix o una descripcion libre, en worktree aislado y con PR obligatorio, con DoD reducido."
 argument-hint: "<numero-de-issue | descripcion del fix>"
 model: haiku
 ---

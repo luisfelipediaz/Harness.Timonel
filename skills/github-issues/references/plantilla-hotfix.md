@@ -49,6 +49,7 @@ Ninguna
 - [ ] Implementación
 - [ ] Lint + tests afectados
 - [ ] Code review
+- [ ] PR abierto
 - [ ] Definition of Done
 ````
 

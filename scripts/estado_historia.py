@@ -18,25 +18,51 @@ import subprocess
 
 from timonel_gh import find_marker_comment, gh_json, label_value, repo_from_config
 
-TAREAS = ["Contrato API aprobado", "Modelos compartidos", "Backend", "Frontend",
-          "Consolidación (lint + tests)", "Code review", "Retrospectiva", "PR abierto",
-          "Definition of Done"]
+CHECKLISTS: dict[str, list[str]] = {
+    "hu": ["Contrato API aprobado", "Modelos compartidos", "Backend", "Frontend",
+           "Consolidación (lint + tests)", "Code review", "Retrospectiva", "PR abierto",
+           "Definition of Done"],
+    "hotfix": ["Implementación", "Lint + tests afectados", "Code review", "PR abierto",
+               "Definition of Done"],
+}
+# Retrocompat: otros modulos importan TAREAS directamente (test_consistencia.py::ChecklistsPorTipoTests
+# ya cubre la invariante contra plantilla-hu.md para todos los tipos, incluido este).
+TAREAS = CHECKLISTS["hu"]
+
 MARCADORES = ["investigacion", "contrato-api", "consolidacion", "review", "retro", "dod"]
 
-# Orden de fases y la condicion (tareas/marcadores) que indica que ya se hizo.
-# "PR abierto" ausente del checklist (issues anteriores a v0.6.0) cuenta
-# como hecha (SKIPPED): el default `True` de `.get` es a proposito.
-FASES = [
-    ("1.5 Investigacion",      lambda e: "investigacion" in e["marcadores"]),
-    ("2 Contrato API",         lambda e: e["tareas"].get("Contrato API aprobado") or "contrato-api" in e["marcadores"]),
-    ("3 Backend",              lambda e: e["tareas"].get("Backend") or e["alcance"] == "frontend"),
-    ("3 Frontend",             lambda e: e["tareas"].get("Frontend") or e["alcance"] == "backend"),
-    ("4-5 Consolidacion",      lambda e: e["tareas"].get("Consolidación (lint + tests)") or "consolidacion" in e["marcadores"]),
-    ("5.5 Code review",        lambda e: e["tareas"].get("Code review") or "review" in e["marcadores"]),
-    ("6 Retrospectiva",        lambda e: e["tareas"].get("Retrospectiva") or "retro" in e["marcadores"]),
-    ("6.5 PR/Integración",     lambda e: e["tareas"].get("PR abierto", True)),
-    ("7 Definition of Done",   lambda e: e["tareas"].get("Definition of Done") or "dod" in e["marcadores"]),
-]
+# Prefijos de rama que reconoce rama_local(), en orden de preferencia cuando existe mas
+# de una para el mismo issue (hu/ para historias, fix/ para hotfixes aislados en worktree).
+PREFIJOS_RAMA = ("hu", "fix")
+
+# Orden de fases por tipo y la condicion (tareas/marcadores) que indica que ya se hizo.
+# Una tarea ausente del body cuenta como pendiente, nunca como hecha por defecto: si el
+# checklist del tipo la declara (CHECKLISTS[tipo]) y no aparece en el body del issue
+# (p. ej. issues anteriores a v0.6.0 sin "PR abierto"), esta pendiente, no SKIPPED.
+FASES_POR_TIPO: dict[str, list[tuple]] = {
+    "hu": [
+        ("1.5 Investigacion",      lambda e: "investigacion" in e["marcadores"]),
+        ("2 Contrato API",         lambda e: e["tareas"].get("Contrato API aprobado") or "contrato-api" in e["marcadores"]),
+        ("3 Backend",              lambda e: e["tareas"].get("Backend") or e["alcance"] == "frontend"),
+        ("3 Frontend",             lambda e: e["tareas"].get("Frontend") or e["alcance"] == "backend"),
+        ("4-5 Consolidacion",      lambda e: e["tareas"].get("Consolidación (lint + tests)") or "consolidacion" in e["marcadores"]),
+        ("5.5 Code review",        lambda e: e["tareas"].get("Code review") or "review" in e["marcadores"]),
+        ("6 Retrospectiva",        lambda e: e["tareas"].get("Retrospectiva") or "retro" in e["marcadores"]),
+        ("6.5 PR/Integración",     lambda e: e["tareas"].get("PR abierto")),
+        ("7 Definition of Done",   lambda e: e["tareas"].get("Definition of Done") or "dod" in e["marcadores"]),
+    ],
+    "hotfix": [
+        ("2 Implementacion",  lambda e: e["tareas"].get("Implementación") and e["tareas"].get("Lint + tests afectados")),
+        ("3 Code review",     lambda e: e["tareas"].get("Code review") or "review" in e["marcadores"]),
+        ("5 PR/Integración",  lambda e: e["tareas"].get("PR abierto")),
+        ("6 DoD reducido",    lambda e: e["tareas"].get("Definition of Done") or "dod" in e["marcadores"]),
+    ],
+}
+
+
+def _fases_del_tipo(tipo: str | None) -> list[tuple]:
+    """Fases del checklist del tipo de issue; tipo ausente o desconocido cae a `hu`."""
+    return FASES_POR_TIPO.get(tipo, FASES_POR_TIPO["hu"])
 
 
 def parse_tareas(body: str) -> dict[str, bool]:
@@ -52,14 +78,19 @@ def parse_tareas(body: str) -> dict[str, bool]:
 
 
 def rama_local(issue: int) -> str | None:
-    out = subprocess.run(["git", "branch", "--list", f"hu/{issue}-*"], capture_output=True, text=True)
-    ramas = [l.strip().lstrip("* ").strip() for l in out.stdout.splitlines() if l.strip()]
-    return ramas[0] if ramas else None
+    for prefijo in PREFIJOS_RAMA:
+        out = subprocess.run(["git", "branch", "--list", f"{prefijo}/{issue}-*"], capture_output=True, text=True)
+        ramas = [l.strip().lstrip("* ").strip() for l in out.stdout.splitlines() if l.strip()]
+        if ramas:
+            return ramas[0]
+    return None
 
 
 def estado(issue: dict, rama: str | None = None) -> dict:
     labels = issue.get("label_names") or [l["name"] for l in issue.get("labels", [])]
     comentarios = issue.get("comments", [])
+    tipo = label_value(labels, "tipo")
+    fases = _fases_del_tipo(tipo if tipo in CHECKLISTS else "hu")
     e = {
         "issue": issue["number"],
         "titulo": issue.get("title", ""),
@@ -70,11 +101,14 @@ def estado(issue: dict, rama: str | None = None) -> dict:
         "marcadores": [m for m in MARCADORES if find_marker_comment(comentarios, m)],
         "rama": rama,
     }
-    hechas = [nombre for nombre, cond in FASES if cond(e)]
-    pendientes = [nombre for nombre, cond in FASES if not cond(e)]
+    hechas = [nombre for nombre, cond in fases if cond(e)]
+    pendientes = [nombre for nombre, cond in fases if not cond(e)]
     e["fases_hechas"] = hechas
     e["fases_pendientes"] = pendientes
-    cerrada = e["state"].upper() == "CLOSED" or ("dod" in e["marcadores"] and FASES[-1][1](e))
+    # Cerrada = estado CLOSED, o todas las fases del tipo hechas (no solo la ultima):
+    # con "PR abierto" ya sin default True, una historia con DoD marcado pero el PR
+    # todavia pendiente NO esta cerrada (decision aprobada del humano en #83).
+    cerrada = e["state"].upper() == "CLOSED" or not pendientes
     e["reanudar_en"] = "cerrar" if cerrada else (pendientes[0] if pendientes else "cerrar")
     hay_trabajo = bool(e["marcadores"]) or any(e["tareas"].values()) or rama is not None or e["estado_label"] == "en-progreso"
     e["nueva"] = not cerrada and not hay_trabajo
