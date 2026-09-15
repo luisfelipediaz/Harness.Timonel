@@ -13,6 +13,7 @@ import estado_historia as eh  # noqa: E402
 import eval_dor as ed  # noqa: E402
 import integracion as ig  # noqa: E402
 import metricas_flujo as mf  # noqa: E402
+import pr_check as pc  # noqa: E402
 import validar_marcador as vm  # noqa: E402
 from test_markers import RETRO_COMMENT, REVIEW_COMMENT  # noqa: E402
 
@@ -606,11 +607,11 @@ class IntegracionTests(unittest.TestCase):
 
     def test_comando_pr_escapa_titulo_con_apostrofo(self):
         import shlex
-        titulo = "Fase 8: abrir el PR de 'hu/N-slug' y registrarlo (#31)"
+        titulo = "Fase 6.5: abrir el PR de 'hu/N-slug' y registrarlo (#31)"
         for url in ("https://github.com/o/r.git", "https://dev.azure.com/org/proj/_git/repo"):
             cmd = ig.comando_pr(url, "hu/31-x", "main", titulo, "/tmp/pr-31.md")
             partes = shlex.split(cmd)
-            self.assertIn(titulo, partes, "el titulo debe sobrevivir intacto a shlex.split (eval en la Fase 8)")
+            self.assertIn(titulo, partes, "el titulo debe sobrevivir intacto a shlex.split (eval en la Fase 6.5)")
 
     def test_comando_pr_azure_no_usa_command_substitution(self):
         cmd = ig.comando_pr("https://dev.azure.com/org/proj/_git/repo", "hu/31-x", "main", "Titulo (#31)", "/tmp/pr-31.md")
@@ -661,6 +662,231 @@ class IntegracionTests(unittest.TestCase):
         cuerpo = ig.cuerpo_pr(31, "luisfelipediaz/Harness.Timonel", "Titulo", None, DOD_OK)
         self.assertIn("| 1 |", cuerpo)
         self.assertNotIn("DoD pendiente", cuerpo)
+
+
+class PrCheckTests(unittest.TestCase):
+    """Casos de `pr_check.py` (#81), uno por fila de la tabla de 27 casos del contrato.
+    Las filas 19 y 22 (`verde` de CheckRun/StatusContext) son `-` por si solas: se
+    verifican dentro de los casos compuestos 19+27 y 22+27 (PASSED completo)."""
+
+    RAMA = "hu/31-x"
+    ISSUE = 31
+    BASE = "main"
+
+    @staticmethod
+    def _pr(**over):
+        pr = {
+            "number": 31, "url": "https://github.com/o/r/pull/31", "state": "OPEN",
+            "isDraft": False, "baseRefName": "main", "headRefName": "hu/31-x",
+            "body": "Closes #31\n\nTexto", "mergeable": "MERGEABLE",
+            "mergeStateStatus": "CLEAN", "statusCheckRollup": [],
+        }
+        pr.update(over)
+        return pr
+
+    def _evaluar(self, prs, **over):
+        args = dict(issue=self.ISSUE, rama=self.RAMA, base=self.BASE,
+                     tipo_remote="github", hay_workflows=False)
+        args.update(over)
+        return pc.evaluar(prs, **args)
+
+    # --- R0 remote / herramienta ---
+
+    def test_caso1_remote_azure_devops_no_critico(self):
+        v = self._evaluar([], tipo_remote="azure-devops")
+        self.assertEqual(v.estado, "FAILED")
+        self.assertEqual(v.criticidad, "no-critico")
+        self.assertIn("azure-devops", v.motivo)
+
+    def test_caso2_remote_desconocido_no_critico(self):
+        v = self._evaluar([], tipo_remote="desconocido")
+        self.assertEqual(v.estado, "FAILED")
+        self.assertEqual(v.criticidad, "no-critico")
+        self.assertIn("no reconocido", v.motivo)
+
+    def test_caso3_gh_error_critico(self):
+        v = self._evaluar([], gh_error="rate limit exceeded")
+        self.assertEqual(v.estado, "FAILED")
+        self.assertEqual(v.criticidad, "critico")
+        self.assertIn("rate limit exceeded", v.motivo)
+
+    # --- R1 rama / existencia ---
+
+    def test_caso4_rama_no_corresponde_al_issue(self):
+        v = self._evaluar([], rama="hu/99-otra")
+        self.assertEqual(v.estado, "FAILED")
+        self.assertEqual(v.criticidad, "critico")
+        self.assertIn("#31", v.motivo)
+        self.assertIn("hu/99-otra", v.motivo)
+
+    def test_caso5_sin_prs(self):
+        v = self._evaluar([])
+        self.assertEqual(v.estado, "FAILED")
+        self.assertEqual(v.criticidad, "critico")
+        self.assertIn("no hay PR abierto", v.motivo)
+        self.assertIn(self.RAMA, v.motivo)
+
+    def test_caso6_pr_cerrado_sin_merge(self):
+        v = self._evaluar([self._pr(state="CLOSED")])
+        self.assertEqual(v.estado, "FAILED")
+        self.assertEqual(v.criticidad, "critico")
+        self.assertIn("#31", v.motivo)
+        self.assertIn("cerrado sin merge", v.motivo)
+
+    def test_caso7_multiples_prs_abiertos(self):
+        v = self._evaluar([self._pr(number=31), self._pr(number=32)])
+        self.assertEqual(v.estado, "FAILED")
+        self.assertEqual(v.criticidad, "critico")
+        self.assertIn("2 PRs abiertos", v.motivo)
+        self.assertIn("ambigüedad", v.motivo)
+
+    # --- R2 estado ---
+
+    def test_caso8_pr_mergeado_passed(self):
+        v = self._evaluar([self._pr(state="MERGED", mergeable="UNKNOWN", mergeStateStatus="UNKNOWN")])
+        self.assertEqual(v.estado, "PASSED")
+        self.assertIn("#31", v.motivo)
+        self.assertIn("ya fue mergeado", v.motivo)
+
+    # --- R3 forma ---
+
+    def test_caso9_draft(self):
+        v = self._evaluar([self._pr(isDraft=True)])
+        self.assertEqual(v.estado, "FAILED")
+        self.assertEqual(v.criticidad, "critico")
+        self.assertIn("draft", v.motivo)
+
+    def test_caso10_base_incorrecta(self):
+        v = self._evaluar([self._pr(baseRefName="develop")])
+        self.assertEqual(v.estado, "FAILED")
+        self.assertEqual(v.criticidad, "critico")
+        self.assertIn("develop", v.motivo)
+        self.assertIn("main", v.motivo)
+
+    def test_caso11_sin_keyword_de_cierre_no_critico(self):
+        v = self._evaluar([self._pr(body="Sin keyword de cierre")])
+        self.assertEqual(v.estado, "FAILED")
+        self.assertEqual(v.criticidad, "no-critico")
+        self.assertIn("#31", v.motivo)
+
+    # --- R4 merge ---
+
+    def test_caso12_conflicting(self):
+        v = self._evaluar([self._pr(mergeable="CONFLICTING")])
+        self.assertEqual(v.estado, "FAILED")
+        self.assertEqual(v.criticidad, "critico")
+        self.assertIn("conflictos", v.motivo)
+
+    def test_caso13_mergestate_dirty_con_mergeable_no_conflicting(self):
+        v = self._evaluar([self._pr(mergeable="MERGEABLE", mergeStateStatus="DIRTY")])
+        self.assertEqual(v.estado, "FAILED")
+        self.assertEqual(v.criticidad, "critico")
+        self.assertIn("conflictos", v.motivo)
+        self.assertIn("DIRTY", v.motivo)
+
+    def test_caso14_mergeable_unknown_tras_espera(self):
+        v = self._evaluar([self._pr(mergeable="UNKNOWN", mergeStateStatus="UNKNOWN")], espera=60)
+        self.assertEqual(v.estado, "FAILED")
+        self.assertEqual(v.criticidad, "critico")
+        self.assertIn("60", v.motivo)
+
+    def test_caso15_behind_no_critico(self):
+        v = self._evaluar([self._pr(mergeStateStatus="BEHIND")])
+        self.assertEqual(v.estado, "FAILED")
+        self.assertEqual(v.criticidad, "no-critico")
+        self.assertIn("detrás", v.motivo)
+
+    def test_caso16_mergestate_blocked_no_altera_veredicto(self):
+        """D2: BLOCKED es el estado normal de un PR sano bajo branch protection; no
+        debe alterar el veredicto (aqui, sin checks configurados, sigue PASSED)."""
+        v = self._evaluar([self._pr(mergeStateStatus="BLOCKED")], hay_workflows=False)
+        self.assertEqual(v.estado, "PASSED")
+
+    # --- R5 checks: rollup vacio ---
+
+    def test_caso17_sin_checks_sin_workflows_passed(self):
+        v = self._evaluar([self._pr(statusCheckRollup=[])], hay_workflows=False)
+        self.assertEqual(v.estado, "PASSED")
+        self.assertIn("no tiene checks configurados", v.motivo)
+
+    def test_caso18_sin_checks_con_workflows_failed_no_critico(self):
+        v = self._evaluar([self._pr(statusCheckRollup=[])], hay_workflows=True)
+        self.assertEqual(v.estado, "FAILED")
+        self.assertEqual(v.criticidad, "no-critico")
+        self.assertIn("reevalu", v.motivo)
+
+    # --- R5 checks: CheckRun / StatusContext ---
+
+    def test_caso19_y_27_checkrun_verde_passed(self):
+        checks = [{"__typename": "CheckRun", "name": "build", "status": "COMPLETED", "conclusion": "SUCCESS"}]
+        v = self._evaluar([self._pr(statusCheckRollup=checks)])
+        self.assertEqual(v.estado, "PASSED")
+        self.assertIn("checks en verde", v.motivo)
+
+    def test_caso20_checkrun_rojo_nombra_el_check(self):
+        checks = [{"__typename": "CheckRun", "name": "lint-check", "status": "COMPLETED", "conclusion": "FAILURE"}]
+        v = self._evaluar([self._pr(statusCheckRollup=checks)])
+        self.assertEqual(v.estado, "FAILED")
+        self.assertEqual(v.criticidad, "critico")
+        self.assertIn("lint-check", v.motivo, "el motivo debe nombrar el check por su name, no solo el exit code")
+        self.assertIn("FAILURE", v.motivo)
+
+    def test_caso21_checkrun_en_curso_no_critico(self):
+        checks = [{"__typename": "CheckRun", "name": "build", "status": "IN_PROGRESS"}]
+        v = self._evaluar([self._pr(statusCheckRollup=checks)])
+        self.assertEqual(v.estado, "FAILED")
+        self.assertEqual(v.criticidad, "no-critico")
+        self.assertIn("build", v.motivo)
+
+    def test_caso22_y_27_statuscontext_verde_passed(self):
+        checks = [{"__typename": "StatusContext", "context": "ci/circleci", "state": "SUCCESS"}]
+        v = self._evaluar([self._pr(statusCheckRollup=checks)])
+        self.assertEqual(v.estado, "PASSED")
+
+    def test_caso23_statuscontext_rojo_nombra_el_check(self):
+        checks = [{"__typename": "StatusContext", "context": "ci/circleci", "state": "FAILURE"}]
+        v = self._evaluar([self._pr(statusCheckRollup=checks)])
+        self.assertEqual(v.estado, "FAILED")
+        self.assertEqual(v.criticidad, "critico")
+        self.assertIn("ci/circleci", v.motivo)
+        self.assertIn("FAILURE", v.motivo)
+
+    def test_caso24_statuscontext_en_curso_no_critico(self):
+        checks = [{"__typename": "StatusContext", "context": "ci/circleci", "state": "PENDING"}]
+        v = self._evaluar([self._pr(statusCheckRollup=checks)])
+        self.assertEqual(v.estado, "FAILED")
+        self.assertEqual(v.criticidad, "no-critico")
+        self.assertIn("ci/circleci", v.motivo)
+
+    def test_caso25_valor_no_mapeado_es_desconocido_no_critico(self):
+        checks = [{"__typename": "CheckRun", "name": "raro", "status": "COMPLETED", "conclusion": "ALGO_NUEVO"}]
+        v = self._evaluar([self._pr(statusCheckRollup=checks)])
+        self.assertEqual(v.estado, "FAILED")
+        self.assertEqual(v.criticidad, "no-critico")
+        self.assertIn("raro", v.motivo)
+        self.assertIn("ALGO_NUEVO", v.motivo)
+        self.assertIn("desconocido", v.motivo)
+
+    def test_caso26_mezcla_de_tipos_prioriza_rojo(self):
+        checks = [
+            {"__typename": "StatusContext", "context": "ok", "state": "SUCCESS"},
+            {"__typename": "CheckRun", "name": "build", "status": "COMPLETED", "conclusion": "FAILURE"},
+            {"__typename": "StatusContext", "context": "pend", "state": "PENDING"},
+        ]
+        v = self._evaluar([self._pr(statusCheckRollup=checks)])
+        self.assertEqual(v.estado, "FAILED")
+        self.assertEqual(v.criticidad, "critico")
+        self.assertIn("build", v.motivo, "rojo > desconocido > en_curso > verde: debe nombrar el check rojo")
+
+    def test_caso27_passed_completo(self):
+        checks = [{"__typename": "CheckRun", "name": "build", "status": "COMPLETED", "conclusion": "SUCCESS"}]
+        v = self._evaluar([self._pr(statusCheckRollup=checks)])
+        self.assertEqual(v.estado, "PASSED")
+        self.assertEqual(v.criticidad, "n-a")
+        self.assertIn("#31", v.motivo)
+        self.assertIn("main", v.motivo)
+        self.assertIn("checks en verde", v.motivo)
+        self.assertEqual(v.pr, "https://github.com/o/r/pull/31")
 
 
 class MetricasTests(unittest.TestCase):
