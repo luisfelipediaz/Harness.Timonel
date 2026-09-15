@@ -22,7 +22,7 @@ Todo dato específico del proyecto vive en `.claude/timonel.config.json` del con
 | `modulos[]` | Labels `mod:*` y validación del módulo destino |
 | `heuristicsDir` | `null` → `heuristics/` del plugin; ruta → carpeta propia |
 | `git.baseBranches` (opcional) | Ramas protegidas por el hook `PreToolUse` (default `["main","master","develop"]`): no se permite `git commit` directo durante el trabajo del harness |
-| `git.protectBase` (opcional) | `true` (default) activa ese bloqueo; `false` lo desactiva en repos que commitean a main |
+| `git.protectBase` (opcional) | **Deprecado e ignorado desde v0.6.0** (#85): el hook de commits bloquea siempre la rama base, sin leer este flag. Se deprecó porque `guard_integracion.py` (#82) ya bloqueaba el `push`/`merge`/PR a la base aunque `protectBase: false` permitiera comitear ahí en local — la "salida" llevaba a commits locales impublicables, una incoherencia entre dos guards, no una opción útil |
 | `git.integracion` (opcional) | Unico valor valido: `"pr"` (default y unica via desde v0.6.0) abre PR en la Fase 6.5, antes del DoD (GitHub con `gh`, Azure DevOps con `az repos`). `"merge"` queda **deprecado e ignorado** desde v0.6.0: ya no existe camino de merge directo a la rama base, ni en el consumidor ni en el propio plugin |
 | `timonel.repo` (opcional) | Repo del plugin al que `cosechar_retro.py` envia las mejoras que apuntan al harness (default `luisfelipediaz/Harness.Timonel`) |
 
@@ -35,6 +35,7 @@ Se nombra `timonel.config.json` y no `harness.config.json` para convivir con Mef
 - 2026-09-10 (v0.4.0, #15 #13): se agregan `git.baseBranches`, `git.protectBase` y `timonel.repo`.
 - 2026-09-10 (v0.5.0, #31): se agrega `git.integracion`.
 - 2026-09-11 (v0.6.0, #80): `git.integracion` pasa a tener un unico valor valido, `"pr"`; `"merge"` queda deprecado e ignorado — el PR es la unica via de integracion, tambien en el perfil plugin.
+- 2026-09-15 (v0.6.0, #85): `git.protectBase` pasa a estar deprecado e ignorado; el guard de commits bloquea la rama base incondicionalmente, alineado con `guard_integracion.py`.
 
 ## Consecuencias
 

@@ -342,6 +342,17 @@ def _comando_guard_integracion() -> str:
     raise AssertionError("hooks.json no tiene ningun guard que invoque guard_integracion.py")
 
 
+def _comando_guard_commits() -> str:
+    """El guard hermano de `_comando_guard_integracion`: selecciona por CONTENIDO del
+    hooks.json real (el mensaje que bloquea commits directos en la base), nunca por
+    indice del array -- un guard nuevo insertado antes correria este test contra el
+    hook equivocado sin que nadie lo notara."""
+    for cmd in _comandos_pretooluse():
+        if "commit directo en la rama base" in cmd:
+            return cmd
+    raise AssertionError("hooks.json no tiene ningun guard que bloquee commits en la rama base")
+
+
 def _comando_push_force() -> str:
     for cmd in _comandos_pretooluse():
         if "push" in cmd and "--force" in cmd:
@@ -349,7 +360,11 @@ def _comando_push_force() -> str:
     raise AssertionError("hooks.json no tiene el guard de push --force")
 
 
-def _preparar_repo(tmp: Path, rama: str, perfil: str) -> None:
+def _preparar_repo(tmp: Path, rama: str, perfil: str, config_extra: dict | None = None) -> None:
+    """`config_extra` se mezcla (nivel superior) dentro de `.claude/timonel.config.json`
+    en perfil `consumidor`, que hoy solo escribia `github.repo`. Lo necesita el caso 6
+    de #85 para simular `{"git": {"protectBase": false}}` sin escribir un config a mano
+    en cada test."""
     subprocess.run(["git", "init", "-q", "-b", rama], cwd=tmp, check=True)
     subprocess.run(["git", "config", "user.email", "a@a.com"], cwd=tmp, check=True)
     subprocess.run(["git", "config", "user.name", "a"], cwd=tmp, check=True)
@@ -360,8 +375,11 @@ def _preparar_repo(tmp: Path, rama: str, perfil: str) -> None:
         (tmp / ".claude-plugin").mkdir(exist_ok=True)
         (tmp / ".claude-plugin/plugin.json").write_text(json.dumps({"name": "timonel"}), encoding="utf-8")
     elif perfil == "consumidor":
+        config = {"github": {"repo": "o/r"}}
+        if config_extra:
+            config.update(config_extra)
         (tmp / ".claude").mkdir(exist_ok=True)
-        (tmp / ".claude/timonel.config.json").write_text(json.dumps({"github": {"repo": "o/r"}}), encoding="utf-8")
+        (tmp / ".claude/timonel.config.json").write_text(json.dumps(config), encoding="utf-8")
 
 
 def _correr_hook(comando_hook: str, cmd_bash: str, tmp: Path, plugin_root: str) -> subprocess.CompletedProcess:
@@ -430,6 +448,28 @@ class HookEnCajaNegraTests(unittest.TestCase):
             resultado = _correr_hook(comando, "git push --force origin hu/82-x", tmp_path, plugin_root=str(ROOT))
             self.assertEqual(resultado.returncode, 2)
             self.assertIn("[timonel] Bloqueado", resultado.stderr)
+
+    def test_protectbase_false_ya_no_habilita_commit_en_base_caso_6(self):
+        """Caso 6 de #85: `protectBase: false` quedo deprecado e ignorado (TIM-ADR-0002).
+        Ejecucion real del hook, no un grep de su texto -- repo consumidor, rama `main`,
+        config con el flag en `false`, `git commit` sigue bloqueado."""
+        comando = _comando_guard_commits()
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            _preparar_repo(tmp_path, "main", perfil="consumidor", config_extra={"git": {"protectBase": False}})
+            resultado = _correr_hook(comando, 'git commit -m "x"', tmp_path, plugin_root=str(ROOT))
+            self.assertEqual(resultado.returncode, 2, f"stderr={resultado.stderr!r}")
+            self.assertIn("[timonel] Bloqueado", resultado.stderr)
+
+    def test_mensaje_del_guard_de_commits_no_ofrece_protectbase_como_remedio_caso_7(self):
+        """Caso 7 de #85: el mensaje de bloqueo ya no debe sugerir `protectBase: false`
+        como salida, porque esa salida ya no existe."""
+        comando = _comando_guard_commits()
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            _preparar_repo(tmp_path, "main", perfil="consumidor", config_extra={"git": {"protectBase": False}})
+            resultado = _correr_hook(comando, 'git commit -m "x"', tmp_path, plugin_root=str(ROOT))
+            self.assertNotIn("protectBase", resultado.stderr)
 
     def test_push_force_bloqueado_incondicional_sin_script_caso_24(self):
         """Caso 24: aunque guard_integracion.py sea inexistente/no resoluble, --force sigue bloqueado
