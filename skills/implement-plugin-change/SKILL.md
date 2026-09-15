@@ -3,16 +3,22 @@ name: implement-plugin-change
 description: Implementa un cambio del propio plugin Timonel (agentes, skills, scripts, hooks, docs) a partir de un issue mod:plugin de luisfelipediaz/Harness.Timonel, con TDD sobre unittest y respetando la gobernanza del repo (issue obligatorio, commits con #N, sin tocar CHANGELOG ni version). Lo usa el sub-agente unico del perfil plugin de flechodiezx.
 ---
 
-Recibes del orquestador: `issue`, el body del issue, el **contrato de cambio** (tabla archivo → cambio) y la investigacion (`timonel:investigacion`). Trabajas en la rama `hu/<issue>-*` ya creada, en el repo del plugin. Siempre en espanol.
+Recibes del orquestador: `issue`, el body del issue, el **contrato de cambio** (tabla archivo → cambio) y la investigacion (`timonel:investigacion`). Trabajas en **un worktree aislado** (`isolation: worktree`), en una rama nueva que el harness genera (tipicamente `worktree-agent-<id>`, bajo `.claude/worktrees/agent-<id>/`) creada desde `origin/main` — no en `hu/<issue>-*` directamente. El orquestador mergea esa rama a `hu/<issue>-*` despues, via `consolidate-story`. Siempre en espanol.
 
 ## Reglas del repo (TIM-ADR-0005 y `CLAUDE.md` del plugin)
 
+- **Nunca uses `$PLUGIN_ROOT`.** Dentro de tu worktree esa variable resuelve al plugin instalado en cache (una version vieja), no al repo que estas editando. Usa siempre **rutas relativas a tu CWD** (`tests/`, `scripts/`, `agents/`, `skills/`): el codigo que se prueba es el codigo que se edita.
 - **Solo los archivos del contrato de cambio.** Si necesitas tocar otro, no lo hagas: documentalo en el output como pendiente.
 - **No edites `CHANGELOG.md` ni `.claude-plugin/plugin.json`**: lo hace `consolidate-story`.
 - **Cambios de formato de issue/comentario** → actualiza en el mismo commit `skills/github-issues/references/*.md`, `scripts/timonel_gh.py`, `scripts/validar_marcador.py` y sus tests.
 - **Agentes**: frontmatter `name`, `description`, `model`, `color`, `skills`. **Commands**: `description`, `argument-hint`, `model`. **Skills**: `name` = carpeta, `description` con cuando usarlo.
 - Python stdlib puro, lookup maps antes que cadenas de `if` (`heuristics/general/evitar-ifs.md`), sin tipos espejo.
 - Commits: `<tipo>: <que> (#<issue>)`; el hook `commit-msg` rechaza sin `#N`.
+
+## Limites conocidos del worktree
+
+- **`core.hooksPath` resuelve al `.githooks` del arbol principal** (ruta absoluta), incluso dentro de tu worktree. Si tu cambio toca `.githooks/commit-msg`, tus propios commits se validan con el hook **viejo** — es una trampa: que tus commits pasen no prueba que el hook nuevo funcione.
+- **El guard `PreToolUse` si resuelve al de tu worktree** (`./scripts/guard_integracion.py`, relativo a tu CWD). Si tu cambio toca ese guard, tu propia sesion ya corre contra el guard **nuevo** — te "dogfoodeas" el cambio. Es la asimetria opuesta a la anterior.
 
 ## Pasos
 
@@ -34,5 +40,6 @@ Recibes del orquestador: `issue`, el body del issue, el **contrato de cambio** (
 - Casos de prueba de hooks ejecutados (si aplica)
 - Invariantes nuevas agregadas a `test_consistencia.py` (si aplica)
 - Pendientes fuera del contrato (o "Ninguno")
-- Rama y hash del commit
+- **Rama exacta y ruta de tu worktree** (`git branch --show-current` y `pwd`): el orquestador los necesita para consolidar
+- Hash del commit
 - Si la verificacion fallo: error exacto y lo intentado

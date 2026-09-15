@@ -180,6 +180,82 @@ class HotfixAisladoTests(unittest.TestCase):
             self.assertIn(frase, texto, f"flechodiezx-hotfix.md debe mencionar `{frase}`")
 
 
+class WorktreeDeImplementacionTests(unittest.TestCase):
+    """Todo skill `implement-*` se lanza con `isolation: worktree` (#84). Se genera del
+    glob `skills/implement-*` en vez de listar frases prohibidas por agente, porque
+    `agents/flechodiezx.md` dice "sin worktree" cinco veces de forma legitima (Dora en
+    Fase 1.5, code-review en 5.5, retro en 6, verify-dod en 7): son sub-agentes de solo
+    lectura que no deben aislarse, y una lista de frases prohibidas convertiria esa
+    documentacion correcta en un test rojo.
+
+    La propiedad se verifica sobre la seccion `##` del agente que menciona el nombre del
+    skill (el bloque de encabezado de nivel 2, no los `###` internos), tal como lo pide
+    el contrato de #84.
+
+    Caso degenerado (eje 1, caso 3 del contrato de #84): "delta = 0 en las ramas
+    `worktree-agent-*` pero con commits nuevos en la rama de la historia" significa que
+    el sub-agente escribio en el arbol de trabajo de la sesion en vez de en su worktree —
+    el aislamiento fallo. Es la razon por la que este test exige que CADA skill
+    `implement-*` aparezca mencionado en al menos una seccion de algun agente
+    (`test_todo_skill_implement_aparece_en_una_seccion`): sin esa fila, "ningun agente
+    menciona el skill" se leeria como que no hay nada que objetar, exactamente cuando el
+    sub-agente nunca se lanza aislado. Es el mismo razonamiento de #81 con las entradas
+    degeneradas del PR (sin `number`, sin `mergeable`): a una entrada degenerada le
+    corresponde un motivo propio, no un pase por default."""
+
+    FRASES_PROHIBIDAS = (
+        "sin worktree",
+        "sin worktrees",
+        "Nunca worktree",
+        "sin merge de worktrees",
+        "trabaja en la rama",
+    )
+
+    @staticmethod
+    def _skills_implement() -> list[str]:
+        return sorted(p.parent.name for p in (ROOT / "skills").glob("implement-*/SKILL.md"))
+
+    @staticmethod
+    def _secciones(texto: str) -> list[str]:
+        """Bloques de encabezado `##` (nivel 2): separa por lineas que empiezan
+        exactamente con '## ', sin capturar subtitulos '### '."""
+        return re.split(r"\n(?=## (?!#))", texto)
+
+    def _secciones_que_mencionan(self, skill: str) -> list[tuple]:
+        encontradas = []
+        for agente in (ROOT / "agents").glob("*.md"):
+            texto = agente.read_text(encoding="utf-8")
+            for seccion in self._secciones(texto):
+                if skill in seccion:
+                    encontradas.append((agente, seccion))
+        return encontradas
+
+    def test_todo_skill_implement_aparece_en_una_seccion(self):
+        skills_implement = self._skills_implement()
+        self.assertTrue(skills_implement, "no hay skills implement-* que verificar: glob vacio")
+        for skill in skills_implement:
+            secciones = self._secciones_que_mencionan(skill)
+            self.assertTrue(
+                secciones,
+                f"ningun agente menciona el skill `{skill}` en ninguna seccion `##`: "
+                "no hay evidencia de que se lance, y sin evidencia la invariante de "
+                "aislamiento seria vacua (ver docstring, caso 3 del eje 1 de #84)",
+            )
+
+    def test_toda_seccion_que_lanza_implement_aisla_en_worktree(self):
+        for skill in self._skills_implement():
+            for agente, seccion in self._secciones_que_mencionan(skill):
+                self.assertIn(
+                    "isolation: worktree", seccion,
+                    f"{agente.name}: la seccion que lanza `{skill}` debe declarar `isolation: worktree`",
+                )
+                for frase in self.FRASES_PROHIBIDAS:
+                    self.assertNotIn(
+                        frase, seccion,
+                        f"{agente.name}: la seccion que lanza `{skill}` no debe decir `{frase}`",
+                    )
+
+
 class DodEstrictoTests(unittest.TestCase):
     """DoD estricto (gap 3 de la auditoria #24, issue #28): sin autoevaluacion sin evaluador."""
 
