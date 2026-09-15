@@ -18,6 +18,7 @@ Timonel exige a sus consumidores que el backlog viva en GitHub Issues (TIM-ADR-0
 ## Control de cambios
 
 - 2026-09-10 (#27): el plugin se desarrolla con su propio flujo (perfil `plugin` de `flechodiezx`). `main` queda protegida tambien en el plugin: el trabajo va en ramas `hu/N-*` y se integra por PR con merge humano; la release se etiqueta al cerrar la epica.
+- 2026-09-15 (v0.6.0, #85): se cierra la epica #79 y con ella el ciclo abierto en #27. El trabajo en el plugin siempre ocurre en un worktree aislado (deroga expresamente el "sin worktree" que regia el perfil plugin hasta #84); ninguna lectura vigente autoriza ya `git push origin main` ni un `git merge --ff-only` parado en la rama base -- esa via quedo derogada desde #82 (`guard_integracion.py` la bloquea) y esta entrada lo deja explicito en vez de confiar en la memoria de quien lo escribio; el merge a `main` lo sigue haciendo un humano, siempre via PR. Ademas, `/timonel:onboard` puede activar proteccion de rama server-side en el repo consumidor (`required_pull_request_reviews`, `enforce_admins`), para que la politica no dependa solo del comportamiento de los agentes.
 
 ## Consecuencias
 
