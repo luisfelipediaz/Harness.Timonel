@@ -98,3 +98,15 @@ Forzar un lookup donde no corresponde es el anti-patrón opuesto. Dejá el condi
 - **Rangos / umbrales numéricos** (`x >= 3 ? 2 : x >= 1 ? 1 : 0`): no son claves discretas, son
   cortes en un continuo; un `Record` no aplica (a lo sumo una tabla de rangos si hay muchos). El
   ternario encadenado está bien.
+
+## Caso real
+
+**Procedencia: importada, sin caso registrado en este repo.** Llegó con el harness original del Portal en el commit `c8bcc42` (*"extraer harness SDD del Portal como plugin timonel con backlog en GitHub Issues"*, v0.1.0), anterior a la gobernanza de TIM-ADR-0005 — ese commit no referencia ningún issue y no hay retro ni review que la origine. No se le inventa un caso: su procedencia se documentó retroactivamente en #134, la historia que hizo descubribles las heurísticas.
+
+El uso vivo que sí es verificable: `CLAUDE.md` la cita como regla de Python del propio plugin (*"lookup maps antes que cadenas de `if`"*), y `scripts/pr_check.py` y `scripts/guard_integracion.py` la aplican con sus mapas de traducción (`_STATE_A_EJE`, `_CONCLUSION_A_EJE`, `_MOTIVO_POR_EJE`).
+
+## Relación con otras heurísticas
+
+- **`perfiles-como-tabla.md`** es esta misma regla aplicada a la prosa de agentes y skills. Invocá ésta cuando edites código —donde `Record<Tipo, …>` te da exhaustividad del compilador— y aquélla cuando edites un `.md` de `agents/` o `skills/`, donde nadie verifica que estén todas las celdas y la tabla es el único mecanismo que hace visible lo que falta.
+- **`no-tipos-espejo.md`** comparte el mecanismo del `Record` exhaustivo por unión de literales, pero mira los tipos en vez del flujo de control: allá el olor es un tipo que duplica a otro, acá un condicional que duplica una tabla.
+- **`enumerar-la-clase-no-el-representante.md`** interviene cuando la clave del mapa no es una unión cerrada: un lookup sobre valores externos necesita además la clase completa de entradas y un default que no sea el resultado favorable.

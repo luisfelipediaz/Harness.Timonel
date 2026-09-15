@@ -2,10 +2,12 @@
 name: code-review detecta any, *ngIf y tipo espejo como WARNING
 tags: [code-review, heuristicas]
 runs: 2
-max_turns: 8
+max_turns: 12
 ---
 
-Vas a revisar una implementación siguiendo el skill `skills/code-review/SKILL.md` del plugin `timonel` y las heurísticas que referencia en `heuristics/` (`general/evitar-ifs.md`, `general/no-tipos-espejo.md`, `angular/convenciones-bitakora.md`).
+Vas a revisar una implementación siguiendo el skill `skills/code-review/SKILL.md` del plugin `timonel`.
+
+Las heurísticas **se descubren por glob**, como indica el Paso 1 del skill: no hay una lista de nombres que leer. Para este caso, trata al consumidor como si su `.claude/timonel.config.json` declarara `stack.frontend: "Angular 21"` y `heuristicsDir: null`; el alcance del issue es `Frontend`, así que el glob del Paso 1 debe traerte **`heuristics/general/*.md` más `heuristics/angular/*.md`**. Aplicá todas las que ese glob traiga a disco.
 
 **No hay issue real en GitHub**: usa el body de abajo como si fuera el issue `#99` ya leído. Concretamente, **omite**:
 

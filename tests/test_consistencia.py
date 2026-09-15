@@ -385,5 +385,187 @@ class EvalsTests(unittest.TestCase):
         self.assertIn("evals/results/", gitignore, ".gitignore debe ignorar evals/results/")
 
 
+class HeuristicasDescubriblesTests(unittest.TestCase):
+    """Una heuristica escrita que ningun skill puede descubrir no cambia ninguna decision (#134).
+
+    El ratchet cosecho once heuristicas como issues desde #34 y ninguna llego al disco;
+    peor, el mecanismo que las consume enumeraba por nombre los archivos que leia, asi que
+    crear un archivo nuevo no lo activaba. Estas cinco invariantes cubren las dos mitades:
+    que el descubrimiento sea por patron (A), que no queden referencias colgadas (B), que
+    cada archivo tenga la forma que lo hace aplicable (C, D) y que su carpeta sea alcanzable
+    por alguna regla documentada (E).
+
+    **A verifica el nombre SIN extension (el *stem*), no el nombre con `.md`.** La lista
+    cerrada que esta invariante existe para atrapar --la de la seccion 3.4 del skill de
+    review, que es la que decide que hallazgos se reportan-- estaba escrita sin extension.
+    Verificar con `.md` la habria dejado pasar limpia y la invariante habria nacido vacua:
+    verde, y sin cubrir el unico lugar que importaba. El stem es ademas estrictamente mas
+    fuerte, porque toda mencion con extension contiene al stem.
+
+    Este docstring se abstiene **a proposito** de escribir un stem real de heuristica, y los
+    tests derivan la lista de stems del contenido de `heuristics/` en vez de listarla. En #84
+    (`4fdb04c`) el fix que corrigio el ambito de una invariante reescribio su docstring para
+    explicar la regla, la explicacion repitio el literal buscado, y eso volvio a vaciar la
+    invariante que el fix acababa de arreglar. El ambito de A son los skills, no este archivo,
+    asi que aqui un literal no vaciaria nada hoy; la abstencion es disciplina barata frente a
+    un ambito que puede ampliarse. Si alguien "completa" este texto con un ejemplo concreto,
+    esta deshaciendo la leccion.
+
+    El selector de C y D es **default-in con opt-out declarado**: todo archivo de `heuristics/`
+    esta cubierto salvo que su H1 termine en el sufijo literal de catalogo. No se usa "el H1
+    empieza con tal prefijo" porque seria default-out: un archivo nuevo con el encabezado mal
+    escrito quedaria exento en silencio, que es el modo de fallo que esta clase persigue.
+    """
+
+    SKILLS_QUE_DESCUBREN = ("code-review", "implement-plugin-change")
+    SUFIJO_OPT_OUT = " — catálogo"
+    GLOB_OBLIGATORIO = "general/*.md"
+    MARCA_DE_GLOB = "*.md"
+    SECCION_CASO = "Caso real"
+    SECCION_RELACION = "Relación con otras heurísticas"
+    SECCION_REGLA = "Regla general"
+    PREFIJO_CUANDO = "Cuándo"
+    CARPETA_SIEMPRE_ALCANZABLE = "general"
+    DIRS_CON_MARKDOWN = ("agents", "commands", "skills", "scripts", "hooks", "heuristics", "docs", "evals", "tests", ".github")
+    _RE_RUTA_HEURISTICA = re.compile(r"heuristics/([A-Za-z0-9_-]+)/([A-Za-z0-9_.-]+\.md)")
+
+    @staticmethod
+    def _heuristicas() -> list[Path]:
+        return sorted((ROOT / "heuristics").rglob("*.md"))
+
+    @classmethod
+    def _stems(cls) -> list[str]:
+        """Los nombres sin extension, derivados del disco. Nunca una lista literal: una
+        lista aqui seria la misma enumeracion cerrada que la invariante A prohibe."""
+        return sorted({p.stem for p in cls._heuristicas()})
+
+    @staticmethod
+    def _h1(path: Path) -> str:
+        for linea in path.read_text(encoding="utf-8").splitlines():
+            if linea.startswith("# "):
+                return linea
+        return ""
+
+    @classmethod
+    def _cubiertas_por_formato(cls) -> list[Path]:
+        return [p for p in cls._heuristicas() if not cls._h1(p).rstrip().endswith(cls.SUFIJO_OPT_OUT)]
+
+    @staticmethod
+    def _sin_bloques_de_codigo(texto: str) -> str:
+        """Un `## ...` dentro de un bloque cercado es parte de un ejemplo, no una seccion.
+        Contarlo dejaria que un ejemplo satisfaga las invariantes de formato."""
+        return re.sub(r"^```.*?^```", "", texto, flags=re.M | re.S)
+
+    @classmethod
+    def _titulos_de_seccion(cls, texto: str) -> list[str]:
+        return [l[3:].strip() for l in cls._sin_bloques_de_codigo(texto).splitlines() if l.startswith("## ")]
+
+    @classmethod
+    def _cuerpo_de_seccion(cls, texto: str, titulo: str) -> str | None:
+        for bloque in re.split(r"^## ", cls._sin_bloques_de_codigo(texto), flags=re.M)[1:]:
+            if bloque.splitlines()[0].strip() == titulo:
+                return bloque
+        return None
+
+    @staticmethod
+    def _parrafos(texto: str) -> list[str]:
+        return re.split(r"\n[ \t]*\n", texto)
+
+    @classmethod
+    def _markdown_del_repo(cls):
+        """Solo los directorios versionados con documentacion. `rglob` desde la raiz
+        entraria a `.claude/worktrees/`, donde viven copias completas del repo."""
+        yield from sorted(ROOT.glob("*.md"))
+        for carpeta in cls.DIRS_CON_MARKDOWN:
+            yield from sorted((ROOT / carpeta).rglob("*.md"))
+
+    # --- A: descubrimiento por glob -------------------------------------------------
+
+    def test_a_los_skills_que_consumen_heuristicas_declaran_el_glob(self):
+        for skill in self.SKILLS_QUE_DESCUBREN:
+            archivo = ROOT / "skills" / skill / "SKILL.md"
+            self.assertTrue(archivo.exists(), f"{skill}/SKILL.md no existe")
+            self.assertTrue(
+                self.GLOB_OBLIGATORIO in archivo.read_text(encoding="utf-8"),
+                f"{skill}/SKILL.md debe descubrir las heuristicas por glob `{self.GLOB_OBLIGATORIO}`: "
+                "sin el glob no hay mecanismo, y una heuristica nueva no llega a nadie",
+            )
+
+    def test_a_ningun_parrafo_nombra_una_heuristica_sin_declarar_el_glob(self):
+        """Unidad: el PARRAFO (leccion de #84). Un glob que vive en otro parrafo no cubre a
+        la cita de este. Se busca el stem y no el basename con extension: ver docstring."""
+        stems = self._stems()
+        self.assertTrue(stems, "no hay archivos en heuristics/: la invariante seria vacua")
+        for skill in self.SKILLS_QUE_DESCUBREN:
+            archivo = ROOT / "skills" / skill / "SKILL.md"
+            for parrafo in self._parrafos(archivo.read_text(encoding="utf-8")):
+                nombrados = [s for s in stems if s in parrafo]
+                if not nombrados:
+                    continue
+                self.assertIn(
+                    self.MARCA_DE_GLOB, parrafo,
+                    f"{skill}/SKILL.md: el parrafo que nombra {nombrados} no declara el glob. "
+                    "Una cita puntual solo sobrevive en el mismo parrafo que el patron de "
+                    "descubrimiento; sola, es una lista cerrada disfrazada",
+                )
+
+    # --- B: sin referencias huerfanas -----------------------------------------------
+
+    def test_b_toda_ruta_de_heuristica_citada_existe_en_disco(self):
+        for doc in self._markdown_del_repo():
+            for carpeta, archivo in self._RE_RUTA_HEURISTICA.findall(doc.read_text(encoding="utf-8")):
+                ruta = ROOT / "heuristics" / carpeta / archivo
+                self.assertTrue(
+                    ruta.exists(),
+                    f"{doc.relative_to(ROOT)} cita `heuristics/{carpeta}/{archivo}` y ese archivo no existe",
+                )
+
+    # --- C y D: formato y evidencia --------------------------------------------------
+
+    def test_c_toda_heuristica_tiene_regla_cuando_y_relacion(self):
+        cubiertas = self._cubiertas_por_formato()
+        self.assertTrue(cubiertas, "ninguna heuristica quedo cubierta por el formato: revisa el opt-out")
+        for archivo in cubiertas:
+            titulos = self._titulos_de_seccion(archivo.read_text(encoding="utf-8"))
+            nombre = archivo.relative_to(ROOT)
+            self.assertIn(self.SECCION_REGLA, titulos, f"{nombre} no tiene `## {self.SECCION_REGLA}`")
+            self.assertTrue(
+                any(t.startswith(self.PREFIJO_CUANDO) for t in titulos),
+                f"{nombre} no tiene una seccion `## {self.PREFIJO_CUANDO}...`: sin limites, una heuristica "
+                "se aplica donde no corresponde y se vuelve ruido ignorable",
+            )
+            self.assertIn(
+                self.SECCION_RELACION, titulos,
+                f"{nombre} no tiene `## {self.SECCION_RELACION}`: sin decir en que se distingue de su "
+                "vecina, dos heuristicas parientes se invocan indistintamente",
+            )
+
+    def test_d_toda_heuristica_cita_su_caso_con_un_issue(self):
+        for archivo in self._cubiertas_por_formato():
+            nombre = archivo.relative_to(ROOT)
+            cuerpo = self._cuerpo_de_seccion(archivo.read_text(encoding="utf-8"), self.SECCION_CASO)
+            self.assertIsNotNone(cuerpo, f"{nombre} no tiene `## {self.SECCION_CASO}`")
+            self.assertRegex(
+                cuerpo, r"#\d+",
+                f"{nombre}: `## {self.SECCION_CASO}` no cita ningun issue `#N`. Una heuristica sin el caso "
+                "que la origino es prosa generica, y una con evidencia inventada es peor que una sin evidencia",
+            )
+
+    # --- E: carpeta alcanzable --------------------------------------------------------
+
+    def test_e_toda_carpeta_de_heuristicas_es_alcanzable(self):
+        claude_md = (ROOT / "CLAUDE.md").read_text(encoding="utf-8")
+        carpetas = sorted({p.parent.name for p in self._heuristicas()})
+        self.assertTrue(carpetas, "no hay carpetas en heuristics/")
+        for carpeta in carpetas:
+            if carpeta == self.CARPETA_SIEMPRE_ALCANZABLE:
+                continue
+            self.assertTrue(
+                f"`{carpeta}/`" in claude_md,
+                f"la carpeta `heuristics/{carpeta}/` no esta documentada en CLAUDE.md: ningun glob la "
+                "alcanza y sus heuristicas son codigo muerto. Documenta la regla que la deriva o no la crees",
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

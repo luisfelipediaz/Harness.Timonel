@@ -6,4 +6,4 @@ match: contains
 target: last_message
 ---
 
-`gastos: any[] = []` debe salir como hallazgo WARNING (heurística "No `any`" de `convenciones-bitakora.md`).
+`gastos: any[] = []` debe salir como hallazgo WARNING. La regla "No `any`" vive en el catálogo de convenciones del stack (`heuristics/angular/convenciones-bitakora.md`, H1 terminado en ` — catálogo`), que el skill revisa en §3.3 como hallazgo `Convención`.

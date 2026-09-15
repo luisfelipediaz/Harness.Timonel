@@ -1,4 +1,4 @@
-# Convenciones de código Bitákora (Angular + NestJS)
+# Convenciones de código Bitákora (Angular + NestJS) — catálogo
 
 Reglas que `code-review` verifica cuando el `CLAUDE.md` del consumidor no las redefine. **El `CLAUDE.md` y `.claude/rules/` del consumidor mandan**: si contradicen algo de aquí, gana el consumidor. Movidas desde el skill `code-review` (issue #21) para que el skill no acumule reglas de un proyecto concreto.
 
