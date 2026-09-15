@@ -27,6 +27,8 @@ python3 "$PLUGIN_ROOT/scripts/estado_historia.py" N
 
 Si `REANUDAR_EN` no es `inicio`, anuncia "Reanudo #N desde la fase X" y **salta** las fases hechas: no vuelvas a pedir el contrato si existe `timonel:contrato-api`, no relances sub-agentes cuyas tareas estan marcadas, reutiliza la rama `hu/N-*` existente. Si la rama existe pero la tarea Backend/Frontend no esta marcada, revisa `git log` de la rama antes de relanzar.
 
+Ademas, antes de lanzar cualquier sub-agente revisa si ya hay worktrees bajo `.claude/worktrees/` (`git worktree list --porcelain`) y clasificalos por `locked` y por si el pid que anoto el lock sigue vivo (`ps -p <pid>`): `locked` + pid vivo = un sub-agente sigue corriendo, no lo toques; sin `locked` y sin mergear = termino y falta consolidar (normal entre Fase 3 y Fase 4); `locked` + pid **muerto** = sesion caida a mitad de camino. Para este ultimo caso **reporta** el worktree, su rama y si tiene commits sin mergear, y **pregunta**: reusarlo (mergear su rama y saltar Fase 3) o descartarlo. Nunca lo borres ni lo reuses por tu cuenta.
+
 ## Fase 1: Analisis del issue
 
 1. Si no recibiste numero: `gh issue list -R "$REPO" --label tipo:hu --label estado:listo --state open --json number,title,labels` y pide elegir uno. No leas otros issues.
@@ -56,13 +58,27 @@ Muestra el contrato y pregunta "¿Procedo con esta definicion?". Espera confirma
 
 Con el "si":
 
-1. Crea/actualiza las interfaces y el barrel. `git add {modelos.path} && git commit -m "feat(<modulo>): modelos compartidos para #N"` (critico: los worktrees nacen del ultimo commit).
+1. Crea/actualiza las interfaces y el barrel. `git add {modelos.path} && git commit -m "feat(<modulo>): modelos compartidos para #N"` (factual: los worktrees nacen de `origin/main`, no del ultimo commit local — si `hu/N-slug` queda adelantada a `origin/main` y no se pushea, el worktree del sub-agente no vera estos modelos; el rediseño de esta fase por ese motivo es #122).
 2. Escribe el comentario `<!-- timonel:contrato-api -->` (formato en `marcadores.md`, con `backend_desplegado`), validalo con `python3 "$PLUGIN_ROOT/scripts/validar_marcador.py" <archivo> --tipo contrato-api` y publicalo con `publicar_marcador N contrato-api <archivo>`.
 3. Marca `- [x] Contrato API aprobado` y `- [x] Modelos compartidos` (si hubo) en `## Tareas`.
 
 ## Fase 3: Ejecucion paralela
 
-**Perfil plugin**: lanza **un** sub-agente `model: "sonnet"`, **sin** worktree (trabaja en la rama `hu/N-*` actual), con el skill `implement-plugin-change` (`"$PLUGIN_ROOT/skills/implement-plugin-change/SKILL.md"`; dentro del repo del plugin `PLUGIN_ROOT` es la raiz del repo). Prompt: body del issue, contrato de cambio, extracto de la investigacion, y las restricciones del skill (solo archivos del contrato; no tocar CHANGELOG ni version; commit `<tipo>: <que> (#N)`). Marca `- [x] Implementación` (o `Backend`) al terminar y salta a Fases 4-5.
+**Perfil plugin — por que worktree tambien aca.** El aislamiento del que escribe deja de ser una regla de cortesia (recordada leyendo retros, mejora #89 sin implementar) y pasa a ser una propiedad del entorno. Precision necesaria: los incidentes que motivaron este cambio (#80, #83) fueron con el **consolidador** y el **reviewer**, no con el sub-agente de implementacion — que es el unico que esta fase aisla. El consolidador **no puede** correr en worktree: tiene que mergear a `hu/N-slug`, y git prohibe la misma rama checkouteada en dos worktrees a la vez; es una restriccion estructural, no una omision de diseño. La concurrencia orquestador ↔ consolidador/reviewer **sigue siendo de #89**: esta fase no la cierra.
+
+Antes de lanzar, verifica la base del worktree: `git fetch origin main` y compara `hu/N-slug` contra `origin/main` (`git rev-list --left-right --count hu/N-slug...origin/main`). Si `hu/N-slug` esta **adelantada** a `origin/main` (reanudacion, o un commit propio de Fase 2), **advierte antes de lanzar**: el worktree nace de `origin/main` y no va a contener esos commits (ejemplo real: un fix del orquestador aplicado directo a `hu/N-slug` dejo esa rama adelantada a `origin/main` sin que el worktree recien creado lo viera). Si `main` local esta adelantada a `origin/main` sin pushear, tambien advierte: la base esta obsoleta.
+
+Captura la linea base con `git branch --list 'worktree-agent-*'`. Lanza **un** sub-agente `model: "sonnet"`, `isolation: worktree`, con el skill `implement-plugin-change` (`"$PLUGIN_ROOT/skills/implement-plugin-change/SKILL.md"`; dentro del repo del plugin `PLUGIN_ROOT` es la raiz del repo). Prompt: body del issue, contrato de cambio, extracto de la investigacion, y las restricciones del skill (solo archivos del contrato; no tocar CHANGELOG ni version; commit `<tipo>: <que> (#N)`; nunca `$PLUGIN_ROOT`, rutas relativas a su CWD; informar en su output la rama exacta y la ruta de su worktree).
+
+Al terminar, recalcula `git branch --list 'worktree-agent-*'` y toma el **delta** contra la linea base — nunca confies solo en el auto-reporte del sub-agente: usalo para contrastar, no como autoridad. Segun la cardinalidad del delta:
+
+- **Delta = 1, con commits en esa rama**: caso normal. Guarda esa rama como `branch_worktree` para `consolidate-story`.
+- **Delta = 1, rama sin commits**: merge no-op. Reporta que el sub-agente no commiteo nada; **no borres el worktree** (puede tener trabajo sin commitear).
+- **Delta = 0** porque el sub-agente no cambio nada (el harness limpia worktree y rama solo): **no es un pase**. La Fase 3 no produjo nada que consolidar: detente y reporta.
+- **Delta = 0 y ademas hay commits nuevos en `hu/N-slug`** que no estaban en la linea base: el sub-agente escribio en el arbol de trabajo de la sesion en vez de en su worktree — **el aislamiento fallo**. Detente y reporta el/los commits.
+- **Delta > 1**: ambiguedad (mas de un worktree nuevo para este issue). Detente y reporta las ramas candidatas; no adivines cual mergear.
+
+Marca `- [x] Implementación` (o `Backend`) solo en el caso normal, y salta a Fases 4-5.
 
 **Perfil consumidor**: lanza los sub-agentes **en el mismo mensaje** con el Agent tool, `isolation: worktree`, `model: "sonnet"` (nunca hereden opus).
 
@@ -111,7 +127,7 @@ Al terminar cada uno, marca `- [x] Backend` / `- [x] Frontend` segun corresponda
 
 ## Fases 4 y 5: Consolidacion
 
-**Perfil plugin**: mismo skill `consolidate-story` con `perfil: plugin`: sin merge de worktrees, Fase B = `python3 -m unittest discover -s tests` + `bash -n scripts/*.sh .githooks/*` + `jq` de los JSON; agrega la linea del issue al `CHANGELOG.md` bajo la version en desarrollo; publica `timonel:consolidacion`.
+**Perfil plugin**: mismo skill `consolidate-story` con `perfil: plugin`, pasandole `branch_worktree` (la rama capturada en la Fase 3, o el motivo por el que te detuviste si no hubo una que mergear): el skill mergea esa rama a `hu/N-slug` con `--no-ff` **antes** de la Fase B (`python3 -m unittest discover -s tests` + `bash -n scripts/*.sh .githooks/*` + `jq` de los JSON); si el merge tiene conflictos, se detiene y los reporta sin correr la Fase B. Con la Fase B en verde, agrega la linea del issue al `CHANGELOG.md` bajo la version en desarrollo (commit siempre desde `hu/N-slug`, nunca desde el worktree que ya se borro); publica `timonel:consolidacion`.
 
 **Perfil consumidor**: sub-agente `model: "sonnet"`, **sin** worktree, con el skill `consolidate-story` (`"$PLUGIN_ROOT/skills/consolidate-story/SKILL.md"`). Parametros: `issue`, `repo`, `modulo`, `alcance`, `app_destino`, `branch_worktree_backend|frontend` (o `N/A`), `output_sub_agente_backend|frontend`, `api.moduleFile`, `frontend.routesFile`, `api.project`, `frontend.project`. Devuelve el bloque `ARCHIVOS_*`, `LINT_RESULTADO`, `TESTS_RESULTADO`, etc. y publica `<!-- timonel:consolidacion -->`. Guarda el reporte para las fases siguientes.
 

@@ -18,18 +18,30 @@ Integra los branches de implementacion a la rama actual (`hu/N-slug`), registra 
 | `output_sub_agente_backend` / `output_sub_agente_frontend` | Resumen del output (archivos, providers/rutas a registrar) |
 | `api_module_file`, `api_project` | `config.api.moduleFile`, `config.api.project` |
 | `frontend_routes_file`, `frontend_project` | `routesFile` y `project` de la app destino |
-| `perfil` | `consumidor` (default) \| `plugin` (repo del propio Timonel: sin nx ni worktrees) |
+| `perfil` | `consumidor` (default) \| `plugin` (repo del propio Timonel: sin nx) |
+| `branch_worktree` (perfil plugin) | Rama que dejo el sub-agente de `implement-plugin-change` en su worktree (delta de `git branch --list 'worktree-agent-*'` capturado por el orquestador en su Fase 3), o el motivo por el que no hay una para mergear |
 | `output_sub_agente` (perfil plugin) | Resumen del output del sub-agente unico de `implement-plugin-change` (archivos, tests, pendientes) |
 | `version_en_desarrollo` (perfil plugin) | Version `X.Y.0` de la epica en curso, para la seccion `## X.Y.0 — en desarrollo` del CHANGELOG |
 
-Si falta alguno, detente y reporta cual. En `perfil: plugin` solo se requieren `issue`, `repo`, `output_sub_agente` y `version_en_desarrollo`.
+Si falta alguno, detente y reporta cual. En `perfil: plugin` solo se requieren `issue`, `repo`, `branch_worktree`, `output_sub_agente` y `version_en_desarrollo`.
 
 ## Perfil plugin
 
-- **Fase A**: no hay worktrees ni providers/rutas: verifica que el commit del sub-agente esta en la rama `hu/<issue>-*` (`git log --oneline main..HEAD`).
-- **Fase B**: `python3 -m unittest discover -s tests` → `TESTS_RESULTADO`; `bash -n scripts/*.sh .githooks/*` y `jq . .claude-plugin/plugin.json .claude-plugin/marketplace.json hooks/hooks.json >/dev/null` → `LINT_RESULTADO`. Mismas reglas de 2 intentos.
-- **CHANGELOG**: agrega bajo `## <version_en_desarrollo> — en desarrollo` una linea `- <resumen del cambio> (#<issue>)` (crea la seccion si no existe y actualiza `.claude-plugin/plugin.json` a esa version). Commit `chore: changelog #<issue>`.
-- **Fase C** igual: el checklist `## Tareas` es el estandar de `plantilla-hu.md`; marca `Backend` (la implementacion), `Consolidación (lint + tests)` y, si `Contrato API aprobado`/`Modelos compartidos` no aplican, dejalos sin marcar (el DoD los trata como SKIPPED en perfil plugin). Comentario `timonel:consolidacion` con comentario `timonel:consolidacion` con `providers_registrados: n-a`, `rutas_registradas: n-a`).
+No hay providers ni rutas que registrar. Orden estricto: **merge → Fase B (tests) → CHANGELOG** — cada paso depende de que el anterior haya terminado sobre el working tree correcto.
+
+- **Fase A**: si `branch_worktree` viene con el motivo por el que no hubo rama que mergear (la Fase 3 del orquestador se detuvo sin producto), no hay nada que consolidar: reporta ese motivo y detente, no sigas con la Fase B. Si hay rama, mergeala a `hu/<issue>-*`:
+  ```bash
+  git merge <branch_worktree> --no-ff -m "feat(plugin): #<issue> <resumen>"
+  ```
+  Mismo manejo de conflictos que la Fase A del perfil consumidor: si el merge falla, `git merge --abort`, reporta los archivos en conflicto y **no** corras la Fase B. Con el merge limpio (o si la rama ya estaba mergeada — repórtalo, no marques la tarea), limpia el worktree **sin forzar**:
+  ```bash
+  git worktree remove <ruta_worktree>
+  git branch -d <branch_worktree>
+  ```
+  Nunca `--force` en `worktree remove` ni `-D` en `branch -d`: si cualquiera falla (cambios sin commitear en el worktree, o la rama no quedo mergeada), no insistas — repórtalo y segui.
+- **Fase B**: recien ahora, sobre `hu/<issue>-*` ya con el merge aplicado: `python3 -m unittest discover -s tests` → `TESTS_RESULTADO`; `bash -n scripts/*.sh .githooks/*` y `jq . .claude-plugin/plugin.json .claude-plugin/marketplace.json hooks/hooks.json >/dev/null` → `LINT_RESULTADO`. Mismas reglas de 2 intentos.
+- **CHANGELOG**: con la Fase B en verde y siempre desde el checkout de `hu/<issue>-*` (nunca desde el worktree, que ya se borro), agrega bajo `## <version_en_desarrollo> — en desarrollo` una linea `- <resumen del cambio> (#<issue>)` (crea la seccion si no existe y actualiza `.claude-plugin/plugin.json` a esa version). Commit `chore: changelog #<issue>`.
+- **Fase C** igual: el checklist `## Tareas` es el estandar de `plantilla-hu.md`; marca `Backend` (la implementacion), `Consolidación (lint + tests)` y, si `Contrato API aprobado`/`Modelos compartidos` no aplican, dejalos sin marcar (el DoD los trata como SKIPPED en perfil plugin). Publica el comentario `timonel:consolidacion` con `providers_registrados: n-a`, `rutas_registradas: n-a`.
 
 ## Fase A: Consolidacion
 
