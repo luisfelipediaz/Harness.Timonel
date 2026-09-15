@@ -355,6 +355,60 @@ class EstadoHistoriaTests(unittest.TestCase):
         self.assertNotIn("6.5 PR/Integración", e["fases_hechas"])
 
 
+class InvestigacionReutilizadaTests(unittest.TestCase):
+    """`1.5 Investigacion` era la unica fase con UNA sola fuente de evidencia, y justo la
+    unica cuya evidencia puede vivir legitimamente en OTRO issue: la Fase 1.5 de
+    flechodiezx autoriza reutilizar una investigacion vigente en vez de relanzar a Dora,
+    y entonces el issue de la historia nunca recibe su comentario `timonel:investigacion`.
+    Sus hermanas son todas `tarea OR marcador`. El contrato sirve de evidencia indirecta
+    porque el dominio lo garantiza: "nunca redactes el contrato sin la investigacion"
+    (flechodiezx.md). Sin ese `or`, una HU terminada que reutilizo investigacion reporta
+    REANUDAR_EN: 1.5 Investigacion en vez de `cerrar` -- un falso pendiente que vive en la
+    ventana que abrio #80: toda HU terminada queda OPEN hasta el merge humano del PR, asi
+    que el sensor la sigue leyendo despues de terminada."""
+
+    SIN_CONTRATO = HU_OK["body"].replace("- [x] Contrato API aprobado", "- [ ] Contrato API aprobado")
+    TODO_HECHO = HU_OK["body"].replace("- [ ]", "- [x]").replace(
+        "- [x] Definition of Done", "- [x] Definition of Done\n- [x] PR abierto")
+
+    @staticmethod
+    def _issue(body: str, marcadores: list[str]):
+        return dict(HU_OK, body=body, state="OPEN",
+                    comments=[{"body": f"<!-- timonel:{m} -->\nx"} for m in marcadores])
+
+    def test_investigacion_propia_marca_la_fase(self):
+        """Evidencia en el propio issue: el marcador basta, sin ninguna senal de contrato."""
+        e = eh.estado(self._issue(self.SIN_CONTRATO, ["investigacion"]), rama="hu/42-x")
+        self.assertIn("1.5 Investigacion", e["fases_hechas"])
+
+    def test_investigacion_reutilizada_con_tarea_de_contrato_marcada(self):
+        """Evidencia fuera del issue: no hay marcador, pero la tarea del contrato esta
+        marcada -- y el contrato no se redacta sin investigacion."""
+        e = eh.estado(self._issue(HU_OK["body"], []), rama="hu/42-x")
+        self.assertIn("1.5 Investigacion", e["fases_hechas"])
+        self.assertEqual(e["reanudar_en"], "3 Frontend")
+
+    def test_investigacion_reutilizada_con_marcador_de_contrato_sin_tarea(self):
+        """Misma evidencia indirecta por la otra fuente: el comentario `timonel:contrato-api`
+        publicado aunque la tarea del body no se haya llegado a marcar."""
+        e = eh.estado(self._issue(self.SIN_CONTRATO, ["contrato-api"]), rama="hu/42-x")
+        self.assertIn("1.5 Investigacion", e["fases_hechas"])
+
+    def test_sin_investigacion_ni_contrato_sigue_pendiente(self):
+        """El guard contra la sobre-correccion: sin ninguna de las tres senales la fase
+        sigue pendiente, que es lo correcto."""
+        e = eh.estado(self._issue(self.SIN_CONTRATO, []), rama="hu/42-x")
+        self.assertEqual(e["reanudar_en"], "1.5 Investigacion")
+
+    def test_hu_terminada_que_reutilizo_investigacion_cierra(self):
+        """El sintoma que motivo el arreglo, end-to-end: todo hecho, PR abierto, DoD
+        publicado, investigacion reutilizada de otro issue -> `cerrar`, no un falso
+        pendiente en la primera fase."""
+        e = eh.estado(self._issue(self.TODO_HECHO, ["dod"]), rama="hu/42-x")
+        self.assertEqual(e["reanudar_en"], "cerrar")
+        self.assertEqual(e["fases_pendientes"], [])
+
+
 class RamaLocalTests(unittest.TestCase):
     """rama_local() itera PREFIJOS_RAMA (#83): antes solo miraba `hu/<N>-*`, asi que una
     rama `fix/N-slug` (creada por el hotfix aislado) se reportaba como 'ninguna'."""

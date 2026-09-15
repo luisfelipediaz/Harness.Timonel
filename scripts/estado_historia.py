@@ -41,7 +41,13 @@ PREFIJOS_RAMA = ("hu", "fix")
 # (p. ej. issues anteriores a v0.6.0 sin "PR abierto"), esta pendiente, no SKIPPED.
 FASES_POR_TIPO: dict[str, list[tuple]] = {
     "hu": [
-        ("1.5 Investigacion",      lambda e: "investigacion" in e["marcadores"]),
+        # Unica fase cuya evidencia puede vivir en OTRO issue: la Fase 1.5 de flechodiezx
+        # autoriza reutilizar una investigacion vigente en vez de relanzar a Dora. El
+        # contrato sirve de evidencia indirecta porque el dominio lo garantiza: "nunca
+        # redactes el contrato sin la investigacion" (flechodiezx.md).
+        ("1.5 Investigacion",      lambda e: "investigacion" in e["marcadores"]
+                                         or e["tareas"].get("Contrato API aprobado")
+                                         or "contrato-api" in e["marcadores"]),
         ("2 Contrato API",         lambda e: e["tareas"].get("Contrato API aprobado") or "contrato-api" in e["marcadores"]),
         ("3 Backend",              lambda e: e["tareas"].get("Backend") or e["alcance"] == "frontend"),
         ("3 Frontend",             lambda e: e["tareas"].get("Frontend") or e["alcance"] == "backend"),
