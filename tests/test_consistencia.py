@@ -451,12 +451,18 @@ class HeuristicasDescubriblesTests(unittest.TestCase):
         return [p for p in cls._heuristicas() if not cls._h1(p).rstrip().endswith(cls.SUFIJO_OPT_OUT)]
 
     @staticmethod
-    def _titulos_de_seccion(texto: str) -> list[str]:
-        return [l[3:].strip() for l in texto.splitlines() if l.startswith("## ")]
+    def _sin_bloques_de_codigo(texto: str) -> str:
+        """Un `## ...` dentro de un bloque cercado es parte de un ejemplo, no una seccion.
+        Contarlo dejaria que un ejemplo satisfaga las invariantes de formato."""
+        return re.sub(r"^```.*?^```", "", texto, flags=re.M | re.S)
 
-    @staticmethod
-    def _cuerpo_de_seccion(texto: str, titulo: str) -> str | None:
-        for bloque in re.split(r"^## ", texto, flags=re.M)[1:]:
+    @classmethod
+    def _titulos_de_seccion(cls, texto: str) -> list[str]:
+        return [l[3:].strip() for l in cls._sin_bloques_de_codigo(texto).splitlines() if l.startswith("## ")]
+
+    @classmethod
+    def _cuerpo_de_seccion(cls, texto: str, titulo: str) -> str | None:
+        for bloque in re.split(r"^## ", cls._sin_bloques_de_codigo(texto), flags=re.M)[1:]:
             if bloque.splitlines()[0].strip() == titulo:
                 return bloque
         return None
@@ -554,8 +560,8 @@ class HeuristicasDescubriblesTests(unittest.TestCase):
         for carpeta in carpetas:
             if carpeta == self.CARPETA_SIEMPRE_ALCANZABLE:
                 continue
-            self.assertIn(
-                f"`{carpeta}/`", claude_md,
+            self.assertTrue(
+                f"`{carpeta}/`" in claude_md,
                 f"la carpeta `heuristics/{carpeta}/` no esta documentada en CLAUDE.md: ningun glob la "
                 "alcanza y sus heuristicas son codigo muerto. Documenta la regla que la deriva o no la crees",
             )
