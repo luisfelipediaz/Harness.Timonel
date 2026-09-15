@@ -183,25 +183,34 @@ class HotfixAisladoTests(unittest.TestCase):
 class WorktreeDeImplementacionTests(unittest.TestCase):
     """Todo skill `implement-*` se lanza con `isolation: worktree` (#84). Se genera del
     glob `skills/implement-*` en vez de listar frases prohibidas por agente, porque
-    `agents/flechodiezx.md` dice "sin worktree" cinco veces de forma legitima (Dora en
-    Fase 1.5, code-review en 5.5, retro en 6, verify-dod en 7): son sub-agentes de solo
-    lectura que no deben aislarse, y una lista de frases prohibidas convertiria esa
-    documentacion correcta en un test rojo.
+    `agents/flechodiezx.md` dice "sin worktree" cuatro veces de forma legitima (code-review
+    en 5.5, retro en 6, verify-dod en 7, y Dora en 1.5): son sub-agentes de solo lectura
+    que no deben aislarse, y una lista de frases prohibidas convertiria esa documentacion
+    correcta en un test rojo.
 
-    La propiedad se verifica sobre la seccion `##` del agente que menciona el nombre del
-    skill (el bloque de encabezado de nivel 2, no los `###` internos), tal como lo pide
-    el contrato de #84.
+    **La unidad de verificacion es el PARRAFO, no la seccion `##`** — corregido tras el
+    hallazgo critico del code review de #84. La primera version segmentaba por bloques
+    `##`, y `## Fase 3: Ejecucion paralela` es una sola seccion que agrupa los TRES
+    lanzamientos (`implement-plugin-change` del perfil plugin, `implement-backend-story` y
+    `implement-frontend-story` del consumidor). Con esa granularidad bastaba que
+    `isolation: worktree` apareciera en cualquier punto de la seccion: quitarlo solo de la
+    clausula que lanza `implement-plugin-change` dejaba el test en VERDE, porque la frase
+    seguia viva en el parrafo del perfil consumidor. Era exactamente la regresion que el
+    Gherkin 1 de la HU quiere impedir, invisible para el unico test que debia cubrirla.
+
+    La propiedad correcta es existencial y por parrafo: para cada skill debe existir **un
+    parrafo que nombre el skill y declare `isolation: worktree` a la vez**. Un `isolation`
+    que vive en otro parrafo ya no cubre a un skill que no esta ahi.
 
     Caso degenerado (eje 1, caso 3 del contrato de #84): "delta = 0 en las ramas
-    `worktree-agent-*` pero con commits nuevos en la rama de la historia" significa que
-    el sub-agente escribio en el arbol de trabajo de la sesion en vez de en su worktree —
-    el aislamiento fallo. Es la razon por la que este test exige que CADA skill
-    `implement-*` aparezca mencionado en al menos una seccion de algun agente
-    (`test_todo_skill_implement_aparece_en_una_seccion`): sin esa fila, "ningun agente
-    menciona el skill" se leeria como que no hay nada que objetar, exactamente cuando el
-    sub-agente nunca se lanza aislado. Es el mismo razonamiento de #81 con las entradas
-    degeneradas del PR (sin `number`, sin `mergeable`): a una entrada degenerada le
-    corresponde un motivo propio, no un pase por default."""
+    `worktree-agent-*` pero con commits nuevos en la rama de la historia" significa que el
+    sub-agente escribio en el arbol de trabajo de la sesion en vez de en su worktree — el
+    aislamiento fallo. Es la razon por la que este test exige que CADA skill `implement-*`
+    aparezca mencionado en algun parrafo (`test_todo_skill_implement_aparece_en_un_parrafo`):
+    sin esa fila, "ningun agente menciona el skill" se leeria como que no hay nada que
+    objetar, exactamente cuando el sub-agente nunca se lanza aislado. Es el mismo
+    razonamiento de #81 con las entradas degeneradas del PR (sin `number`, sin `mergeable`):
+    a una entrada degenerada le corresponde un motivo propio, no un pase por default."""
 
     FRASES_PROHIBIDAS = (
         "sin worktree",
@@ -216,43 +225,50 @@ class WorktreeDeImplementacionTests(unittest.TestCase):
         return sorted(p.parent.name for p in (ROOT / "skills").glob("implement-*/SKILL.md"))
 
     @staticmethod
-    def _secciones(texto: str) -> list[str]:
-        """Bloques de encabezado `##` (nivel 2): separa por lineas que empiezan
-        exactamente con '## ', sin capturar subtitulos '### '."""
-        return re.split(r"\n(?=## (?!#))", texto)
+    def _parrafos(texto: str) -> list[str]:
+        """Bloques separados por linea en blanco. Es la unidad mas chica que todavia
+        contiene una instruccion de lanzamiento completa (verbo + skill + isolation)."""
+        return re.split(r"\n[ \t]*\n", texto)
 
-    def _secciones_que_mencionan(self, skill: str) -> list[tuple]:
-        encontradas = []
-        for agente in (ROOT / "agents").glob("*.md"):
-            texto = agente.read_text(encoding="utf-8")
-            for seccion in self._secciones(texto):
-                if skill in seccion:
-                    encontradas.append((agente, seccion))
-        return encontradas
+    def _parrafos_que_mencionan(self, skill: str) -> list[tuple]:
+        encontrados = []
+        for agente in sorted((ROOT / "agents").glob("*.md")):
+            for parrafo in self._parrafos(agente.read_text(encoding="utf-8")):
+                if skill in parrafo:
+                    encontrados.append((agente, parrafo))
+        return encontrados
 
-    def test_todo_skill_implement_aparece_en_una_seccion(self):
+    def test_todo_skill_implement_aparece_en_un_parrafo(self):
         skills_implement = self._skills_implement()
         self.assertTrue(skills_implement, "no hay skills implement-* que verificar: glob vacio")
         for skill in skills_implement:
-            secciones = self._secciones_que_mencionan(skill)
             self.assertTrue(
-                secciones,
-                f"ningun agente menciona el skill `{skill}` en ninguna seccion `##`: "
-                "no hay evidencia de que se lance, y sin evidencia la invariante de "
-                "aislamiento seria vacua (ver docstring, caso 3 del eje 1 de #84)",
+                self._parrafos_que_mencionan(skill),
+                f"ningun agente menciona el skill `{skill}` en ningun parrafo: no hay "
+                "evidencia de que se lance, y sin evidencia la invariante de aislamiento "
+                "seria vacua (ver docstring, caso 3 del eje 1 de #84)",
             )
 
-    def test_toda_seccion_que_lanza_implement_aisla_en_worktree(self):
+    def test_cada_skill_implement_se_lanza_en_un_parrafo_que_declara_worktree(self):
+        """Existencial y por parrafo: el `isolation: worktree` tiene que estar en el MISMO
+        parrafo que nombra al skill. Es la fila que el review de #84 encontro ausente."""
         for skill in self._skills_implement():
-            for agente, seccion in self._secciones_que_mencionan(skill):
-                self.assertIn(
-                    "isolation: worktree", seccion,
-                    f"{agente.name}: la seccion que lanza `{skill}` debe declarar `isolation: worktree`",
-                )
+            parrafos = self._parrafos_que_mencionan(skill)
+            aislados = [(a, p) for a, p in parrafos if "isolation: worktree" in p]
+            self.assertTrue(
+                aislados,
+                f"ningun parrafo que menciona `{skill}` declara `isolation: worktree`: "
+                f"lo mencionan {[a.name for a, _ in parrafos]}, pero ninguno en el mismo "
+                "parrafo que el lanzamiento. Un `isolation` en otro parrafo no cubre a este skill",
+            )
+
+    def test_ningun_parrafo_que_menciona_implement_niega_el_worktree(self):
+        for skill in self._skills_implement():
+            for agente, parrafo in self._parrafos_que_mencionan(skill):
                 for frase in self.FRASES_PROHIBIDAS:
                     self.assertNotIn(
-                        frase, seccion,
-                        f"{agente.name}: la seccion que lanza `{skill}` no debe decir `{frase}`",
+                        frase, parrafo,
+                        f"{agente.name}: el parrafo que menciona `{skill}` no debe decir `{frase}`",
                     )
 
 

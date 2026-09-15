@@ -27,7 +27,7 @@ python3 "$PLUGIN_ROOT/scripts/estado_historia.py" N
 
 Si `REANUDAR_EN` no es `inicio`, anuncia "Reanudo #N desde la fase X" y **salta** las fases hechas: no vuelvas a pedir el contrato si existe `timonel:contrato-api`, no relances sub-agentes cuyas tareas estan marcadas, reutiliza la rama `hu/N-*` existente. Si la rama existe pero la tarea Backend/Frontend no esta marcada, revisa `git log` de la rama antes de relanzar.
 
-Ademas, antes de lanzar cualquier sub-agente revisa si ya hay worktrees bajo `.claude/worktrees/` (`git worktree list --porcelain`) y clasificalos por `locked` y por si el pid que anoto el lock sigue vivo (`ps -p <pid>`): `locked` + pid vivo = un sub-agente sigue corriendo, no lo toques; sin `locked` y sin mergear = termino y falta consolidar (normal entre Fase 3 y Fase 4); `locked` + pid **muerto** = sesion caida a mitad de camino. Para este ultimo caso **reporta** el worktree, su rama y si tiene commits sin mergear, y **pregunta**: reusarlo (mergear su rama y saltar Fase 3) o descartarlo. Nunca lo borres ni lo reuses por tu cuenta.
+Ademas, antes de lanzar cualquier sub-agente revisa si ya hay worktrees bajo `.claude/worktrees/` (`git worktree list --porcelain`) y clasificalos por `locked` y por si el pid que anoto el lock sigue vivo (`ps -p <pid>`): `locked` + pid vivo = un sub-agente sigue corriendo, no lo toques; sin `locked` y sin mergear = termino y falta consolidar (normal entre Fase 3 y Fase 4); `locked` + pid **muerto** = sesion caida a mitad de camino. Para este ultimo caso **reporta** el worktree, su rama y si tiene commits sin mergear, y **pregunta**: reusarlo (mergear su rama y saltar Fase 3) o descartarlo. Si el humano elige reusarlo, **esa rama es la que se guarda como `branch_worktree`** para `consolidate-story` (Fases 4-5), igual que si la hubiera devuelto el delta de la Fase 3. Nunca lo borres ni lo reuses por tu cuenta.
 
 ## Fase 1: Analisis del issue
 
@@ -80,7 +80,7 @@ Al terminar, recalcula `git branch --list 'worktree-agent-*'` y toma el **delta*
 
 Marca `- [x] Implementación` (o `Backend`) solo en el caso normal, y salta a Fases 4-5.
 
-**Perfil consumidor**: lanza los sub-agentes **en el mismo mensaje** con el Agent tool, `isolation: worktree`, `model: "sonnet"` (nunca hereden opus).
+**Perfil consumidor**: lanza los sub-agentes **en el mismo mensaje** con el Agent tool, `isolation: worktree`, `model: "sonnet"` (nunca hereden opus): uno con el skill `implement-backend-story` y otro con `implement-frontend-story`, segun el alcance. El aislamiento se declara aca, en el mismo parrafo que nombra cada skill, a proposito: esa es la unidad que verifica `WorktreeDeImplementacionTests`, y una declaracion que viva en otro parrafo no cubre a estos skills. Por el mismo motivo esta frase no repite el literal: una segunda copia en el parrafo volveria a satisfacer la asercion cuando el lanzamiento real ya la perdio.
 
 Cada prompt incluye: (1) el body completo del issue, (2) el contrato aprobado, (3) la lista de modelos compartidos ya commiteados, (4) la instruccion de usar el skill con ruta absoluta, (5) los valores del config que necesita.
 
