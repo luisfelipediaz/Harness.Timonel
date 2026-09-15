@@ -24,8 +24,8 @@ En paralelo:
 
 - **Issue**: `gh issue view <issue> -R <repo> --json title,body,labels,comments`. Extrae Gherkin, Ficha tecnica, Tipo de operacion.
 - **Retro previa** del modulo: `python3 <plugin_root>/scripts/retro_query.py --modulo <modulo> --seccion "Errores recurrentes"`.
-- **Convenciones del consumidor (mandan)**: `CLAUDE.md` y todo `.claude/rules/*.md` si existe. Extrae de ahi la lista de reglas verificables; solo lo que no este cubierto se toma de `heuristics/angular/convenciones-bitakora.md`.
-- **Heuristicas**: `HEUR=$(jq -r '.heuristicsDir // empty' .claude/timonel.config.json); HEUR="${HEUR:-<plugin_root>/heuristics}"` → lee `general/evitar-ifs.md`, `general/no-tipos-espejo.md`, `angular/usar-pipes-existentes.md`, `angular/convenciones-bitakora.md` (las que existan).
+- **Convenciones del consumidor (mandan)**: `CLAUDE.md` y todo `.claude/rules/*.md` si existe. Extrae de ahi la lista de reglas verificables; solo lo que no este cubierto se toma del **catalogo de convenciones del stack**: el archivo que el glob del punto siguiente trae desde `<stack>/` y cuyo H1 termina en ` — catálogo`.
+- **Heuristicas** (descubrimiento por glob, **sin lista de nombres** en este skill): `HEUR=$(jq -r '.heuristicsDir // empty' .claude/timonel.config.json 2>/dev/null); HEUR="${HEUR:-<plugin_root>/heuristics}"; ls "$HEUR"/general/*.md "$HEUR"/<stack>/*.md 2>/dev/null` → lee **todas**. `general/*.md` siempre, en todo perfil. `<stack>` = primer token en minusculas de `stack.frontend` (alcance `Frontend`/`Full-stack`) y de `stack.backend` (`Backend`/`Full-stack`): `"Angular 21"` → `angular`, `"NestJS 10"` → `nestjs`; solo si la carpeta existe. Nunca derives el stack de `stack.estado`. Perfil plugin (sin config): degrada a `general/*.md`. Un archivo nuevo en `heuristics/` entra al review con solo crearlo; si tuvieras que editar este skill para leerlo, el descubrimiento esta roto.
 - **Contrato vs codigo (sensor)**: `python3 <plugin_root>/scripts/contrato_check.py <issue>` → tabla PASSED/FAILED por endpoint declarado en `timonel:contrato-api`.
 - **Formato**: `<plugin_root>/skills/github-issues/references/marcadores.md`, seccion `timonel:review`.
 
@@ -47,10 +47,10 @@ Por cada escenario, busca la logica concreta que lo implementa. No cumplido → 
 Endpoints: pega la tabla de `contrato_check.py`; cada `FAILED` es un hallazgo `Ficha` (CRITICO si el endpoint sostiene un Gherkin). Permisos (`AuthorizationGuard<TiposDePermisos>` correcto), Auditoria (`@AuditoriaApi`), Modelos (compartidos desde `modelos.alias`, no redeclarados), Sesion propagada controller → aplicacion → servicio. WARNING salvo que rompa un Gherkin.
 
 ### 3.3 Convenciones (`Convención`)
-Las reglas salen del `CLAUDE.md` / `.claude/rules/` del consumidor y, en lo no cubierto, de `heuristics/angular/convenciones-bitakora.md`. No mantengas listas de reglas en este skill. Todo WARNING.
+Las reglas salen del `CLAUDE.md` / `.claude/rules/` del consumidor y, en lo no cubierto, del **catalogo de convenciones del stack** leido en el Paso 1 (el de H1 ` — catálogo`). No mantengas listas de reglas en este skill. Todo WARNING.
 
 ### 3.4 Heuristicas (`Heurística`)
-`evitar-ifs`, `no-tipos-espejo`, `usar-pipes-existentes`. Omite las que no esten en disco. WARNING.
+Aplica **todas** las heuristicas que el glob del Paso 1 trajo a disco (`general/*.md` + `<stack>/*.md`), salvo las de H1 terminado en ` — catálogo`, que son convenciones y se revisan en 3.3. Este skill **no enumera heuristicas por nombre**: la lista es el contenido del directorio. WARNING.
 
 ### 3.5 Tests (`Tests`)
 `.spec.ts` para codigo nuevo; cubren los Gherkin; usa `TESTS_RESULTADO` de consolidacion (no re-ejecutes salvo duda). Faltantes no directos de Gherkin → WARNING; directos → CRITICO con tipo `Gherkin`.

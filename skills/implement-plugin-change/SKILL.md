@@ -12,7 +12,7 @@ Recibes del orquestador: `issue`, el body del issue, el **contrato de cambio** (
 - **No edites `CHANGELOG.md` ni `.claude-plugin/plugin.json`**: lo hace `consolidate-story`.
 - **Cambios de formato de issue/comentario** → actualiza en el mismo commit `skills/github-issues/references/*.md`, `scripts/timonel_gh.py`, `scripts/validar_marcador.py` y sus tests.
 - **Agentes**: frontmatter `name`, `description`, `model`, `color`, `skills`. **Commands**: `description`, `argument-hint`, `model`. **Skills**: `name` = carpeta, `description` con cuando usarlo.
-- Python stdlib puro, lookup maps antes que cadenas de `if` (`heuristics/general/evitar-ifs.md`), sin tipos espejo.
+- Python stdlib puro, lookup maps antes que cadenas de `if` (`heuristics/general/evitar-ifs.md`), sin tipos espejo. Esa cita es un recordatorio, **no** el mecanismo: antes de escribir codigo lee **todo** `heuristics/general/*.md` con el glob (`ls heuristics/general/*.md`), nunca una lista de nombres. Un archivo nuevo ahi te aplica con solo existir, y si tuvieras que editar este skill para enterarte, el descubrimiento esta roto.
 - Commits: `<tipo>: <que> (#<issue>)`; el hook `commit-msg` rechaza sin `#N`.
 
 ## Limites conocidos del worktree

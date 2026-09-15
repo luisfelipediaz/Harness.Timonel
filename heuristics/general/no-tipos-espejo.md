@@ -76,3 +76,15 @@ return doc; // el tipo del return ya restringe la forma
 - Los campos omitidos son **datos sensibles** (tokens, passwords, secrets internos)
 - El tipo combina datos de **múltiples fuentes** que no comparten un modelo natural
 - El tipo representa un **contrato público** (API pública, SDK) que debe ser estable aunque el modelo interno cambie
+
+## Caso real
+
+**Procedencia: importada, sin caso registrado en este repo.** Llegó con el harness original del Portal en `c8bcc42` (v0.1.0), antes de TIM-ADR-0005: ese commit no referencia issue y no hay retro ni code review que la origine. No se le inventa uno; su procedencia quedó documentada en #134.
+
+Lo verificable hoy es su uso como criterio de review: `evals/code-review/tres-violaciones-warning/` la usa como uno de los tres hallazgos esperados, con el grader `detecta-tipo-espejo.md` (*"`GastoResponse` copia campo a campo `Gasto` (tipo espejo…) y debe salir como hallazgo WARNING"*).
+
+## Relación con otras heurísticas
+
+- **`evitar-ifs.md`** es su par sobre el flujo de control: las dos terminan en el mismo `Record<Tipo, …>` exhaustivo, pero aquélla pregunta *"¿este condicional es una tabla?"* y ésta *"¿este tipo dice algo nuevo?"*.
+- **`sensor-importa-no-reimplementa.md`** es el mismo principio sobre cálculos en vez de tipos: un segundo contador que duplica a otro diverge en silencio igual que un segundo tipo que duplica a otro. Invocá aquélla cuando estés por copiar una función; ésta cuando estés por copiar una forma de datos.
+- **`enumerar-la-clase-no-el-representante.md`** aparece al derivar con `Omit`/`Pick`: si la derivación enumera campos a mano en vez de expresarse por la regla que los selecciona, el tipo espejo vuelve por la ventana.
