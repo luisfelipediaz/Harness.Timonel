@@ -1004,6 +1004,69 @@ class PrCheckTests(unittest.TestCase):
                 self.assertIn(campo, v.motivo)
                 self.assertNotIn("reevaluá en unos segundos", v.motivo)
 
+    # --- WARNINGs cosméticos del review de #81: motivo que miente (check sin
+    # identificador) y concordancia en plural (uno o varios PRs). Ningún
+    # veredicto (estado/criticidad) cambia respecto de antes de este fix. ---
+
+    def test_checkrun_sin_name_no_dice_estado_desconocido(self):
+        """SUCCESS sí se reconoce -- lo que falta es la identidad del check,
+        no el estado. El motivo no debe sugerir que SUCCESS no está mapeado."""
+        checks = [{"__typename": "CheckRun", "status": "COMPLETED", "conclusion": "SUCCESS"}]
+        v = self._evaluar([self._pr(statusCheckRollup=checks)])
+        self.assertEqual(v.estado, "FAILED")
+        self.assertEqual(v.criticidad, "no-critico")
+        self.assertEqual(v.motivo, "check sin name identificable (estado SUCCESS); no cuenta como verde")
+        self.assertNotIn("estado desconocido", v.motivo)
+
+    def test_statuscontext_sin_context_no_dice_estado_desconocido(self):
+        checks = [{"__typename": "StatusContext", "state": "SUCCESS"}]
+        v = self._evaluar([self._pr(statusCheckRollup=checks)])
+        self.assertEqual(v.estado, "FAILED")
+        self.assertEqual(v.criticidad, "no-critico")
+        self.assertEqual(v.motivo, "check sin context identificable (estado SUCCESS); no cuenta como verde")
+        self.assertNotIn("estado desconocido", v.motivo)
+
+    def test_valor_no_mapeado_con_identificador_sigue_diciendo_estado_desconocido(self):
+        """El otro lado del mismo mapa: con identificador presente pero un
+        valor fuera de `_CONCLUSION_A_EJE`, el mensaje original sigue siendo
+        verdadero (ahí sí es un estado no reconocido) y no se toca."""
+        checks = [{"__typename": "CheckRun", "name": "raro", "status": "COMPLETED", "conclusion": "ALGO_NUEVO"}]
+        v = self._evaluar([self._pr(statusCheckRollup=checks)])
+        self.assertEqual(v.estado, "FAILED")
+        self.assertEqual(v.criticidad, "no-critico")
+        self.assertEqual(v.motivo, "check raro: estado desconocido ALGO_NUEVO")
+
+    def test_un_pr_cerrado_concuerda_en_singular(self):
+        v = self._evaluar([self._pr(state="CLOSED", number=31)])
+        self.assertEqual(v.estado, "FAILED")
+        self.assertEqual(v.criticidad, "critico")
+        self.assertEqual(v.motivo, "el PR #31 está cerrado sin merge")
+
+    def test_varios_prs_cerrados_concuerdan_en_plural(self):
+        v = self._evaluar([self._pr(state="CLOSED", number=31), self._pr(state="CLOSED", number=32)])
+        self.assertEqual(v.estado, "FAILED")
+        self.assertEqual(v.criticidad, "critico")
+        self.assertEqual(v.motivo, "los PR #31 y #32 están cerrados sin merge")
+
+    def test_varios_prs_mergeados_concuerdan_en_plural(self):
+        m1 = self._pr(number=31, state="MERGED", mergeable="UNKNOWN", mergeStateStatus="UNKNOWN")
+        m2 = self._pr(number=32, state="MERGED", mergeable="UNKNOWN", mergeStateStatus="UNKNOWN")
+        v = self._evaluar([m1, m2])
+        self.assertEqual(v.estado, "PASSED")
+        self.assertEqual(v.criticidad, "n-a")
+        self.assertEqual(v.motivo, "los PR #31 y #32 ya fueron mergeados (fuera del flujo: el merge va después del DoD)")
+
+    def test_varios_prs_mergeados_a_base_incorrecta_concuerdan_en_plural(self):
+        m1 = self._pr(number=31, state="MERGED", baseRefName="develop", mergeable="UNKNOWN", mergeStateStatus="UNKNOWN")
+        m2 = self._pr(number=32, state="MERGED", baseRefName="feature", mergeable="UNKNOWN", mergeStateStatus="UNKNOWN")
+        v = self._evaluar([m1, m2])
+        self.assertEqual(v.estado, "FAILED")
+        self.assertEqual(v.criticidad, "critico")
+        self.assertEqual(
+            v.motivo,
+            "los PR #31 (base develop) y #32 (base feature) fueron mergeados contra una base distinta de main",
+        )
+
 
 class MetricasTests(unittest.TestCase):
     def test_calcula_cobertura_y_lead_time(self):
