@@ -110,14 +110,18 @@ class PerfilPluginTests(unittest.TestCase):
 
 
 class IntegracionPorPrTests(unittest.TestCase):
-    """El PR es la unica via de integracion (#80): sin merge directo a la rama base."""
+    """El PR es la unica via de integracion (#80, extendido a flechodiezx-hotfix por
+    #83): sin merge directo a la rama base, en ningun agente que integre por PR."""
+
+    AGENTES_CON_PR = ("flechodiezx", "flechodiezx-hotfix")
 
     def test_flechodiezx_no_menciona_merge_directo(self):
-        texto = (ROOT / "agents/flechodiezx.md").read_text(encoding="utf-8")
         prohibidas = ('git.integracion: "merge"', "git merge --no-ff", "git push origin main",
                       "merge --ff-only", "git checkout main", "gh issue close")
-        for cadena in prohibidas:
-            self.assertNotIn(cadena, texto, f"flechodiezx.md no debe mencionar `{cadena}`: la unica via de integracion es el PR")
+        for nombre in self.AGENTES_CON_PR:
+            texto = (ROOT / f"agents/{nombre}.md").read_text(encoding="utf-8")
+            for cadena in prohibidas:
+                self.assertNotIn(cadena, texto, f"{nombre}.md no debe mencionar `{cadena}`: la unica via de integracion es el PR")
 
     def test_flechodiezx_declara_regla_dura_de_via_unica(self):
         texto = (ROOT / "agents/flechodiezx.md").read_text(encoding="utf-8")
@@ -149,6 +153,33 @@ class IntegracionPorPrTests(unittest.TestCase):
         )
 
 
+class HotfixAisladoTests(unittest.TestCase):
+    """flechodiezx-hotfix aisla en worktree y siempre abre PR (#83): espejo de
+    IntegracionPorPrTests.test_flechodiezx_no_menciona_merge_directo pero con la
+    familia de frases que la decision de #83 volvio obsoletas ('sin worktree(s)',
+    'en la/rama actual', cierre directo del issue, o cualquier via de integracion
+    distinta del PR)."""
+
+    ARCHIVOS = (ROOT / "agents/flechodiezx-hotfix.md", ROOT / "commands/hotfix.md")
+
+    PROHIBIDAS = (
+        "sin worktree", "sin worktrees", "Nunca worktree", "en la rama actual",
+        "rama actual", "gh issue close", "git push origin main", "merge --ff-only",
+        "git checkout main", "git merge --no-ff",
+    )
+
+    def test_no_menciona_frases_obsoletas(self):
+        for archivo in self.ARCHIVOS:
+            texto = archivo.read_text(encoding="utf-8")
+            for frase in self.PROHIBIDAS:
+                self.assertNotIn(frase, texto, f"{archivo.name} no debe mencionar `{frase}`: el hotfix aisla en worktree y siempre abre PR")
+
+    def test_menciona_worktree_fix_integracion_y_en_revision(self):
+        texto = (ROOT / "agents/flechodiezx-hotfix.md").read_text(encoding="utf-8")
+        for frase in ("isolation: worktree", "fix/", "integracion.py", "en-revision"):
+            self.assertIn(frase, texto, f"flechodiezx-hotfix.md debe mencionar `{frase}`")
+
+
 class DodEstrictoTests(unittest.TestCase):
     """DoD estricto (gap 3 de la auditoria #24, issue #28): sin autoevaluacion sin evaluador."""
 
@@ -178,14 +209,24 @@ class InvocadoresTests(unittest.TestCase):
         self.assertFalse(sin, f"scripts sin mencion en CLAUDE.md/README.md: {sin}")
 
 
-class TareasTests(unittest.TestCase):
-    def test_tareas_de_estado_historia_estan_en_plantilla_hu(self):
-        import estado_historia as eh
-        plantilla = (ROOT / "skills/github-issues/references/plantilla-hu.md").read_text(encoding="utf-8")
-        lineas_plantilla = re.findall(r"^- \[ \] (.+)$", plantilla, re.MULTILINE)
-        self.assertEqual(eh.TAREAS, lineas_plantilla,
-                          "TAREAS (estado_historia.py) y el checklist de plantilla-hu.md deben coincidir en contenido y orden")
+class ChecklistsPorTipoTests(unittest.TestCase):
+    """Genera la familia (#83): itera CHECKLISTS contra su plantilla-<tipo>.md, en vez de
+    cablear un test hermano por tipo. Cubre `hu` (invariante que ya afirmaba TareasTests)
+    y `hotfix`, y cualquier tipo que se agregue despues sin tener que recordar escribir
+    un test nuevo."""
 
+    def test_checklists_coinciden_con_su_plantilla(self):
+        import estado_historia as eh
+        for tipo, checklist in eh.CHECKLISTS.items():
+            plantilla_path = ROOT / f"skills/github-issues/references/plantilla-{tipo}.md"
+            self.assertTrue(plantilla_path.exists(), f"CHECKLISTS declara el tipo `{tipo}` pero falta {plantilla_path}")
+            texto = plantilla_path.read_text(encoding="utf-8")
+            lineas_plantilla = re.findall(r"^- \[ \] (.+)$", texto, re.MULTILINE)
+            self.assertEqual(checklist, lineas_plantilla,
+                              f"CHECKLISTS['{tipo}'] y el checklist de {plantilla_path.name} deben coincidir en contenido y orden")
+
+
+class TareasTests(unittest.TestCase):
     def test_git_integracion_documentado(self):
         adr = (ROOT / "docs/adr/tim-adr-0002-configuracion-del-consumidor.md").read_text(encoding="utf-8")
         onboard = (ROOT / "commands/onboard.md").read_text(encoding="utf-8")
