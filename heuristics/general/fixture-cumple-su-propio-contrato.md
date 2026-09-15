@@ -57,7 +57,7 @@ y fue el **CRÍTICO de la primera ronda de review**. El fix `2936063` (*"el fixt
 
 El contra-hecho, y la parte que convierte el caso en heurística, está en la misma retro:
 
-> Verificar el fixture ejecutando el evaluado: un eval cuyo fixture no cumple lo que su grader exige mide otra cosa. Ningún test unitario de `evals/` puede detectarlo.
+> **Verificar el fixture ejecutando el evaluado**: un eval cuyo fixture no cumple lo que su grader exige mide otra cosa. El CRITICO lo encontró el reviewer lanzando el skill `code-review` real contra el fixture, no leyéndolo; ningún test unitario de `evals/` (convención de carpeta, `type` de graders, 3 violaciones sembradas) puede detectarlo.
 
 Es decir: **no existe un guardrail automático posible** para este defecto. Sólo ejecutar el evaluado.
 

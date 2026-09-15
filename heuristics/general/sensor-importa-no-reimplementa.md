@@ -49,7 +49,7 @@ from timonel_gh import fetch_issues, find_marker_comment, label_value, origen_re
 
 La retro #30 lo registró así, textual:
 
-> Un sensor nuevo que necesita un cálculo que otro sensor ya hace debe importarlo, no reimplementarlo: `metricas_flujo` importó `contar_eventos`/`fila_hook` de `smoke_harness` y `origen_retro` de `timonel_gh`, y con eso heredó gratis el conteo por ancla y el estado `sin datos` que la retro #29 había costado descubrir.
+> Un sensor nuevo que necesita un cálculo que otro sensor ya hace debe **importarlo**, no reimplementarlo: `metricas_flujo` importó `contar_eventos`/`fila_hook` de `smoke_harness` y `origen_retro` de `timonel_gh`, y con eso heredó gratis el conteo por ancla y el estado `sin datos` que la retro #29 había costado descubrir.
 
 El contra-hecho no es un bug que ocurrió, sino uno que **no** ocurrió: el estado `sin datos` de `fila_hook` —la distinción entre `None` (no hay `events.log`) y `0` (el perfil no tiene ese consumidor)— llegó a `metricas_flujo.py:128-129` sin que su autor tuviera que redescubrirla. Una reimplementación habría devuelto `0` en los dos casos, con la misma cara de correcta.
 
