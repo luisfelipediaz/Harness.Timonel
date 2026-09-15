@@ -54,11 +54,11 @@ La prosa que queda debajo explica **una** celda cuando la celda no se explica so
 
 ## Caso real
 
-**Los perfiles de `flechodiezx` en prosa (#34, retro #27(2)).** `agents/flechodiezx.md` menciona `Perfil plugin` / `Perfil consumidor` **diez veces**, repartidas en la Fase 0 (línea 16), Fase 1 (38), Fase 2 (50, 52), Fase 3 (67, 83), Fases 4-5 (130, 132), Fase 6 (140) y las notas (173) — **sin ninguna tabla de detección ni tabla de fases × perfil**. La Fase 0 lleva la regla de detección redactada dentro de un párrafo corrido, junto con lo que cada perfil lee del config.
+**Los perfiles de `flechodiezx` en prosa (#34, retro #27(2)).** `agents/flechodiezx.md` menciona `Perfil plugin` / `Perfil consumidor` **diez veces**, repartidas en **nueve líneas**: Fase 0 (línea 16), Fase 1 (38), Fase 2 (50, 52), Fase 3 (67, 83), Fases 4-5 (130, 132) y Fase 6 (140, que sola lleva dos) — **sin ninguna tabla de detección ni tabla de fases × perfil**. La Fase 0 lleva la regla de detección redactada dentro de un párrafo corrido, junto con lo que cada perfil lee del config.
 
 La retro del issue #27, punto 2, textual:
 
-> Los perfiles del orquestador (nx vs plugin) se expresan bien como una tabla de detección + tabla de fases con 'obligatorio/N/A' por perfil; evita ramificar cada fase con condicionales en prosa.
+> Los perfiles del orquestador (`nx` vs `plugin`) se expresan bien como una tabla de detección (`mod:plugin` / `.claude-plugin/plugin.json`) + tabla de fases con "obligatorio / N/A" por perfil; evita ramificar cada fase con condicionales en prosa.
 
 El contra-hecho es el estado presente, no un bug pasado: al escribirse esta heurística el archivo **sigue en el formato que la retro describe como problema**. Por eso el caso es verificable con un comando en vez de con un diff:
 
