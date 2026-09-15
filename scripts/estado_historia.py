@@ -25,10 +25,6 @@ CHECKLISTS: dict[str, list[str]] = {
     "hotfix": ["Implementación", "Lint + tests afectados", "Code review", "PR abierto",
                "Definition of Done"],
 }
-# Retrocompat: otros modulos importan TAREAS directamente (test_consistencia.py::ChecklistsPorTipoTests
-# ya cubre la invariante contra plantilla-hu.md para todos los tipos, incluido este).
-TAREAS = CHECKLISTS["hu"]
-
 MARCADORES = ["investigacion", "contrato-api", "consolidacion", "review", "retro", "dod"]
 
 # Prefijos de rama que reconoce rama_local(), en orden de preferencia cuando existe mas
@@ -46,7 +42,6 @@ FASES_POR_TIPO: dict[str, list[tuple]] = {
         # contrato sirve de evidencia indirecta porque el dominio lo garantiza: "nunca
         # redactes el contrato sin la investigacion" (flechodiezx.md).
         ("1.5 Investigacion",      lambda e: "investigacion" in e["marcadores"]
-                                         or e["tareas"].get("Contrato API aprobado")
                                          or "contrato-api" in e["marcadores"]),
         ("2 Contrato API",         lambda e: e["tareas"].get("Contrato API aprobado") or "contrato-api" in e["marcadores"]),
         ("3 Backend",              lambda e: e["tareas"].get("Backend") or e["alcance"] == "frontend"),

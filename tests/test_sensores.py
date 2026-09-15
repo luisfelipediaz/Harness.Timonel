@@ -356,16 +356,23 @@ class EstadoHistoriaTests(unittest.TestCase):
 
 
 class InvestigacionReutilizadaTests(unittest.TestCase):
-    """`1.5 Investigacion` era la unica fase con UNA sola fuente de evidencia, y justo la
-    unica cuya evidencia puede vivir legitimamente en OTRO issue: la Fase 1.5 de
-    flechodiezx autoriza reutilizar una investigacion vigente en vez de relanzar a Dora,
-    y entonces el issue de la historia nunca recibe su comentario `timonel:investigacion`.
-    Sus hermanas son todas `tarea OR marcador`. El contrato sirve de evidencia indirecta
-    porque el dominio lo garantiza: "nunca redactes el contrato sin la investigacion"
-    (flechodiezx.md). Sin ese `or`, una HU terminada que reutilizo investigacion reporta
-    REANUDAR_EN: 1.5 Investigacion en vez de `cerrar` -- un falso pendiente que vive en la
-    ventana que abrio #80: toda HU terminada queda OPEN hasta el merge humano del PR, asi
-    que el sensor la sigue leyendo despues de terminada."""
+    """`1.5 Investigacion` es la unica fase cuya evidencia puede vivir legitimamente en OTRO
+    issue: la Fase 1.5 de flechodiezx autoriza reutilizar una investigacion vigente en vez
+    de relanzar a Dora, y entonces el issue de la historia nunca recibe su comentario
+    `timonel:investigacion`. Acepta por eso el marcador `timonel:contrato-api` como
+    evidencia indirecta: el dominio garantiza que si hubo contrato hubo investigacion
+    ("nunca redactes el contrato sin la investigacion", flechodiezx.md). Sin eso, una HU
+    terminada que reutilizo investigacion reporta REANUDAR_EN: 1.5 Investigacion en vez de
+    `cerrar` -- falso pendiente observable en la ventana que abrio #80 (toda HU terminada
+    queda OPEN hasta el merge humano del PR).
+
+    La tarea `Contrato API aprobado` NO cuenta como esa evidencia, aunque la fase
+    `2 Contrato API` si la acepte: las dos fuentes no tienen la misma fuerza. Un marcador
+    solo existe si alguien paso por `publicar_marcador` (y por `validar_marcador.py`); un
+    checkbox lo tilda a mano cualquiera en la web de GitHub. El unico estado que la rama
+    por tarea haria pasar por hecho -- contrato marcado sin ningun marcador -- es
+    justamente una VIOLACION de la regla dura de flechodiezx.md, y dejar la fase pendiente
+    ahi es la senal correcta, no un falso positivo (hallazgo del code review de #83)."""
 
     SIN_CONTRATO = HU_OK["body"].replace("- [x] Contrato API aprobado", "- [ ] Contrato API aprobado")
     TODO_HECHO = HU_OK["body"].replace("- [ ]", "- [x]").replace(
@@ -381,18 +388,21 @@ class InvestigacionReutilizadaTests(unittest.TestCase):
         e = eh.estado(self._issue(self.SIN_CONTRATO, ["investigacion"]), rama="hu/42-x")
         self.assertIn("1.5 Investigacion", e["fases_hechas"])
 
-    def test_investigacion_reutilizada_con_tarea_de_contrato_marcada(self):
-        """Evidencia fuera del issue: no hay marcador, pero la tarea del contrato esta
-        marcada -- y el contrato no se redacta sin investigacion."""
-        e = eh.estado(self._issue(HU_OK["body"], []), rama="hu/42-x")
-        self.assertIn("1.5 Investigacion", e["fases_hechas"])
-        self.assertEqual(e["reanudar_en"], "3 Frontend")
-
-    def test_investigacion_reutilizada_con_marcador_de_contrato_sin_tarea(self):
-        """Misma evidencia indirecta por la otra fuente: el comentario `timonel:contrato-api`
-        publicado aunque la tarea del body no se haya llegado a marcar."""
+    def test_investigacion_reutilizada_con_marcador_de_contrato(self):
+        """Evidencia fuera del issue: no hay marcador de investigacion propio, pero si el
+        comentario `timonel:contrato-api`, que solo existe si la Fase 2 corrio de verdad."""
         e = eh.estado(self._issue(self.SIN_CONTRATO, ["contrato-api"]), rama="hu/42-x")
         self.assertIn("1.5 Investigacion", e["fases_hechas"])
+
+    def test_tarea_del_contrato_tildada_a_mano_no_cuenta_como_investigacion(self):
+        """Contraejemplo hallado en el code review de #83: la tarea `Contrato API aprobado`
+        marcada SIN ningun marcador no es un contrato aprobado por el pipeline -- es un
+        checkbox que cualquiera tilda en la web. Ese estado viola la regla dura de
+        flechodiezx.md (contrato sin investigacion), y el sensor debe seguir senalandolo
+        como pendiente en vez de encubrirlo dandolo por hecho."""
+        e = eh.estado(self._issue(HU_OK["body"], []), rama="hu/42-x")
+        self.assertNotIn("1.5 Investigacion", e["fases_hechas"])
+        self.assertEqual(e["reanudar_en"], "1.5 Investigacion")
 
     def test_sin_investigacion_ni_contrato_sigue_pendiente(self):
         """El guard contra la sobre-correccion: sin ninguna de las tres senales la fase
@@ -404,7 +414,7 @@ class InvestigacionReutilizadaTests(unittest.TestCase):
         """El sintoma que motivo el arreglo, end-to-end: todo hecho, PR abierto, DoD
         publicado, investigacion reutilizada de otro issue -> `cerrar`, no un falso
         pendiente en la primera fase."""
-        e = eh.estado(self._issue(self.TODO_HECHO, ["dod"]), rama="hu/42-x")
+        e = eh.estado(self._issue(self.TODO_HECHO, ["contrato-api", "dod"]), rama="hu/42-x")
         self.assertEqual(e["reanudar_en"], "cerrar")
         self.assertEqual(e["fases_pendientes"], [])
 
