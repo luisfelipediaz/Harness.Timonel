@@ -170,17 +170,31 @@ def evaluar(
         return Veredicto("FAILED", "critico", f"hay {len(abiertos)} PRs abiertos para la rama; ambigüedad", "n-a")
 
     if not abiertos:
-        if len(prs) == 1 and prs[0].get("state") == "MERGED":
-            pr = prs[0]
+        # Se filtra por estado, nunca por la cardinalidad de `prs`: un MERGED
+        # contra la base equivocada no debe pasar (aunque sea el unico
+        # elemento) y un MERGED valido no debe fallar por coexistir con un
+        # CLOSED (aunque la lista tenga mas de un elemento). Hallazgo #1 del
+        # review de #81.
+        mergeados = [p for p in prs if p.get("state") == "MERGED"]
+        validos = [p for p in mergeados if p.get("baseRefName") == base]
+        if validos:
+            numeros = ", ".join(f"#{p.get('number')}" for p in validos)
             return Veredicto(
                 "PASSED", "n-a",
-                f"el PR #{pr.get('number')} ya fue mergeado (fuera del flujo: el merge va después del DoD)",
-                pr.get("url", "n-a"),
+                f"el PR {numeros} ya fue mergeado (fuera del flujo: el merge va después del DoD)",
+                validos[0].get("url", "n-a"),
+            )
+        if mergeados:
+            detalle = ", ".join(f"#{p.get('number')} (base {p.get('baseRefName')})" for p in mergeados)
+            return Veredicto(
+                "FAILED", "critico",
+                f"el PR {detalle} fue mergeado contra una base distinta de {base}",
+                mergeados[0].get("url", "n-a"),
             )
         cerrados = [p for p in prs if p.get("state") == "CLOSED"]
         if cerrados:
-            pr = cerrados[0]
-            return Veredicto("FAILED", "critico", f"el PR #{pr.get('number')} está cerrado sin merge", pr.get("url", "n-a"))
+            numeros = ", ".join(f"#{p.get('number')}" for p in cerrados)
+            return Veredicto("FAILED", "critico", f"el PR {numeros} está cerrado sin merge", cerrados[0].get("url", "n-a"))
         return Veredicto("FAILED", "critico", f"no hay PR abierto para la rama {rama}", "n-a")
 
     pr = abiertos[0]
