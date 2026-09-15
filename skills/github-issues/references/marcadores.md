@@ -169,6 +169,8 @@ Maximo 3-5 bullets por seccion; `- Ninguno` si no aplica. Los scripts leen las s
 
 ## `timonel:dod` — verify-dod
 
+El mismo cuerpo del comentario se publica **dos veces**: como `<!-- timonel:dod -->` en el issue y, sin el marcador, con `gh pr comment` en el PR que identifico `pr_check.py` (issue #81).
+
 ````markdown
 <!-- timonel:dod -->
 ## Definition of Done
@@ -181,7 +183,7 @@ perfil: consumidor | plugin
 
 | #   | Item                              | Estado  |
 | --- | --------------------------------- | ------- |
-| 1   | Código commiteado                 | PASSED  |
+| 1   | PR abierto y mergeable            | PASSED  |
 | 2   | Lint pasa                         | PASSED  |
 | 3   | Tests unitarios creados           | PASSED  |
 | 4   | Tests pasan                       | PASSED  |

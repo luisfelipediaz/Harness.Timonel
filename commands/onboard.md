@@ -29,7 +29,7 @@ Si ya existe `.claude/timonel.config.json`, muestralo y pregunta si regenerar o 
 - `modulos[]`: carpetas de primer nivel en `<api.path>/src/app/` que tengan `controllers/` o `*.module.ts` (kebab-case). Muestra la lista y deja que el usuario quite/agregue.
 - `heuristicsDir`: `null`.
 - `git`: `{ "baseBranches": [<rama por defecto de `gh repo view` o `main`, mas `develop` si existe>], "protectBase": true, "integracion": "pr" }`. Pregunta si el equipo commitea directo a la rama base; si sí, `protectBase: false`. No preguntes por `integracion`: siempre `"pr"` en consumidores.
-- Detecta el tipo de remote con `python3 "$PLUGIN_ROOT/scripts/integracion.py" --tipo-remote`; si es `azure-devops` y falta `az`, avisa que la Fase 8 mostrará el comando en vez de ejecutarlo.
+- Detecta el tipo de remote con `python3 "$PLUGIN_ROOT/scripts/integracion.py" --tipo-remote`; si es `azure-devops` y falta `az`, avisa que la Fase 6.5 mostrará el comando en vez de ejecutarlo.
 - `timonel`: `{ "repo": "luisfelipediaz/Harness.Timonel" }`.
 
 ## 2. Confirmar y escribir
