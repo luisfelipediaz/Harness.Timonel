@@ -83,3 +83,15 @@ Solo cuando el pipe no cubre el caso:
 3. ¿La lib del proyecto (`@sinco/angular`, Material, etc.) ya expone un pipe? → Grep por `Pipe` en las libs antes.
 4. Si nada aplica, ¿puedo **encadenar pipes existentes** en vez de escribir uno nuevo? → `| date | titlecase`, `| currency | slice:0:-3`, etc.
 5. Si debo escribir código, ¿lo encapsulo en un **pipe reutilizable** en vez de lógica inline en el componente?
+
+## Caso real
+
+**Procedencia: importada, sin caso registrado en este repo.** Llegó con el harness original del Portal en `c8bcc42` (v0.1.0), antes de TIM-ADR-0005; el ejemplo del array `MESES` viene del código del Portal, no de un issue de Timonel. No se le inventa un commit propio: la procedencia se documentó en #134.
+
+Su uso verificable hoy es como fuente de hallazgos `Heurística` del skill `code-review`, junto con el resto de `heuristics/`.
+
+## Relación con otras heurísticas
+
+- **`sensor-importa-no-reimplementa.md`** es la misma regla mirando hacia adentro del harness: no reimplementar un cálculo que otro sensor ya resolvió. Invocá ésta cuando lo ya resuelto lo trae **el framework o la plataforma**; aquélla cuando lo trae **otro módulo del propio repo**.
+- **`no-tipos-espejo.md`** ataca la variante estructural del mismo desperdicio: un `ViewModel` que sólo existe para guardar el string ya formateado suele ser el síntoma de no haber usado el pipe.
+- **`convenciones-bitakora.md`** cataloga las reglas de estilo de Angular/NestJS del consumidor; ésta es una heurística de diseño, no una regla de estilo, y manda el `CLAUDE.md` del consumidor sobre aquél, no sobre ésta.
