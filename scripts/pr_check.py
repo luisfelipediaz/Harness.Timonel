@@ -151,6 +151,19 @@ def evaluar(
     Pura: no ejecuta `gh` ni `git`. Las reglas se evaluan en el orden del
     contrato de #81 (R0 remote/herramienta -> R1 rama/existencia -> R2 estado
     -> R3 forma -> R4 merge -> R5 checks); la primera que aplica decide.
+
+    Guard clauses, no una lista de tuplas `(predicado, resultado)` recorrida
+    con `next()` al estilo `_PATRONES` de `integracion.py` -- alternativa
+    evaluada y descartada en el review de #81. En `_PATRONES` todos los
+    predicados deciden sobre un unico string (la URL del remote), por eso una
+    tabla de datos los captura sin perdida. Aca los predicados cierran sobre
+    objetos heterogeneos -- el remote, la rama, la lista completa de PRs, un
+    PR individual, la lista de checks --, asi que una tupla necesitaria un
+    parametro comun artificial o closures sobre variables externas, y las dos
+    opciones son mas indirectas que el guard clause que ya esta. Criterio de
+    desempate: ¿se lee igual que la tabla de 27 casos que lo especifica? Los
+    guard clauses, leidos en orden, si; una lista de tuplas con closures no
+    mejora esa lectura y agrega una capa mas.
     """
     if tipo_remote == "azure-devops":
         return Veredicto("FAILED", "no-critico", "remote azure-devops: gh pr no aplica; verificá el PR a mano", "n-a")
