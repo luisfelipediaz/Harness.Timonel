@@ -888,6 +888,122 @@ class PrCheckTests(unittest.TestCase):
         self.assertIn("checks en verde", v.motivo)
         self.assertEqual(v.pr, "https://github.com/o/r/pull/31")
 
+    # --- Hallazgo #1 del code review (#81): filtrar por estado, nunca por
+    # cardinalidad de la lista total. Reproducen los tres defectos reportados. ---
+
+    def test_caso8b_merged_base_incorrecta_failed_critico(self):
+        """Defecto (a): un unico MERGED contra la base equivocada daba PASSED
+        porque `len(prs) == 1` no mira `baseRefName`."""
+        v = self._evaluar([self._pr(state="MERGED", baseRefName="develop",
+                                     mergeable="UNKNOWN", mergeStateStatus="UNKNOWN")])
+        self.assertEqual(v.estado, "FAILED")
+        self.assertEqual(v.criticidad, "critico")
+        self.assertIn("#31", v.motivo)
+        self.assertIn("develop", v.motivo)
+        self.assertIn("main", v.motivo)
+
+    def test_caso8c_merged_base_correcta_con_closed_passed(self):
+        """Defecto (b): un MERGED valido que coexiste con un CLOSED daba
+        FAILED critico "cerrado sin merge" porque `len(prs) == 1` ya era falso."""
+        mergeado = self._pr(number=31, state="MERGED", mergeable="UNKNOWN", mergeStateStatus="UNKNOWN")
+        cerrado = self._pr(number=32, state="CLOSED")
+        v = self._evaluar([mergeado, cerrado])
+        self.assertEqual(v.estado, "PASSED")
+        self.assertIn("#31", v.motivo)
+
+    def test_caso8d_dos_merged_sin_closed_passed_nombra_ambos(self):
+        """Defecto (c): dos MERGED sin CLOSED caian en el generico "no hay PR
+        abierto", que ni nombraba los PRs mergeados existentes."""
+        m1 = self._pr(number=31, state="MERGED", mergeable="UNKNOWN", mergeStateStatus="UNKNOWN")
+        m2 = self._pr(number=32, state="MERGED", mergeable="UNKNOWN", mergeStateStatus="UNKNOWN")
+        v = self._evaluar([m1, m2])
+        self.assertEqual(v.estado, "PASSED")
+        self.assertIn("#31", v.motivo)
+        self.assertIn("#32", v.motivo)
+
+    def test_caso8e_merged_base_incorrecta_junto_a_closed_sigue_critico(self):
+        """Un MERGED a la base equivocada no se salva porque coexista con un
+        CLOSED: sigue FAILED critico nombrando la base real."""
+        mergeado_mal = self._pr(number=31, state="MERGED", baseRefName="develop",
+                                 mergeable="UNKNOWN", mergeStateStatus="UNKNOWN")
+        cerrado = self._pr(number=32, state="CLOSED")
+        v = self._evaluar([mergeado_mal, cerrado])
+        self.assertEqual(v.estado, "FAILED")
+        self.assertEqual(v.criticidad, "critico")
+        self.assertIn("#31", v.motivo)
+        self.assertIn("develop", v.motivo)
+
+    # --- Regresiones que el fix del hallazgo #1 no puede introducir ---
+
+    def test_regresion_merged_mas_open_evalua_el_open(self):
+        mergeado = self._pr(number=30, state="MERGED", mergeable="UNKNOWN", mergeStateStatus="UNKNOWN")
+        check_verde = [{"__typename": "CheckRun", "name": "build", "status": "COMPLETED", "conclusion": "SUCCESS"}]
+        abierto = self._pr(number=31, statusCheckRollup=check_verde)
+        v = self._evaluar([mergeado, abierto])
+        self.assertEqual(v.estado, "PASSED")
+        self.assertIn("#31", v.motivo)
+        self.assertIn("checks en verde", v.motivo)
+
+    def test_regresion_dos_open_sigue_siendo_ambiguedad(self):
+        """Ya cubierto por test_caso7; se repite explicito como guardia de
+        regresion del fix del hallazgo #1 (no debe tocar la rama `> 1 OPEN`)."""
+        v = self._evaluar([self._pr(number=31), self._pr(number=32)])
+        self.assertEqual(v.estado, "FAILED")
+        self.assertEqual(v.criticidad, "critico")
+        self.assertIn("2 PRs abiertos", v.motivo)
+        self.assertIn("ambigüedad", v.motivo)
+
+    # --- Hallazgo #3 del code review (#81): propiedad de entrada degenerada ---
+
+    def test_propiedad_entrada_degenerada_nunca_passed_ni_lanza(self):
+        """Invariante: para toda entrada degenerada -cualquier campo del PR
+        ausente o None- `evaluar()` no lanza y su estado nunca es PASSED.
+
+        Generado programaticamente a partir de un PR valido (nunca a mano) para
+        que cubra tambien los campos que GitHub agregue mañana, y detecte un
+        `.get(x, True)` descuidado dentro de seis meses. Escenario realista de
+        este propio repo (D7 del contrato de #81): `hay_workflows=True`.
+        """
+        base = self._pr()
+        variantes: list[tuple[str, dict]] = []
+        for campo in base:
+            sin_campo = dict(base)
+            del sin_campo[campo]
+            variantes.append((f"{campo} ausente", sin_campo))
+            con_none = dict(base)
+            con_none[campo] = None
+            variantes.append((f"{campo} en None", con_none))
+
+        check_sin_name = [{"__typename": "CheckRun", "status": "COMPLETED", "conclusion": "SUCCESS"}]
+        variantes.append(("check sin name (verde)", self._pr(statusCheckRollup=check_sin_name)))
+        check_typename_desconocido = [{"__typename": "TipoQueNoExisteAun", "name": "raro"}]
+        variantes.append(("__typename desconocido", self._pr(statusCheckRollup=check_typename_desconocido)))
+
+        for etiqueta, pr in variantes:
+            with self.subTest(etiqueta):
+                try:
+                    v = self._evaluar([pr], hay_workflows=True)
+                except Exception as exc:  # la propiedad exige "no lanza"
+                    self.fail(f"{etiqueta}: evaluar() lanzo {type(exc).__name__}: {exc}")
+                self.assertNotEqual(v.estado, "PASSED", f"{etiqueta}: dio PASSED sobre una entrada degenerada")
+
+    # --- Hallazgo #4 del code review (#81): motivo que nombra el campo ausente ---
+
+    def test_motivo_nombra_campo_faltante_en_vez_de_reevaluar(self):
+        """Con `mergeable`, `isDraft` o `number` ausentes el veredicto ya era
+        correcto (FAILED no-critico), pero el motivo decia "checks aun no
+        registrados; reevalua en unos segundos" -- manda a esperar por algo
+        que no va a cambiar. Debe nombrar el campo que falta."""
+        for campo in ("mergeable", "isDraft", "number"):
+            with self.subTest(campo):
+                pr = self._pr()
+                del pr[campo]
+                v = self._evaluar([pr], hay_workflows=True)
+                self.assertEqual(v.estado, "FAILED")
+                self.assertEqual(v.criticidad, "no-critico")
+                self.assertIn(campo, v.motivo)
+                self.assertNotIn("reevaluá en unos segundos", v.motivo)
+
 
 class MetricasTests(unittest.TestCase):
     def test_calcula_cobertura_y_lead_time(self):
