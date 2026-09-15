@@ -99,14 +99,37 @@ def _cierra_issue(body: str, issue: int) -> bool:
     return any(int(n) == issue for n in _CIERRA_ISSUE_RE.findall(body or ""))
 
 
+def _unir(items: list[str]) -> str:
+    """Une una lista para prosa en español: sin "y" con uno solo, "y" antes
+    del ultimo con dos o mas, sin coma serial (`#1 y #2`, `#1, #2 y #3`)."""
+    if len(items) <= 1:
+        return items[0] if items else ""
+    return ", ".join(items[:-1]) + f" y {items[-1]}"
+
+
+def _frase_pr(items: list[str], forma_singular: str, forma_plural: str) -> str:
+    """Concuerda "el/los PR" y una forma verbal con la cardinalidad de
+    `items` (WARNING cosmetico del review de #81: con varios PRs el motivo
+    quedaba en singular, ej. "el PR #1, #2 esta cerrado sin merge"). Un unico
+    punto de formato en vez de repetir el condicional en cada motivo que
+    nombra uno o mas PRs."""
+    sujeto = "el PR " if len(items) == 1 else "los PR "
+    forma = forma_singular if len(items) == 1 else forma_plural
+    return f"{sujeto}{_unir(items)} {forma}"
+
+
 def _analizar_check(check: dict) -> tuple[str, str, str, str]:
     """(eje, nombre, valor, typename) de un elemento de `statusCheckRollup`.
 
     Un check sin su campo identificador (`context` en StatusContext, `name`
     en CheckRun) no es confiable aunque su conclusion sea verde: no hay forma
-    de nombrarlo en el motivo, asi que cae en "desconocido" (nunca "verde")
-    -- la misma logica que ya aplica a un valor de conclusion fuera del mapa
-    (hallazgo #3 del review de #81: una entrada degenerada nunca es PASSED).
+    de nombrarlo por su identidad, asi que el eje cae en "desconocido" (nunca
+    "verde") -- la misma logica que ya aplica a un valor de conclusion fuera
+    del mapa (hallazgo #3 del review de #81: una entrada degenerada nunca es
+    PASSED). El motivo si distingue ambos casos (`nombre == "?"` marca la
+    falta de identificador): "sin identificador" no es lo mismo que "estado
+    no reconocido" -- decirle a SUCCESS "estado desconocido" seria falso
+    (WARNING cosmetico del mismo review). Ver `_MOTIVO_POR_EJE["desconocido"]`.
     """
     typename = check.get("__typename", "CheckRun")
     if typename == "StatusContext":
@@ -132,9 +155,19 @@ def _motivo_en_curso(nombre: str, typename: str) -> str:
     return f"checks en curso ({nombre}); reevaluá al terminar"
 
 
+def _motivo_desconocido(nombre: str, valor: str, typename: str) -> str:
+    """Bifurca el unico mensaje que compartian dos causas distintas (WARNING
+    cosmetico del review de #81): sin identificador (`nombre == "?"`, el
+    campo falta) vs. estado no reconocido (el campo esta, su valor no)."""
+    if nombre == "?":
+        campo = "context" if typename == "StatusContext" else "name"
+        return f"check sin {campo} identificable (estado {valor}); no cuenta como verde"
+    return f"check {nombre}: estado desconocido {valor}"
+
+
 _MOTIVO_POR_EJE = {
     "rojo": lambda nombre, valor, typename: f"check {nombre} en rojo ({valor})",
-    "desconocido": lambda nombre, valor, typename: f"check {nombre}: estado desconocido {valor}",
+    "desconocido": _motivo_desconocido,
     "en_curso": lambda nombre, valor, typename: _motivo_en_curso(nombre, typename),
 }
 
@@ -203,23 +236,26 @@ def evaluar(
         mergeados = [p for p in prs if p.get("state") == "MERGED"]
         validos = [p for p in mergeados if p.get("baseRefName") == base]
         if validos:
-            numeros = ", ".join(f"#{p.get('number')}" for p in validos)
-            return Veredicto(
-                "PASSED", "n-a",
-                f"el PR {numeros} ya fue mergeado (fuera del flujo: el merge va después del DoD)",
-                validos[0].get("url", "n-a"),
+            numeros = [f"#{p.get('number')}" for p in validos]
+            motivo = _frase_pr(
+                numeros,
+                "ya fue mergeado (fuera del flujo: el merge va después del DoD)",
+                "ya fueron mergeados (fuera del flujo: el merge va después del DoD)",
             )
+            return Veredicto("PASSED", "n-a", motivo, validos[0].get("url", "n-a"))
         if mergeados:
-            detalle = ", ".join(f"#{p.get('number')} (base {p.get('baseRefName')})" for p in mergeados)
-            return Veredicto(
-                "FAILED", "critico",
-                f"el PR {detalle} fue mergeado contra una base distinta de {base}",
-                mergeados[0].get("url", "n-a"),
+            detalle = [f"#{p.get('number')} (base {p.get('baseRefName')})" for p in mergeados]
+            motivo = _frase_pr(
+                detalle,
+                f"fue mergeado contra una base distinta de {base}",
+                f"fueron mergeados contra una base distinta de {base}",
             )
+            return Veredicto("FAILED", "critico", motivo, mergeados[0].get("url", "n-a"))
         cerrados = [p for p in prs if p.get("state") == "CLOSED"]
         if cerrados:
-            numeros = ", ".join(f"#{p.get('number')}" for p in cerrados)
-            return Veredicto("FAILED", "critico", f"el PR {numeros} está cerrado sin merge", cerrados[0].get("url", "n-a"))
+            numeros = [f"#{p.get('number')}" for p in cerrados]
+            motivo = _frase_pr(numeros, "está cerrado sin merge", "están cerrados sin merge")
+            return Veredicto("FAILED", "critico", motivo, cerrados[0].get("url", "n-a"))
         return Veredicto("FAILED", "critico", f"no hay PR abierto para la rama {rama}", "n-a")
 
     pr = abiertos[0]
