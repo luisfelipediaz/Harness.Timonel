@@ -100,12 +100,24 @@ def _cierra_issue(body: str, issue: int) -> bool:
 
 
 def _analizar_check(check: dict) -> tuple[str, str, str, str]:
-    """(eje, nombre, valor, typename) de un elemento de `statusCheckRollup`."""
+    """(eje, nombre, valor, typename) de un elemento de `statusCheckRollup`.
+
+    Un check sin su campo identificador (`context` en StatusContext, `name`
+    en CheckRun) no es confiable aunque su conclusion sea verde: no hay forma
+    de nombrarlo en el motivo, asi que cae en "desconocido" (nunca "verde")
+    -- la misma logica que ya aplica a un valor de conclusion fuera del mapa
+    (hallazgo #3 del review de #81: una entrada degenerada nunca es PASSED).
+    """
     typename = check.get("__typename", "CheckRun")
     if typename == "StatusContext":
+        contexto = check.get("context")
         valor = check.get("state", "")
-        return _STATE_A_EJE.get(valor, "desconocido"), check.get("context", "?"), valor, typename
-    nombre = check.get("name", "?")
+        if not contexto:
+            return "desconocido", "?", valor, typename
+        return _STATE_A_EJE.get(valor, "desconocido"), contexto, valor, typename
+    nombre = check.get("name")
+    if not nombre:
+        return "desconocido", "?", check.get("conclusion") or check.get("status") or "", typename
     if check.get("status") != "COMPLETED":
         estado = check.get("status", "")
         eje = "en_curso" if estado in _STATUS_EN_CURSO else "desconocido"
