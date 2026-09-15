@@ -225,6 +225,18 @@ def evaluar(
     pr = abiertos[0]
     url = pr.get("url", "n-a")
 
+    # `gh pr list` siempre devuelve estos campos para un PR real; si faltan,
+    # el dato esta corrupto o incompleto y el motivo debe decirlo -- no debe
+    # caer en la rama de "checks aun no registrados", que manda a esperar por
+    # algo que no va a cambiar (hallazgo #4 del review de #81).
+    campos_ausentes = [c for c in ("number", "isDraft", "mergeable") if pr.get(c) is None]
+    if campos_ausentes:
+        return Veredicto(
+            "FAILED", "no-critico",
+            f"gh pr list no devolvió {', '.join(campos_ausentes)}: no se pudo evaluar el PR con certeza",
+            url,
+        )
+
     if pr.get("isDraft"):
         return Veredicto("FAILED", "critico", f"el PR #{pr.get('number')} está en draft; un humano no puede mergearlo", url)
     if pr.get("baseRefName") != base:
