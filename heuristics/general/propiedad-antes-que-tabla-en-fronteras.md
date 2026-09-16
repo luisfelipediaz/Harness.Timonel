@@ -64,7 +64,7 @@ El contra-hecho: un `CheckRun` **sin `name`** con `conclusion: SUCCESS` devolví
 
 Lo que hace al caso instructivo no es el bug sino quién lo encontró. La retro #81, textual:
 
-> el bug más grave —un CheckRun sin name con conclusion: SUCCESS devolviendo PASSED, un falso verde en el ítem crítico del DoD— lo destapó una invariante generada programáticamente sobre entradas degeneradas [tras] tres pasadas adversariales independientes (code review, team lead, orquestador)… Los tres lectores no eran tres muestreos independientes: leyeron la misma tabla y heredaron su marco.
+> El sensor pasó por tres pasadas adversariales independientes (code review, team lead, orquestador) sobre una tabla de 27 casos escrita justamente para "enumerar la clase y no el representante", y aun así el bug más grave —un `CheckRun` sin `name` con `conclusion: SUCCESS` devolviendo `PASSED`, un **falso verde en el ítem crítico del DoD**— lo destapó una invariante generada programáticamente sobre entradas degeneradas. […] Los tres lectores no eran tres muestreos independientes: leyeron la misma tabla y heredaron su marco.
 
 Tres revisiones humanas independientes sobre una tabla de 27 casos no lo vieron; una propiedad generada sí. Esa es la razón de que la propiedad vaya **antes** y no después.
 

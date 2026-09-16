@@ -64,7 +64,7 @@ Al quitarse ese paso manual, el commit `5aca74e` (#80) agregó `Closes #{issue}`
 
 La retro #80, textual:
 
-> Sin la corrección, la HU habría dejado los issues abiertos para siempre… Solo un test que afirme la primera línea literal lo sujeta; ninguna lectura del diff lo detecta.
+> Sin la corrección, la HU habría dejado los issues abiertos para siempre… Solo un test que afirme la **primera línea literal** lo sujeta; ninguna lectura del diff lo detecta.
 
 El síntoma en una frase: **una palabra en español, visualmente correcta, que la plataforma simplemente ignora.**
 
