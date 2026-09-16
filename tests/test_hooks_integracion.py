@@ -342,7 +342,7 @@ def _comando_guard_integracion() -> str:
     raise AssertionError("hooks.json no tiene ningun guard que invoque guard_integracion.py")
 
 
-def _comando_guard_commits() -> str:
+def _comando_guard_commits_consumidor() -> str:
     """El guard hermano de `_comando_guard_integracion`: selecciona por CONTENIDO del
     hooks.json real (el mensaje que bloquea commits directos en la base), nunca por
     indice del array -- un guard nuevo insertado antes correria este test contra el
@@ -351,6 +351,16 @@ def _comando_guard_commits() -> str:
         if "commit directo en la rama base" in cmd:
             return cmd
     raise AssertionError("hooks.json no tiene ningun guard que bloquee commits en la rama base")
+
+
+def _comando_guard_commits_plugin() -> str:
+    """Analogo a `_comando_guard_commits_consumidor` para el Entry A (guard del propio
+    repo Timonel): selecciona por el literal unico de su mensaje de bloqueo, nunca por
+    indice del array (#174)."""
+    for cmd in _comandos_pretooluse():
+        if "no se commitea directo en main" in cmd:
+            return cmd
+    raise AssertionError("hooks.json no tiene ningun guard que bloquee commits directos en main del plugin")
 
 
 def _comando_push_force() -> str:
@@ -492,7 +502,7 @@ class HookEnCajaNegraTests(unittest.TestCase):
         """Caso 6 de #85: `protectBase: false` quedo deprecado e ignorado (TIM-ADR-0002).
         Ejecucion real del hook, no un grep de su texto -- repo consumidor, rama `main`,
         config con el flag en `false`, `git commit` sigue bloqueado."""
-        comando = _comando_guard_commits()
+        comando = _comando_guard_commits_consumidor()
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
             _preparar_repo(tmp_path, "main", perfil="consumidor", config_extra={"git": {"protectBase": False}})
@@ -503,7 +513,7 @@ class HookEnCajaNegraTests(unittest.TestCase):
     def test_mensaje_del_guard_de_commits_no_ofrece_protectbase_como_remedio_caso_7(self):
         """Caso 7 de #85: el mensaje de bloqueo ya no debe sugerir `protectBase: false`
         como salida, porque esa salida ya no existe."""
-        comando = _comando_guard_commits()
+        comando = _comando_guard_commits_consumidor()
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
             _preparar_repo(tmp_path, "main", perfil="consumidor", config_extra={"git": {"protectBase": False}})
@@ -521,6 +531,212 @@ class HookEnCajaNegraTests(unittest.TestCase):
             resultado = _correr_hook(comando, "git push --force origin hu/82-x", tmp_path, plugin_root=plugin_root_inexistente)
             self.assertEqual(resultado.returncode, 2, f"stderr={resultado.stderr!r}")
             self.assertIn("[timonel] Bloqueado", resultado.stderr)
+
+
+def _preparar_repo_destino(tmp_base: Path, rama: str, nombre: str = "destino") -> Path:
+    """Crea, DENTRO de `tmp_base` (el mismo tempdir que se pasa a `_correr_hook`), un
+    SEGUNDO repo git independiente (la "otra ruta" del issue #174) con su propia
+    rama, sin perfil (el guard no lee config/plugin.json del destino, solo su rama).
+    Al vivir dentro de `tmp_base`, se limpia solo con el `TemporaryDirectory` del
+    llamador -- sin necesidad de borrarlo a mano."""
+    destino = tmp_base / nombre
+    destino.mkdir(parents=True, exist_ok=True)
+    _preparar_repo(destino, rama, perfil="ninguno")
+    return destino
+
+
+class GuardCommitsResuelveRepoDestinoTests(unittest.TestCase):
+    """#174: los guards de commit deben resolver la rama del repositorio donde el
+    comando `git commit` realmente corre (`git -C <ruta>` o `cd <ruta> &&`), no la
+    del cwd de la sesion (`tmp`, el mismo directorio que recibe `_correr_hook`).
+
+    Unidad de verificacion: el `command` de CADA entry por separado, ejecutado con el
+    runner de caja negra `_correr_hook` (bash -c real, payload JSON por stdin, sin
+    grep sobre el texto de hooks.json). Cada fila arma un `tmp` (cwd de la sesion) y
+    un `destino` (segundo repo temporal) con ramas que, si el guard resolviera la
+    rama equivocada, produciria el resultado CONTRARIO al esperado -- asi la mutacion
+    (revertir el fix a `branch=$(git branch --show-current 2>/dev/null)`) hace fallar
+    la fila, no solo dejarla en un estado casualmente igual.
+    """
+
+    # Nota sobre los `cmd_template` con `-C`: la compuerta externa de cada entry
+    # (`case "$cmd" in *'git commit'*)`, sin tocar en #174) exige que el TEXTO crudo
+    # del comando contenga el literal contiguo "git commit". Una invocacion real de
+    # `git -C <ruta> commit -m "..."` NO lo contiene (queda "-C <ruta> commit", no
+    # "git commit"), asi que sin ese literal en algun lugar del comando la compuerta
+    # ni siquiera llega a correr la logica de resolucion de rama que #174 arregla --
+    # el caso "pasaria" IGUAL con el fix revertido (falso verde, vacuo). Por eso los
+    # mensajes de commit de estas filas incluyen la frase "git commit" de forma
+    # natural (es, literalmente, un commit sobre la resolucion de `git commit`).
+    def _escenario(self, comando, perfil_cwd, rama_cwd, rama_destino, cmd_template, config_extra=None):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            _preparar_repo(tmp_path, rama_cwd, perfil=perfil_cwd, config_extra=config_extra)
+            destino = _preparar_repo_destino(tmp_path, rama_destino)
+            cmd_bash = cmd_template.format(destino=str(destino))
+            return _correr_hook(comando, cmd_bash, tmp_path, plugin_root=str(ROOT))
+
+    # --- Entry A: guard del propio plugin (mensaje "no se commitea directo en main") ---
+    # Bases fijas main/master; exige #N en cualquier parte del mensaje (no atado al
+    # numero de la rama).
+
+    CASOS_ENTRY_PLUGIN = [
+        # numero, mecanismo, rama_cwd, rama_destino, cmd_template, esperado
+        (
+            "AC1",
+            "git -C explicito: la rama sale del destino, no del cwd",
+            "hu/999-y",  # si se usara el cwd (no es main), pasaria -- bug enmascarado
+            "main",      # el destino SI es base -> debe bloquear
+            'git -C {destino} commit -m "arregla resolucion de rama de git commit via -C (#1)"',
+            BLOQUEADO,
+        ),
+        (
+            "AC2",
+            "cd sin -C: la rama sale del destino, no del cwd",
+            "main",        # si se usara el cwd, bloquearia -- bug enmascarado
+            "hu/174-x",    # el destino NO es base -> debe permitir
+            'cd {destino} && git commit -m "fix #174"',
+            PERMITIDO,
+        ),
+        (
+            "AC3a",
+            "sin ruta, sesion de un solo repositorio: identico a hoy (cwd en base)",
+            "main",
+            "main",  # no se usa (no hay ruta en el comando)
+            'git commit -m "fix #1"',
+            BLOQUEADO,
+        ),
+        (
+            "AC3b",
+            "sin ruta, sesion de un solo repositorio: identico a hoy (cwd fuera de base)",
+            "hu/1-x",
+            "main",  # no se usa
+            'git commit -m "fix #1"',
+            PERMITIDO,
+        ),
+        (
+            "AC4",
+            "reproduccion real: cwd en rama base + commit dirigido a otro repo en rama de trabajo -> no bloquea por rama base",
+            "main",
+            "hu/174-x",
+            'git -C {destino} commit -m "fix #174: resuelve rama de git commit via -C"',
+            PERMITIDO,
+        ),
+    ]
+
+    def test_entry_plugin_resuelve_rama_del_destino(self):
+        comando = _comando_guard_commits_plugin()
+        for numero, motivo, rama_cwd, rama_destino, cmd_template, esperado in self.CASOS_ENTRY_PLUGIN:
+            with self.subTest(caso=numero, motivo=motivo):
+                resultado = self._escenario(comando, "plugin", rama_cwd, rama_destino, cmd_template)
+                if esperado == BLOQUEADO:
+                    self.assertEqual(resultado.returncode, 2, f"caso {numero} ({motivo}): stderr={resultado.stderr!r}")
+                    self.assertIn("[timonel] Bloqueado", resultado.stderr)
+                else:
+                    self.assertEqual(resultado.returncode, 0, f"caso {numero} ({motivo}): stderr={resultado.stderr!r}")
+
+    # --- Entry B: guard del repo consumidor (mensaje "commit directo en la rama base") ---
+    # Bases configurables (default main/master/develop, leidas del cwd); exige #N solo
+    # si la rama resuelta empieza con `hu/`, y el numero debe coincidir con ESA rama.
+
+    CASOS_ENTRY_CONSUMIDOR = [
+        (
+            "AC1",
+            "git -C explicito: bloquea porque el DESTINO es base, aunque el cwd no lo sea",
+            "feature-abc",  # no es base ni hu/* -> si se usara el cwd, pasaria
+            "main",         # el destino SI es base -> debe bloquear
+            'git -C {destino} commit -m "arregla resolucion de rama de git commit via -C"',
+            BLOQUEADO,
+        ),
+        (
+            "AC2",
+            "cd sin -C: permite porque el DESTINO no es base, aunque el cwd si lo sea",
+            "main",          # si se usara el cwd, bloquearia
+            "feature-xyz",   # el destino no es base ni hu/* -> debe permitir
+            'cd {destino} && git commit -m "cualquier cosa"',
+            PERMITIDO,
+        ),
+        (
+            "AC3a",
+            "sin ruta, sesion de un solo repositorio: identico a hoy (cwd en base)",
+            "main",
+            "main",  # no se usa
+            'git commit -m "x"',
+            BLOQUEADO,
+        ),
+        (
+            "AC3b",
+            "sin ruta, sesion de un solo repositorio: identico a hoy (cwd fuera de base)",
+            "feature-abc",
+            "main",  # no se usa
+            'git commit -m "x"',
+            PERMITIDO,
+        ),
+        (
+            "AC4",
+            "reproduccion real (issue #174): cwd en rama base + commit dirigido a otro repo en rama de trabajo -> no bloquea por rama base",
+            "main",
+            "feature-xyz",
+            'git -C {destino} commit -m "arregla resolucion de rama de git commit via -C"',
+            PERMITIDO,
+        ),
+        (
+            "AC5",
+            "el numero de issue exigido sale del hu/<N> del DESTINO, no del cwd",
+            "hu/999-x",     # si se usara el cwd, exigiria #999 y el mensaje trae #174 -> bloquearia
+            "hu/174-y",     # el destino exige #174
+            'git -C {destino} commit -m "fix #174: resuelve rama de git commit via -C"',
+            PERMITIDO,
+        ),
+    ]
+
+    def test_entry_consumidor_resuelve_rama_del_destino(self):
+        comando = _comando_guard_commits_consumidor()
+        for numero, motivo, rama_cwd, rama_destino, cmd_template, esperado in self.CASOS_ENTRY_CONSUMIDOR:
+            with self.subTest(caso=numero, motivo=motivo):
+                resultado = self._escenario(comando, "consumidor", rama_cwd, rama_destino, cmd_template)
+                if esperado == BLOQUEADO:
+                    self.assertEqual(resultado.returncode, 2, f"caso {numero} ({motivo}): stderr={resultado.stderr!r}")
+                    self.assertIn("[timonel] Bloqueado", resultado.stderr)
+                else:
+                    self.assertEqual(resultado.returncode, 0, f"caso {numero} ({motivo}): stderr={resultado.stderr!r}")
+
+    # --- Limite conocido (documentado en el issue): NO perseguir, solo fijar como
+    # comportamiento esperado -- un `cd` que no esta al inicio del comando, o una ruta
+    # entrecomillada con espacios, degradan al cwd de la sesion. ---
+
+    def test_limite_cd_no_al_inicio_degrada_al_cwd_entry_plugin(self):
+        """`true && cd <destino> && ...` no matchea el patron `^cd` (anclado al
+        inicio): el `dir` resuelto queda vacio y cae al cwd. Con cwd fuera de base y
+        destino en base, el resultado documentado es PERMITIDO (no ve el destino)."""
+        comando = _comando_guard_commits_plugin()
+        resultado = self._escenario(
+            comando, "plugin", "hu/999-y", "main",
+            'true && cd {destino} && git commit -m "fix #1"',
+        )
+        self.assertEqual(resultado.returncode, 0, f"stderr={resultado.stderr!r}")
+
+    def test_limite_cd_no_al_inicio_degrada_al_cwd_entry_consumidor(self):
+        comando = _comando_guard_commits_consumidor()
+        resultado = self._escenario(
+            comando, "consumidor", "feature-abc", "main",
+            'true && cd {destino} && git commit -m "x"',
+        )
+        self.assertEqual(resultado.returncode, 0, f"stderr={resultado.stderr!r}")
+
+    def test_limite_ruta_entrecomillada_con_espacios_degrada_al_cwd(self):
+        """`cd "<ruta con espacios>" && ...` SI matchea `^cd`, pero el `dir` capturado
+        incluye las comillas literales (`"..."`): `[ -d "$dir" ]` nunca es cierto para
+        ese literal, cae a `.`. Documentado, no corregido (issue #174)."""
+        comando = _comando_guard_commits_consumidor()
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            _preparar_repo(tmp_path, "feature-abc", perfil="consumidor")
+            destino = _preparar_repo_destino(tmp_path, "main", nombre="destino con espacios")
+            cmd_bash = f'cd "{destino}" && git commit -m "x"'
+            resultado = _correr_hook(comando, cmd_bash, tmp_path, plugin_root=str(ROOT))
+            # cwd ("feature-abc") no es base -> pasa, aunque el destino real ("main") si lo es.
+            self.assertEqual(resultado.returncode, 0, f"stderr={resultado.stderr!r}")
 
 
 class HookVersionRepoInstaladaTests(unittest.TestCase):
