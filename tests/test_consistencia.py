@@ -161,6 +161,40 @@ class PoliticaDeIntegracionDocumentadaTests(unittest.TestCase):
     y de la propia HU #85: con ambito de archivo, la invariante mataria a la entrada de
     `tim-adr-0005` que deroga una via vieja, porque para derogarla tiene que citarla).
 
+    **Correccion (hallazgo CRITICO del code review de #85 sobre esta misma clase): el
+    parrafo no es "lo que separan las lineas en blanco".** La primera version de
+    `_parrafos` cortaba solo ahi (`re.split(r"\n[ \t]*\n", texto)`). Una lista Markdown no
+    lleva linea en blanco entre items, asi que la seccion "Control de cambios" de
+    `tim-adr-0005-gobernanza-del-plugin.md` colapsaba entera en un unico "parrafo".
+    Evidencia reproducida sobre el archivo real (comentario `timonel:review` del issue):
+
+    ```
+    --- parrafo 7: lineas=2  mecanica=['--ff-only', 'git push origin']  derogacion=['derogad']
+    - 2026-09-10 (#27): ...
+    - 2026-09-15 (v0.6.0, #85): ... deroga expresamente ...
+    ```
+
+    Las entradas de **#27 y #85 son el mismo parrafo fusionado**: la marca de derogacion
+    vive en la de #85 y le da cobertura, sin querer, a la de #27. El reviewer lo probo
+    metiendo `git push origin main` sin derogar en la entrada de #27 y
+    `test_ningun_parrafo_vivo_propone_mecanica_de_integracion_a_la_base` siguio en
+    **verde** -- los casos 3 y 10 del contrato pasaban por fusion de parrafo, no por
+    cumplir la propiedad.
+
+    El fix: `_parrafos` corta ademas en **frontera de item de lista y de fila de tabla**.
+    Una linea que empieza (tras espacios opcionales) con `- `, `* `, `+ `, `| ` o un
+    ordinal `N. ` abre una unidad nueva; una linea de continuacion (indentada, que no abre
+    unidad) se acumula con la unidad anterior, para no partir un item que envuelve a la
+    siguiente linea. La unidad correcta no es "el parrafo" en abstracto sino **el bloque
+    mas chico que contiene una instruccion completa**: en Markdown eso lo define la
+    estructura (item, fila, bloque), no las lineas en blanco (ver
+    `heuristics/general/unidad-de-verificacion.md`).
+
+    **La leccion es simetrica (la misma de #84, repetida un nivel mas abajo): un defecto
+    de ambito nunca es puntual.** No alcanza con mutar la entrada que el review encontro
+    (#27): hay que mutar tambien la de #85 -- quitarle la marca de derogacion a #85 debe
+    romper el test por si sola, sin que la entrada de #27 la tape ni la descubra.
+
     **La propiedad, no el literal ni el verbo.** Un parrafo viola la politica cuando, a la
     vez: (a) contiene **mecanica de integracion** (`--no-ff`, `--ff-only`,
     `git push origin`, `git checkout main`, `git.integracion: "merge"`, normalizando
@@ -203,9 +237,33 @@ class PoliticaDeIntegracionDocumentadaTests(unittest.TestCase):
     MENCIONES_DE_BASE = ("main", "rama base")
     MARCAS_DE_DEROGACION = ("derogad", "deprecad")
 
-    @staticmethod
-    def _parrafos(texto: str) -> list[str]:
-        return re.split(r"\n[ \t]*\n", texto)
+    _INICIO_DE_ITEM = re.compile(r"^[ \t]*(?:[-*+][ \t]|\d+\.[ \t]|\|)")
+
+    @classmethod
+    def _parrafos(cls, texto: str) -> list[str]:
+        """El bloque mas chico que contiene una instruccion completa: primero se corta por
+        linea en blanco, y DENTRO de cada bloque, otra vez en cada frontera de item de
+        lista o fila de tabla -- una lista o una tabla Markdown no llevan linea en blanco
+        entre sus entradas, asi que sin este segundo corte todas colapsan en un unico
+        "parrafo" (ver docstring de la clase, evidencia de #27/#85).
+
+        Abre unidad nueva una linea que empieza (tras espacios opcionales) con `- `, `* `,
+        `+ `, `| ` o un ordinal `N. `. Una linea de continuacion -- indentada, que no abre
+        unidad -- se acumula con la unidad anterior en vez de separarse: un item que
+        envuelve a la siguiente linea fisica sigue siendo una sola instruccion.
+        """
+        unidades: list[str] = []
+        for bloque in re.split(r"\n[ \t]*\n", texto):
+            actual: list[str] = []
+            for linea in bloque.split("\n"):
+                if cls._INICIO_DE_ITEM.match(linea) and actual:
+                    unidades.append("\n".join(actual))
+                    actual = [linea]
+                else:
+                    actual.append(linea)
+            if actual:
+                unidades.append("\n".join(actual))
+        return unidades
 
     @classmethod
     def _viola(cls, parrafo: str) -> bool:
@@ -246,6 +304,39 @@ class PoliticaDeIntegracionDocumentadaTests(unittest.TestCase):
         self.assertFalse(self._viola(derogado))
         vigente = derogado.replace("derogada", "vigente")
         self.assertTrue(self._viola(vigente), "sin la marca de derogacion, el mismo parrafo debe violar la politica")
+
+    def test_items_de_lista_consecutivos_no_se_fusionan_en_un_solo_parrafo(self):
+        """Logica pura (no depende de que el repo tenga hoy este texto exacto): fija la
+        unidad nueva con la MISMA forma real de #27/#85 en `tim-adr-0005` -- dos items de
+        lista consecutivos, sin linea en blanco entre ellos, uno con mecanica de
+        integracion vigente y el vecino con la marca de derogacion.
+
+        Con el ambito viejo (una linea en blanco) los dos items eran un solo "parrafo": la
+        marca de derogacion del segundo item cubria al primero y la violacion daba
+        **verde**. Con el ambito nuevo (item de lista) tienen que ser dos unidades, y la
+        del item vigente tiene que violar por si sola."""
+        texto = (
+            "- (#27): se sigue haciendo git push origin main en la rama base.\n"
+            "- (#85): esa via quedo derogada desde #82.\n"
+        )
+        parrafos = self._parrafos(texto)
+        self.assertEqual(
+            len(parrafos), 2,
+            "cada item de lista debe quedar en su propia unidad, no fusionado en un solo parrafo",
+        )
+        item_27, item_85 = parrafos
+        self.assertIn("#27", item_27)
+        self.assertIn("#85", item_85)
+        self.assertTrue(
+            self._viola(item_27),
+            "el item de #27, aislado en su propia unidad, tiene mecanica + base sin su "
+            "propia marca de derogacion: debe violar (antes daba verde, tapado por la "
+            "marca de derogacion del item vecino)",
+        )
+        self.assertFalse(
+            self._viola(item_85),
+            "el item de #85 tiene su propia marca de derogacion y no debe violar",
+        )
 
     def test_el_pipeline_de_implement_en_readme_nombra_pr_antes_que_dod(self):
         """Caso 12, asercion POSITIVA (prohibir no detecta omisiones): el parrafo de
@@ -444,6 +535,30 @@ class TareasTests(unittest.TestCase):
         self.assertNotIn(
             "Pregunta si el equipo commitea directo a la rama base", onboard,
             "onboard.md ya no debe preguntar por protectBase: el flag quedo deprecado e ignorado",
+        )
+
+    def test_receta_de_proteccion_de_rama_esta_completa(self):
+        """Caso 9 del contrato de #85 (comentario `timonel:contrato-api`), nunca
+        implementado -- el review de #85 lo marco WARNING: no habia ningun test que
+        verificara la receta de proteccion de rama del Paso 2.5 de `onboard.md`. Los
+        CUATRO campos top-level son *required* en la API de GitHub aunque acepten `null`
+        (omitir uno da 422); una receta que se recorte a dos campos lo daria y ningun
+        test lo detectaria."""
+        onboard = (ROOT / "commands/onboard.md").read_text(encoding="utf-8")
+        campos = (
+            "required_status_checks",
+            "enforce_admins",
+            "required_pull_request_reviews",
+            "restrictions",
+        )
+        for campo in campos:
+            self.assertIn(
+                campo, onboard,
+                f"onboard.md debe nombrar el campo `{campo}` en la receta de proteccion de rama (los 4 son required en la API)",
+            )
+        self.assertIn(
+            "403", onboard,
+            "onboard.md debe documentar el manejo del 403 (falta de permiso de admin) de la receta de proteccion de rama",
         )
 
 
