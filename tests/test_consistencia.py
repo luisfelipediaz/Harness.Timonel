@@ -153,6 +153,208 @@ class IntegracionPorPrTests(unittest.TestCase):
         )
 
 
+class PoliticaDeIntegracionDocumentadaTests(unittest.TestCase):
+    """La politica "todo cambio entra por PR, la base no recibe commits directos" no
+    puede contradecirse en la doctrina que la explica (#85, epica #79).
+
+    **Ambito: el PARRAFO, no el archivo** (leccion de #84, `WorktreeDeImplementacionTests`,
+    y de la propia HU #85: con ambito de archivo, la invariante mataria a la entrada de
+    `tim-adr-0005` que deroga una via vieja, porque para derogarla tiene que citarla).
+
+    **Correccion (hallazgo CRITICO del code review de #85 sobre esta misma clase): el
+    parrafo no es "lo que separan las lineas en blanco".** La primera version de
+    `_parrafos` cortaba solo ahi (`re.split(r"\n[ \t]*\n", texto)`). Una lista Markdown no
+    lleva linea en blanco entre items, asi que la seccion "Control de cambios" de
+    `tim-adr-0005-gobernanza-del-plugin.md` colapsaba entera en un unico "parrafo".
+    Evidencia reproducida sobre el archivo real (comentario `timonel:review` del issue):
+
+    ```
+    --- parrafo 7: lineas=2  mecanica=['--ff-only', 'git push origin']  derogacion=['derogad']
+    - 2026-09-10 (#27): ...
+    - 2026-09-15 (v0.6.0, #85): ... deroga expresamente ...
+    ```
+
+    Las entradas de **#27 y #85 son el mismo parrafo fusionado**: la marca de derogacion
+    vive en la de #85 y le da cobertura, sin querer, a la de #27. El reviewer lo probo
+    metiendo `git push origin main` sin derogar en la entrada de #27 y
+    `test_ningun_parrafo_vivo_propone_mecanica_de_integracion_a_la_base` siguio en
+    **verde** -- los casos 3 y 10 del contrato pasaban por fusion de parrafo, no por
+    cumplir la propiedad.
+
+    El fix: `_parrafos` corta ademas en **frontera de item de lista y de fila de tabla**.
+    Una linea que empieza (tras espacios opcionales) con `- `, `* `, `+ `, `| ` o un
+    ordinal `N. ` abre una unidad nueva; una linea de continuacion (indentada, que no abre
+    unidad) se acumula con la unidad anterior, para no partir un item que envuelve a la
+    siguiente linea. La unidad correcta no es "el parrafo" en abstracto sino **el bloque
+    mas chico que contiene una instruccion completa**: en Markdown eso lo define la
+    estructura (item, fila, bloque), no las lineas en blanco (ver
+    `heuristics/general/unidad-de-verificacion.md`).
+
+    **La leccion es simetrica (la misma de #84, repetida un nivel mas abajo): un defecto
+    de ambito nunca es puntual.** No alcanza con mutar la entrada que el review encontro
+    (#27): hay que mutar tambien la de #85 -- quitarle la marca de derogacion a #85 debe
+    romper el test por si sola, sin que la entrada de #27 la tape ni la descubra.
+
+    **La propiedad, no el literal ni el verbo.** Un parrafo viola la politica cuando, a la
+    vez: (a) contiene **mecanica de integracion** (`--no-ff`, `--ff-only`,
+    `git push origin`, `git checkout main`, `git.integracion: "merge"`, normalizando
+    backticks); (b) menciona la base (`main`, `rama base`); y (c) no esta marcado como
+    derogado (`derogad`/`deprecad` en el mismo parrafo). Dos candidatas mas simples se
+    midieron y se descartaron (contrato de #85, comentario `timonel:contrato-api`):
+
+    1. *Verbo (`merge`/`push`) + base*: 5 falsos positivos sobre los parrafos reales del
+       repo, entre ellos la propia entrada de Control de cambios que enuncia la politica
+       correcta.
+    2. *Forma-comando* (`git merge`/`gh pr merge`/...): invierte el resultado. Marca
+       parrafos legitimos (la fila de `hooks/` en CLAUDE.md usa literalmente
+       `gh pr merge`) y no atrapa la violacion real de `README.md` (`merge` + backtick +
+       `--no-ff`, sin `git` inmediatamente antes).
+
+    Medicion de la propiedad elegida (contrato de #85): 1/1 violacion viva detectada, 3/3
+    mutaciones detectadas, 5/5 parrafos legitimos pasan.
+
+    **Hueco conocido, declarado a proposito**: la prosa instructiva sin mecanica no se
+    detecta -- "el orquestador mergea la rama a main" o "integra la rama a la rama base sin
+    pasar por un PR" pasan las dos. Perseguirlo pediria una gramatica de prosa: superficie
+    nueva de bug sin defecto que la motive, el mismo criterio con que `guard_integracion.py`
+    declara que no persigue `eval`/`bash -c`.
+
+    **Limite de alcance declarado**: `CHANGELOG.md` queda fuera (es historico por
+    definicion: narra transiciones ya cerradas, no prescribe el mecanismo vigente) y
+    `skills/` tambien (sus `--no-ff` documentan mergear un *worktree* a la rama de la
+    *historia*, nunca a la base, y cubrirlos exigiria que la propiedad distinga destinos
+    dentro de un skill -- sin ese defecto no se justifica la superficie nueva)."""
+
+    ARCHIVOS = (ROOT / "CLAUDE.md", ROOT / "README.md") + tuple(sorted((ROOT / "docs/adr").glob("*.md")))
+
+    MECANICAS_DE_INTEGRACION = (
+        "--no-ff",
+        "--ff-only",
+        "git push origin",
+        "git checkout main",
+        'git.integracion: "merge"',
+    )
+    MENCIONES_DE_BASE = ("main", "rama base")
+    MARCAS_DE_DEROGACION = ("derogad", "deprecad")
+
+    _INICIO_DE_ITEM = re.compile(r"^[ \t]*(?:[-*+][ \t]|\d+\.[ \t]|\|)")
+
+    @classmethod
+    def _parrafos(cls, texto: str) -> list[str]:
+        """El bloque mas chico que contiene una instruccion completa: primero se corta por
+        linea en blanco, y DENTRO de cada bloque, otra vez en cada frontera de item de
+        lista o fila de tabla -- una lista o una tabla Markdown no llevan linea en blanco
+        entre sus entradas, asi que sin este segundo corte todas colapsan en un unico
+        "parrafo" (ver docstring de la clase, evidencia de #27/#85).
+
+        Abre unidad nueva una linea que empieza (tras espacios opcionales) con `- `, `* `,
+        `+ `, `| ` o un ordinal `N. `. Una linea de continuacion -- indentada, que no abre
+        unidad -- se acumula con la unidad anterior en vez de separarse: un item que
+        envuelve a la siguiente linea fisica sigue siendo una sola instruccion.
+        """
+        unidades: list[str] = []
+        for bloque in re.split(r"\n[ \t]*\n", texto):
+            actual: list[str] = []
+            for linea in bloque.split("\n"):
+                if cls._INICIO_DE_ITEM.match(linea) and actual:
+                    unidades.append("\n".join(actual))
+                    actual = [linea]
+                else:
+                    actual.append(linea)
+            if actual:
+                unidades.append("\n".join(actual))
+        return unidades
+
+    @classmethod
+    def _viola(cls, parrafo: str) -> bool:
+        normalizado = parrafo.replace("`", "")
+        tiene_mecanica = any(m in normalizado for m in cls.MECANICAS_DE_INTEGRACION)
+        menciona_base = any(b in normalizado for b in cls.MENCIONES_DE_BASE)
+        derogado = any(marca in normalizado.lower() for marca in cls.MARCAS_DE_DEROGACION)
+        return tiene_mecanica and menciona_base and not derogado
+
+    def test_ningun_parrafo_vivo_propone_mecanica_de_integracion_a_la_base(self):
+        for archivo in self.ARCHIVOS:
+            texto = archivo.read_text(encoding="utf-8")
+            for parrafo in self._parrafos(texto):
+                self.assertFalse(
+                    self._viola(parrafo),
+                    f"{archivo.relative_to(ROOT)}: parrafo con mecanica de integracion a la "
+                    f"base sin marca de derogacion:\n{parrafo}",
+                )
+
+    def test_la_propiedad_exige_mecanica_y_base_a_la_vez(self):
+        """Casos 3 y 5 del contrato, verificados como logica pura (no dependen de que el
+        repo tenga hoy un parrafo con esta forma exacta)."""
+        solo_mecanica = "El script interno usa --no-ff para un merge de prueba en un repo aislado."
+        self.assertFalse(self._viola(solo_mecanica), "sin mencion de la base, no deberia violar")
+
+        solo_base = "La rama base recibe cambios solo mediante revision humana en GitHub."
+        self.assertFalse(self._viola(solo_base), "sin mecanica de integracion, no deberia violar")
+
+        ambas_sin_derogar = "Se sigue haciendo git push origin main para llevar cambios a la base."
+        self.assertTrue(self._viola(ambas_sin_derogar), "mecanica + base sin marca de derogacion deberia violar")
+
+        ambas_derogadas = "Se dejo de hacer git push origin main a la base: esa practica quedo derogada en #27."
+        self.assertFalse(self._viola(ambas_derogadas), "la misma combinacion, marcada como derogada, no deberia violar (caso 3: derogar exige citar)")
+
+    def test_el_opt_out_de_derogacion_no_es_vacuo(self):
+        """Caso 5: quitar la marca de derogacion debe volver a encender la violacion."""
+        derogado = "Se integraba con git merge --ff-only parado en main; via derogada desde #82."
+        self.assertFalse(self._viola(derogado))
+        vigente = derogado.replace("derogada", "vigente")
+        self.assertTrue(self._viola(vigente), "sin la marca de derogacion, el mismo parrafo debe violar la politica")
+
+    def test_items_de_lista_consecutivos_no_se_fusionan_en_un_solo_parrafo(self):
+        """Logica pura (no depende de que el repo tenga hoy este texto exacto): fija la
+        unidad nueva con la MISMA forma real de #27/#85 en `tim-adr-0005` -- dos items de
+        lista consecutivos, sin linea en blanco entre ellos, uno con mecanica de
+        integracion vigente y el vecino con la marca de derogacion.
+
+        Con el ambito viejo (una linea en blanco) los dos items eran un solo "parrafo": la
+        marca de derogacion del segundo item cubria al primero y la violacion daba
+        **verde**. Con el ambito nuevo (item de lista) tienen que ser dos unidades, y la
+        del item vigente tiene que violar por si sola."""
+        texto = (
+            "- (#27): se sigue haciendo git push origin main en la rama base.\n"
+            "- (#85): esa via quedo derogada desde #82.\n"
+        )
+        parrafos = self._parrafos(texto)
+        self.assertEqual(
+            len(parrafos), 2,
+            "cada item de lista debe quedar en su propia unidad, no fusionado en un solo parrafo",
+        )
+        item_27, item_85 = parrafos
+        self.assertIn("#27", item_27)
+        self.assertIn("#85", item_85)
+        self.assertTrue(
+            self._viola(item_27),
+            "el item de #27, aislado en su propia unidad, tiene mecanica + base sin su "
+            "propia marca de derogacion: debe violar (antes daba verde, tapado por la "
+            "marca de derogacion del item vecino)",
+        )
+        self.assertFalse(
+            self._viola(item_85),
+            "el item de #85 tiene su propia marca de derogacion y no debe violar",
+        )
+
+    def test_el_pipeline_de_implement_en_readme_nombra_pr_antes_que_dod(self):
+        """Caso 12, asercion POSITIVA (prohibir no detecta omisiones): el parrafo de
+        `/timonel:implement` en README.md debe nombrar `PR` antes que `DoD`, porque la
+        Fase 6.5 (abrir el PR) ocurre antes de la Fase 7 (DoD) -- ver `agents/flechodiezx.md`.
+        No alcanza con que el parrafo mencione `PR` en cualquier posicion: una version
+        anterior de este caso solo exigia presencia, y esa version dejaba pasar
+        `-> DoD -> PR` (el orden invertido, previo a #80)."""
+        texto = (ROOT / "README.md").read_text(encoding="utf-8")
+        parrafo = next((p for p in self._parrafos(texto) if "/timonel:implement #hu" in p), None)
+        self.assertIsNotNone(parrafo, "README.md no tiene el parrafo del pipeline de /timonel:implement")
+        idx_pr = parrafo.find("PR")
+        idx_dod = parrafo.find("DoD")
+        self.assertNotEqual(idx_pr, -1, "el parrafo del pipeline no nombra PR")
+        self.assertNotEqual(idx_dod, -1, "el parrafo del pipeline no nombra DoD")
+        self.assertLess(idx_pr, idx_dod, "PR debe aparecer antes que DoD en el pipeline: la Fase 6.5 abre el PR antes del DoD (Fase 7)")
+
+
 class HotfixAisladoTests(unittest.TestCase):
     """flechodiezx-hotfix aisla en worktree y siempre abre PR (#83): espejo de
     IntegracionPorPrTests.test_flechodiezx_no_menciona_merge_directo pero con la
@@ -320,10 +522,44 @@ class ChecklistsPorTipoTests(unittest.TestCase):
 
 class TareasTests(unittest.TestCase):
     def test_git_integracion_documentado(self):
+        """Antes solo exigia la presencia de la palabra `integracion` en onboard.md: un
+        bug -- pasaba con cualquier mencion, incluso una que dijera "no preguntes por
+        integracion" sin fijar ningun valor. Ahora afirma la semantica (#85): el valor se
+        escribe fijo (`"pr"`) y onboard.md ya no pregunta por `protectBase` como via para
+        seguir comiteando en la base (ese flag quedo deprecado e ignorado, TIM-ADR-0002)."""
         adr = (ROOT / "docs/adr/tim-adr-0002-configuracion-del-consumidor.md").read_text(encoding="utf-8")
         onboard = (ROOT / "commands/onboard.md").read_text(encoding="utf-8")
         self.assertIn("git.integracion", adr, "tim-adr-0002 debe documentar `git.integracion`")
-        self.assertIn("integracion", onboard, "onboard.md debe generar/detectar `git.integracion`")
+        self.assertIn('"integracion": "pr"', onboard, "onboard.md debe fijar `integracion` en \"pr\"")
+        self.assertIn("unico valor valido", onboard, "onboard.md debe declarar que \"pr\" es el unico valor valido")
+        self.assertNotIn(
+            "Pregunta si el equipo commitea directo a la rama base", onboard,
+            "onboard.md ya no debe preguntar por protectBase: el flag quedo deprecado e ignorado",
+        )
+
+    def test_receta_de_proteccion_de_rama_esta_completa(self):
+        """Caso 9 del contrato de #85 (comentario `timonel:contrato-api`), nunca
+        implementado -- el review de #85 lo marco WARNING: no habia ningun test que
+        verificara la receta de proteccion de rama del Paso 2.5 de `onboard.md`. Los
+        CUATRO campos top-level son *required* en la API de GitHub aunque acepten `null`
+        (omitir uno da 422); una receta que se recorte a dos campos lo daria y ningun
+        test lo detectaria."""
+        onboard = (ROOT / "commands/onboard.md").read_text(encoding="utf-8")
+        campos = (
+            "required_status_checks",
+            "enforce_admins",
+            "required_pull_request_reviews",
+            "restrictions",
+        )
+        for campo in campos:
+            self.assertIn(
+                campo, onboard,
+                f"onboard.md debe nombrar el campo `{campo}` en la receta de proteccion de rama (los 4 son required en la API)",
+            )
+        self.assertIn(
+            "403", onboard,
+            "onboard.md debe documentar el manejo del 403 (falta de permiso de admin) de la receta de proteccion de rama",
+        )
 
 
 class VersionTests(unittest.TestCase):

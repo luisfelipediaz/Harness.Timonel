@@ -29,7 +29,7 @@ Plugin de Claude Code (`.claude-plugin/plugin.json`) que empaqueta el harness de
 
 - **Todo cambio nace en un issue de este repo** (`tipo:hu|hotfix`, `mod:plugin`, agrupado en la épica de la versión). Capturalo con `/timonel:draft` o `gh issue create -R luisfelipediaz/Harness.Timonel`.
 - **Todo commit referencia el issue** (`#N`). Lo exige `.githooks/commit-msg` (activar con `scripts/install-git-hooks.sh`) y el hook `PreToolUse` del plugin cuando corre en este repo.
-- **El plugin se desarrolla con Timonel** (#27): `/timonel:implement #N` detecta el perfil `plugin` (sin nx): rama `hu/N-*`, Dora, contrato de cambio, sub-agente con `implement-plugin-change`, consolidación (unittest, `bash -n`, `jq`, línea en CHANGELOG), review, retro (+ cosecha), PR abierto con `integracion.py` antes del DoD, y DoD. El hook bloquea `git commit` en `main`.
+- **El plugin se desarrolla con Timonel** (#27): `/timonel:implement #N` detecta el perfil `plugin` (sin nx): rama `hu/N-*` en un **worktree aislado**, Dora, contrato de cambio, sub-agente con `implement-plugin-change`, consolidación (unittest, `bash -n`, `jq`, línea en CHANGELOG), review, retro (+ cosecha), **PR obligatorio con merge humano** (única vía de integración, en cualquier perfil) con `integracion.py` antes del DoD, y DoD. El hook bloquea `git commit` en `main` de forma incondicional; `/timonel:onboard` puede además activar protección de rama server-side en el repo consumidor (#85).
 - Al cerrar la épica de la versión: `git tag vX.Y.Z` + `gh release create`; CHANGELOG pasa de "en desarrollo" a la fecha; se cierran los issues con el comentario de DoD.
 
 ## Convenciones al editar el plugin

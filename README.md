@@ -81,7 +81,7 @@ Genera `.claude/timonel.config.json` inspeccionando `nx.json`, `tsconfig.base.js
 /timonel:draft "idea"       → HU borrador rápido
 /timonel:refine #epica      → dividir / repriorizar / deduplicar / completar
 /timonel:investigar #hu     → Dora publica hallazgos (archivos de referencia, patrón, riesgos)
-/timonel:implement #hu      → investigación → contrato API → backend ∥ frontend (worktrees) → consolidación → review → retro → DoD → close
+/timonel:implement #hu      → investigación → contrato API → backend ∥ frontend (worktrees) → consolidación → review → retro → PR → DoD
 /timonel:hotfix #n | "fix"  → un sub-agente en worktree, PR obligatorio, DoD reducido
 /timonel:backlog            → estado por épica
 /timonel:insights           → issues "Insights destilados" (retros / reviews)
@@ -110,7 +110,7 @@ python3 -m unittest discover -s tests          # parsers, destilado, migración
 scripts/setup-github-labels.sh --repo o/r --dry-run
 ```
 
-**Todo cambio nace en un issue de este repo y el commit lo referencia** (TIM-ADR-0005), y se implementa con el propio flujo: `/timonel:implement #N` en perfil `plugin` (rama `hu/N-*`, sub-agente único, unittest como consolidación, review, retro, DoD, merge `--no-ff`; `main` protegida por hook). El propio repo usa sus labels, épicas por versión e issues como backlog; `/timonel:draft`, `/timonel:plan`, `/timonel:backlog` y `/timonel:audit plugin` funcionan aquí sin `timonel.config.json`.
+**Todo cambio nace en un issue de este repo y el commit lo referencia** (TIM-ADR-0005), y se implementa con el propio flujo: `/timonel:implement #N` en perfil `plugin` (rama `hu/N-*` en worktree aislado, sub-agente único, unittest como consolidación, review, retro, PR obligatorio con merge humano antes del DoD; `main` protegida por hook y, si se activa en `/timonel:onboard`, por protección de rama server-side). El propio repo usa sus labels, épicas por versión e issues como backlog; `/timonel:draft`, `/timonel:plan`, `/timonel:backlog` y `/timonel:audit plugin` funcionan aquí sin `timonel.config.json`.
 
 ## Licencia
 
