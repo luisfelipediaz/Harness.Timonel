@@ -109,6 +109,53 @@ class PerfilPluginTests(unittest.TestCase):
         self.assertIn("exit 2", guard)
 
 
+class DefinicionDelRepoEnPerfilPluginTests(unittest.TestCase):
+    """#147: en perfil plugin, flechodiezx y flechodiezx-hotfix corren con las
+    instrucciones de la copia **instalada** del plugin (`$PLUGIN_ROOT`, cache), que puede
+    ser una version vieja del repo que estan editando -- eso fue lo que paso en la epica
+    #79 (el contrato de #85 salio con el orden de fases viejo). La Fase 0 tiene que
+    comparar version del repo vs. instalada y, si difieren, releer `agents/<nombre>.md`
+    del repo con Read.
+
+    "Releer la definicion" NO es recargar el system prompt -- Claude Code no lo permite --
+    asi que el texto tiene que decirlo de forma explicita, o un editor futuro lo
+    "arregla" prometiendo una recarga que no existe."""
+
+    AGENTES = ("flechodiezx", "flechodiezx-hotfix")
+
+    def test_fase_0_describe_el_mecanismo_completo(self):
+        for nombre in self.AGENTES:
+            texto = (ROOT / f"agents/{nombre}.md").read_text(encoding="utf-8")
+            for frase in (
+                "jq -r .version .claude-plugin/plugin.json",
+                ".plugin-root",
+                "avisa",
+                "Read",
+                f"agents/{nombre}.md",
+            ):
+                self.assertIn(frase, texto, f"{nombre}.md: la Fase 0 debe describir el mecanismo completo (falta `{frase}`)")
+
+    def test_no_promete_recarga_de_system_prompt(self):
+        for nombre in self.AGENTES:
+            texto = (ROOT / f"agents/{nombre}.md").read_text(encoding="utf-8")
+            self.assertIn(
+                "no recarga tu system prompt",
+                texto,
+                f"{nombre}.md debe aclarar que releer la definicion no recarga el system prompt",
+            )
+
+    def test_hook_de_version_no_lleva_gate_de_config_consumidor(self):
+        """Invariante 2 (#147): `.claude/timonel.config.json` no existe en el repo del
+        plugin (perfil plugin, verificado); con ese gate el aviso del AC4 nunca correria
+        en el unico perfil donde se necesita."""
+        hooks = json.loads((ROOT / "hooks/hooks.json").read_text(encoding="utf-8"))
+        comandos = [h["command"] for bloque in hooks["hooks"]["SessionStart"] for h in bloque["hooks"]]
+        candidatos = [c for c in comandos if "version_instalada" in c]
+        self.assertTrue(candidatos, "hooks.json debe tener el hook nuevo de version repo vs instalada")
+        for c in candidatos:
+            self.assertNotIn("[ -f .claude/timonel.config.json ]", c)
+
+
 class IntegracionPorPrTests(unittest.TestCase):
     """El PR es la unica via de integracion (#80, extendido a flechodiezx-hotfix por
     #83): sin merge directo a la rama base, en ningun agente que integre por PR."""
