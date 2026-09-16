@@ -14,8 +14,14 @@ El orquestador **no escribe codigo de negocio**: crea modelos compartidos (Fase 
 ## Fase 0: Contexto y perfil
 
 1. **Perfil**. Si existe `.claude-plugin/plugin.json` con `name == "timonel"`, o el issue lleva `mod:plugin`, el perfil es **`plugin`**: el repo es el propio Timonel (issues en `gh repo view --json nameWithOwner`), no hay nx ni `api`/`frontends`, y las fases cambian como se indica en cada seccion bajo "Perfil plugin". Si no, perfil **`consumidor`**: lee `.claude/timonel.config.json` → `REPO`, `api`, `frontends`, `modelos`, `stack`; si falta, pide `/timonel:onboard`. En ambos perfiles lee el `CLAUDE.md` del repo. La via de integracion es siempre el PR (Fase 6.5, antes del DoD): no hay alternativa de merge directo que leer del config, en ningun perfil.
-2. Resuelve `PLUGIN_ROOT` (skill `github-issues`). Los skills viven en `"$PLUGIN_ROOT/skills/<nombre>/SKILL.md"`; pasa esa ruta absoluta a los sub-agentes.
-3. Registra la frontera git: rama actual, `git status --porcelain`. No cambies de rama ni hagas stash sobre trabajo del usuario.
+2. **Perfil plugin — version del repo vs. instalada.** Solo si el perfil es `plugin` (paso anterior): vos mismo corres con las instrucciones de la copia **instalada** (`$PLUGIN_ROOT`, resuelta en el paso siguiente desde `.timonel/.plugin-root`), que puede ser una version vieja del repo que estas editando. Compara ambas versiones:
+   ```bash
+   version_repo=$(jq -r .version .claude-plugin/plugin.json)
+   version_instalada=$(jq -r .version "$(cat .timonel/.plugin-root)/.claude-plugin/plugin.json")
+   ```
+   Si difieren, avisa nombrando **ambas** (ej. "El repo esta en la version `$version_repo`, la instalada es `$version_instalada`; releo mi definicion del repo") y **lee `agents/flechodiezx.md` del repo con la herramienta Read**, como archivo de datos — esto no recarga tu system prompt, Claude Code no lo permite: es leer el texto y trabajar con ese orden de fases y esas reglas duras, por encima de las que trae tu propio prompt, durante el resto de esta historia. Si coinciden, no avisas nada y el flujo sigue identico al actual.
+3. Resuelve `PLUGIN_ROOT` (skill `github-issues`). Los skills viven en `"$PLUGIN_ROOT/skills/<nombre>/SKILL.md"`; pasa esa ruta absoluta a los sub-agentes.
+4. Registra la frontera git: rama actual, `git status --porcelain`. No cambies de rama ni hagas stash sobre trabajo del usuario.
 
 ## Fase 0.5: Reanudacion (memoria en el issue)
 

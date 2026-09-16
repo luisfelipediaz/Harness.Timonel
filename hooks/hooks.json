@@ -14,6 +14,10 @@
           {
             "type": "command",
             "command": "[ -f .claude/timonel.config.json ] || exit 0; command -v gh >/dev/null || exit 0; [ -n \"${CLAUDE_PLUGIN_ROOT:-}\" ] || exit 0; mkdir -p .timonel; cache=.timonel/.latest-release; if [ ! -f \"$cache\" ] || [ -n \"$(find \"$cache\" -mtime +1 2>/dev/null)\" ]; then gh release view --repo luisfelipediaz/Harness.Timonel --json tagName -q .tagName 2>/dev/null > \"$cache\" || true; fi; latest=$(sed 's/^v//' \"$cache\" 2>/dev/null); local=$(jq -r .version \"$CLAUDE_PLUGIN_ROOT/.claude-plugin/plugin.json\" 2>/dev/null); [ -n \"$latest\" ] && [ -n \"$local\" ] && [ \"$latest\" != \"$local\" ] && echo \"[timonel] Hay una version nueva del plugin: $latest (instalada $local). Ejecuta: claude plugin update timonel@luisfelipediaz-harness\" || true"
+          },
+          {
+            "type": "command",
+            "command": "es_plugin=0; [ -f .claude-plugin/plugin.json ] && jq -e '.name==\"timonel\"' .claude-plugin/plugin.json >/dev/null 2>&1 && es_plugin=1; [ \"$es_plugin\" = 1 ] || exit 0; [ -n \"${CLAUDE_PLUGIN_ROOT:-}\" ] || exit 0; version_repo=$(jq -r '.version // empty' .claude-plugin/plugin.json 2>/dev/null); version_instalada=$(jq -r '.version // empty' \"$CLAUDE_PLUGIN_ROOT/.claude-plugin/plugin.json\" 2>/dev/null); [ -n \"$version_repo\" ] && [ -n \"$version_instalada\" ] || exit 0; [ \"$version_repo\" = \"$version_instalada\" ] && exit 0; echo \"[timonel] Los agentes de esta sesion corren con la version instalada ($version_instalada); el repo tiene la version $version_repo. flechodiezx y flechodiezx-hotfix releen agents/*.md del repo al detectar esta diferencia.\""
           }
         ]
       }

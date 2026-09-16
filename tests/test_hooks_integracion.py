@@ -360,11 +360,23 @@ def _comando_push_force() -> str:
     raise AssertionError("hooks.json no tiene el guard de push --force")
 
 
-def _preparar_repo(tmp: Path, rama: str, perfil: str, config_extra: dict | None = None) -> None:
+def _preparar_repo(
+    tmp: Path,
+    rama: str,
+    perfil: str,
+    config_extra: dict | None = None,
+    version: str | None = None,
+    nombre: str = "timonel",
+) -> None:
     """`config_extra` se mezcla (nivel superior) dentro de `.claude/timonel.config.json`
     en perfil `consumidor`, que hoy solo escribia `github.repo`. Lo necesita el caso 6
     de #85 para simular `{"git": {"protectBase": false}}` sin escribir un config a mano
-    en cada test."""
+    en cada test.
+
+    `version` y `nombre` (#147) parametrizan el `.claude-plugin/plugin.json` que se
+    escribe en perfil `plugin`: `HookVersionRepoInstaladaTests` los necesita para simular
+    una version del repo distinta de la instalada, y un plugin con otro `name` (caso
+    negro 3 de la tabla del issue)."""
     subprocess.run(["git", "init", "-q", "-b", rama], cwd=tmp, check=True)
     subprocess.run(["git", "config", "user.email", "a@a.com"], cwd=tmp, check=True)
     subprocess.run(["git", "config", "user.name", "a"], cwd=tmp, check=True)
@@ -373,13 +385,40 @@ def _preparar_repo(tmp: Path, rama: str, perfil: str, config_extra: dict | None 
         subprocess.run(["git", "branch", "main"], cwd=tmp, check=True)
     if perfil == "plugin":
         (tmp / ".claude-plugin").mkdir(exist_ok=True)
-        (tmp / ".claude-plugin/plugin.json").write_text(json.dumps({"name": "timonel"}), encoding="utf-8")
+        plugin_json = {"name": nombre}
+        if version is not None:
+            plugin_json["version"] = version
+        (tmp / ".claude-plugin/plugin.json").write_text(json.dumps(plugin_json), encoding="utf-8")
     elif perfil == "consumidor":
         config = {"github": {"repo": "o/r"}}
         if config_extra:
             config.update(config_extra)
         (tmp / ".claude").mkdir(exist_ok=True)
         (tmp / ".claude/timonel.config.json").write_text(json.dumps(config), encoding="utf-8")
+
+
+def _preparar_plugin_root(tmp: Path, version: str) -> Path:
+    """Crea, dentro de `tmp`, un directorio separado que simula la instalacion
+    (`CLAUDE_PLUGIN_ROOT`) con su propio `.claude-plugin/plugin.json` en `version` --
+    distinto del `plugin.json` del repo que arma `_preparar_repo` (#147)."""
+    root = tmp / "instalada"
+    (root / ".claude-plugin").mkdir(parents=True, exist_ok=True)
+    (root / ".claude-plugin/plugin.json").write_text(
+        json.dumps({"name": "timonel", "version": version}), encoding="utf-8"
+    )
+    return root
+
+
+def _comando_version_repo_vs_instalada() -> str:
+    """Extrae, del hooks.json REAL, el cuarto hook de `SessionStart` (#147): avisa
+    cuando la version del repo difiere de la instalada. Se selecciona por contenido
+    (`version_instalada`, variable exclusiva de este hook), nunca por indice del array."""
+    hooks = json.loads((ROOT / "hooks/hooks.json").read_text(encoding="utf-8"))
+    for bloque in hooks["hooks"]["SessionStart"]:
+        for hook in bloque["hooks"]:
+            if "version_instalada" in hook["command"]:
+                return hook["command"]
+    raise AssertionError("hooks.json no tiene el hook de version del repo vs instalada")
 
 
 def _correr_hook(comando_hook: str, cmd_bash: str, tmp: Path, plugin_root: str) -> subprocess.CompletedProcess:
@@ -482,6 +521,65 @@ class HookEnCajaNegraTests(unittest.TestCase):
             resultado = _correr_hook(comando, "git push --force origin hu/82-x", tmp_path, plugin_root=plugin_root_inexistente)
             self.assertEqual(resultado.returncode, 2, f"stderr={resultado.stderr!r}")
             self.assertIn("[timonel] Bloqueado", resultado.stderr)
+
+
+class HookVersionRepoInstaladaTests(unittest.TestCase):
+    """AC4 de #147: el cuarto hook de `SessionStart` avisa, en perfil plugin, cuando la
+    version del repo difiere de la instalada -- nombrando ambas -- y calla en cualquier
+    otro caso (version igual, otro plugin, repo consumidor, `CLAUDE_PLUGIN_ROOT` vacio).
+    Molde de `HookEnCajaNegraTests`: shell REAL de hooks.json sobre repos temporales.
+    Tabla de casos del issue: 1 (avisa), 2 (silencio por version igual), 3 (silencio por
+    otro plugin), 4 (silencio por repo consumidor), 5 (silencio fail-open)."""
+
+    def test_versiones_distintas_avisa_con_ambas_caso_1(self):
+        comando = _comando_version_repo_vs_instalada()
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            _preparar_repo(tmp_path, "main", perfil="plugin", version="9.9.9")
+            plugin_root = _preparar_plugin_root(tmp_path, "0.6.0")
+            resultado = _correr_hook(comando, "", tmp_path, plugin_root=str(plugin_root))
+            self.assertEqual(resultado.returncode, 0, f"stderr={resultado.stderr!r}")
+            self.assertIn("9.9.9", resultado.stdout)
+            self.assertIn("0.6.0", resultado.stdout)
+
+    def test_versiones_iguales_silencio_caso_2(self):
+        comando = _comando_version_repo_vs_instalada()
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            _preparar_repo(tmp_path, "main", perfil="plugin", version="0.6.0")
+            plugin_root = _preparar_plugin_root(tmp_path, "0.6.0")
+            resultado = _correr_hook(comando, "", tmp_path, plugin_root=str(plugin_root))
+            self.assertEqual(resultado.returncode, 0, f"stderr={resultado.stderr!r}")
+            self.assertEqual(resultado.stdout, "")
+
+    def test_otro_plugin_silencio_caso_3(self):
+        comando = _comando_version_repo_vs_instalada()
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            _preparar_repo(tmp_path, "main", perfil="plugin", version="9.9.9", nombre="otro-plugin")
+            plugin_root = _preparar_plugin_root(tmp_path, "0.6.0")
+            resultado = _correr_hook(comando, "", tmp_path, plugin_root=str(plugin_root))
+            self.assertEqual(resultado.returncode, 0, f"stderr={resultado.stderr!r}")
+            self.assertEqual(resultado.stdout, "")
+
+    def test_repo_consumidor_sin_plugin_json_silencio_caso_4(self):
+        comando = _comando_version_repo_vs_instalada()
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            _preparar_repo(tmp_path, "main", perfil="ninguno")
+            plugin_root = _preparar_plugin_root(tmp_path, "0.6.0")
+            resultado = _correr_hook(comando, "", tmp_path, plugin_root=str(plugin_root))
+            self.assertEqual(resultado.returncode, 0, f"stderr={resultado.stderr!r}")
+            self.assertEqual(resultado.stdout, "")
+
+    def test_claude_plugin_root_vacio_silencio_fail_open_caso_5(self):
+        comando = _comando_version_repo_vs_instalada()
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            _preparar_repo(tmp_path, "main", perfil="plugin", version="9.9.9")
+            resultado = _correr_hook(comando, "", tmp_path, plugin_root="")
+            self.assertEqual(resultado.returncode, 0, f"stderr={resultado.stderr!r}")
+            self.assertEqual(resultado.stdout, "")
 
 
 if __name__ == "__main__":

@@ -11,7 +11,14 @@ Eres **Flecho DiezEquis** en modo hotfix (`flechodiezx-hotfix`): atiendes cambio
 
 ## Fase 0: Contexto
 
-Lee `.claude/timonel.config.json` (`REPO`, `api`, `frontends`, `modelos`) y `CLAUDE.md`. Resuelve `PLUGIN_ROOT` (skill `github-issues`).
+1. **Perfil**. Si existe `.claude-plugin/plugin.json` con `name == "timonel"`, o el issue trae `mod:plugin`, el perfil es **`plugin`**: el repo es el propio Timonel, sin nx ni `api`/`frontends`. Si no, perfil **`consumidor`**: lee `.claude/timonel.config.json` (`REPO`, `api`, `frontends`, `modelos`). En ambos perfiles lee `CLAUDE.md`.
+2. **Perfil plugin — version del repo vs. instalada.** Solo si el perfil es `plugin` (paso anterior): vos mismo corres con las instrucciones de la copia **instalada** (`$PLUGIN_ROOT`, resuelta en el paso siguiente desde `.timonel/.plugin-root`), que puede ser una version vieja del repo que estas editando. Compara ambas versiones:
+   ```bash
+   version_repo=$(jq -r .version .claude-plugin/plugin.json)
+   version_instalada=$(jq -r .version "$(cat .timonel/.plugin-root)/.claude-plugin/plugin.json")
+   ```
+   Si difieren, avisa nombrando **ambas** y **lee `agents/flechodiezx-hotfix.md` del repo con la herramienta Read**, como archivo de datos — esto no recarga tu system prompt, Claude Code no lo permite: es leer el texto y trabajar con ese orden de fases y esas reglas duras, por encima de las que trae tu propio prompt, durante el resto de esta historia. Si coinciden, no avisas nada y el flujo sigue identico al actual.
+3. Resuelve `PLUGIN_ROOT` (skill `github-issues`).
 
 ## Fase 0.5: Reanudacion
 
