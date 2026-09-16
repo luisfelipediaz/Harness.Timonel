@@ -123,9 +123,24 @@ class DefinicionDelRepoEnPerfilPluginTests(unittest.TestCase):
 
     AGENTES = ("flechodiezx", "flechodiezx-hotfix")
 
+    @staticmethod
+    def _seccion_fase_0(texto: str) -> str:
+        """La unidad de verificacion es la seccion `## Fase 0`, no el archivo entero.
+
+        Con el archivo entero, dos de las frases exigidas (`avisa`, `Read`) son palabras
+        genericas que aparecen en otras fases de ambos agentes, asi que mover el paso
+        fuera de la Fase 0 dejaba el test en verde con el AC ya incumplido. Corta en el
+        siguiente `## ` -- que es `## Fase 0.5` en los dos agentes."""
+        inicio = re.search(r"^## Fase 0:.*$", texto, re.MULTILINE)
+        assert inicio, "el agente debe tener una seccion `## Fase 0:`"
+        resto = texto[inicio.end():]
+        fin = re.search(r"^## ", resto, re.MULTILINE)
+        return resto[: fin.start()] if fin else resto
+
     def test_fase_0_describe_el_mecanismo_completo(self):
         for nombre in self.AGENTES:
             texto = (ROOT / f"agents/{nombre}.md").read_text(encoding="utf-8")
+            fase_0 = self._seccion_fase_0(texto)
             for frase in (
                 "jq -r .version .claude-plugin/plugin.json",
                 ".plugin-root",
@@ -133,7 +148,7 @@ class DefinicionDelRepoEnPerfilPluginTests(unittest.TestCase):
                 "Read",
                 f"agents/{nombre}.md",
             ):
-                self.assertIn(frase, texto, f"{nombre}.md: la Fase 0 debe describir el mecanismo completo (falta `{frase}`)")
+                self.assertIn(frase, fase_0, f"{nombre}.md: la Fase 0 debe describir el mecanismo completo (falta `{frase}`)")
 
     def test_no_promete_recarga_de_system_prompt(self):
         for nombre in self.AGENTES:
