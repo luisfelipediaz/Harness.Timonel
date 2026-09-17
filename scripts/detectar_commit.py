@@ -20,7 +20,7 @@ ni en Python (`heuristics/general/sensor-importa-no-reimplementa.md`), y
 tampoco se llama a ninguna funcion privada de `guard_integracion.py`: los dos
 seams publicos de arriba son el contrato completo entre ambos modulos.
 
-Tres respuestas, nunca dos (`heuristics/general/ausencia-de-evidencia.md`):
+Tres respuestas, nunca dos (`heuristics/general/sensor-declara-su-evidencia.md`):
 `invoca_commit(cmd)` devuelve `True` (si invoca un commit real), `False` (no
 invoca ninguno) o `None` ("no se": el comando no se pudo tokenizar -- p. ej.
 una comilla sin cerrar -- o algo inesperado impidio decidir). El llamador
