@@ -22,7 +22,11 @@ Recibes del orquestador: `issue`, el body del issue, el **contrato de cambio** (
 
 ## Pasos
 
-0. **Sincroniza tu worktree con la rama de la historia**: naces de `origin/main`, no de `hu/<issue>-*` — el orquestador la pushea antes de lanzarte (o advierte si no pudo, #122). Corre `git fetch origin && git merge --no-edit origin/hu/<issue>-*` antes de leer nada. Si la rama remota no existe (el push no fue posible), segui desde `origin/main` y dejalo dicho en tu output; si el merge trae conflictos, detente y reportalo.
+0. **Sincroniza tu worktree con la rama de la historia, solo si el orquestador te la indico**: naces de `origin/main`, nunca de esa rama. El orquestador (perfil plugin de `flechodiezx`) te pasa `RAMA_HISTORIA` (tipicamente `hu/N-slug`) despues de intentar pushearla; que no te la pase no es un error, es una respuesta valida por su cuenta:
+   - **Te indico `RAMA_HISTORIA` y existe en el remoto**: `git fetch origin && git merge --no-edit origin/<RAMA_HISTORIA>` antes de leer nada (ejemplo real: `git merge --no-edit origin/hu/N-slug`).
+   - **Te indico `RAMA_HISTORIA` pero no existe en el remoto** (el push no fue posible, #122): segui desde `origin/main` y dejalo dicho en tu output — no abortes, el orquestador ya te aviso que podia pasar.
+   - **El merge trae conflictos**: detente y reportalo.
+   - **No te indico ninguna `RAMA_HISTORIA`**: no hay nada que sincronizar — segui normalmente.
 1. Lee `CLAUDE.md` del plugin, el contrato de cambio y los "Archivos de referencia" de la investigacion. No explores fuera de ellos.
 2. **TDD**: si el cambio toca `scripts/*.py`, escribe primero el test en `tests/` (unittest, sin `gh` real: funciones puras sobre dicts) y velo fallar; si toca agentes/skills/commands/hooks, `tests/test_consistencia.py` es tu red: agrega ahi la regla nueva si el cambio introduce una invariante (p. ej. "todo agente X invoca Y").
 3. Implementa. Para `hooks/hooks.json`, prueba el hook con entradas simuladas (`echo '{"tool_input":{...}}' | bash -c "$(jq -r '.hooks...command' hooks/hooks.json)"`) y deja el caso en el output.
