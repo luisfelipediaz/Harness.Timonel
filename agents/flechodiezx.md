@@ -64,7 +64,7 @@ Muestra el contrato y pregunta "¿Procedo con esta definicion?". Espera confirma
 
 Con el "si":
 
-1. Crea/actualiza las interfaces y el barrel. `git add {modelos.path} && git commit -m "feat(<modulo>): modelos compartidos para #N"` (factual: los worktrees nacen de `origin/main`, no del ultimo commit local — si `hu/N-slug` queda adelantada a `origin/main` y no se pushea, el worktree del sub-agente no vera estos modelos; el rediseño de esta fase por ese motivo es #122).
+1. Crea/actualiza las interfaces y el barrel. `git add {modelos.path} && git commit -m "feat(<modulo>): modelos compartidos para #N" && git push -u origin hu/N-slug` (los worktrees nacen de `origin/main`, no del ultimo commit local — pushear `hu/N-slug` aca es lo que resuelve esa brecha: le da a `origin/hu/N-slug` el commit que cada sub-agente de la Fase 3 va a sincronizar al arrancar, #122).
 2. Escribe el comentario `<!-- timonel:contrato-api -->` (formato en `marcadores.md`, con `backend_desplegado`), validalo con `python3 "$PLUGIN_ROOT/scripts/validar_marcador.py" <archivo> --tipo contrato-api` y publicalo con `publicar_marcador N contrato-api <archivo>`.
 3. Marca `- [x] Contrato API aprobado` y `- [x] Modelos compartidos` (si hubo) en `## Tareas`.
 
@@ -72,13 +72,13 @@ Con el "si":
 
 **Perfil plugin — por que worktree tambien aca.** El aislamiento del que escribe deja de ser una regla de cortesia (recordada leyendo retros, mejora #89 sin implementar) y pasa a ser una propiedad del entorno. Precision necesaria: los incidentes que motivaron este cambio (#80, #83) fueron con el **consolidador** y el **reviewer**, no con el sub-agente de implementacion — que es el unico que esta fase aisla. El consolidador **no puede** correr en worktree: tiene que mergear a `hu/N-slug`, y git prohibe la misma rama checkouteada en dos worktrees a la vez; es una restriccion estructural, no una omision de diseño. La concurrencia orquestador ↔ consolidador/reviewer **sigue siendo de #89**: esta fase no la cierra.
 
-Antes de lanzar, verifica la base del worktree: `git fetch origin main` y compara `hu/N-slug` contra `origin/main` (`git rev-list --left-right --count hu/N-slug...origin/main`). Si `hu/N-slug` esta **adelantada** a `origin/main` (reanudacion, o un commit propio de Fase 2), **advierte antes de lanzar**: el worktree nace de `origin/main` y no va a contener esos commits (ejemplo real: un fix del orquestador aplicado directo a `hu/N-slug` dejo esa rama adelantada a `origin/main` sin que el worktree recien creado lo viera). Si `main` local esta adelantada a `origin/main` sin pushear, tambien advierte: la base esta obsoleta.
+Antes de lanzar, verifica la base del worktree: `git fetch origin main` y compara `hu/N-slug` contra `origin/main` (`git rev-list --left-right --count hu/N-slug...origin/main`). Si `hu/N-slug` esta **adelantada** a `origin/main` (reanudacion, o un commit propio de Fase 2), **resuelvela**: `git push -u origin hu/N-slug` (ejemplo real: un fix del orquestador aplicado directo a `hu/N-slug` dejo esa rama adelantada a `origin/main` sin que el worktree recien creado lo viera; el push es lo que le da a `origin/hu/N-slug` algo que el sub-agente pueda sincronizar al arrancar). Si el push no es posible (sin remoto, sin permisos), degrada al aviso previo: **advierte antes de lanzar** que el worktree no va a contener esos commits. Si `main` local esta adelantada a `origin/main` sin pushear, tambien advierte: la base esta obsoleta.
 
-Captura la linea base con `git branch --list 'worktree-agent-*'`. Lanza **un** sub-agente `model: "sonnet"`, `isolation: worktree`, con el skill `implement-plugin-change` (`"$PLUGIN_ROOT/skills/implement-plugin-change/SKILL.md"`; dentro del repo del plugin `PLUGIN_ROOT` es la raiz del repo). Prompt: body del issue, contrato de cambio, extracto de la investigacion, y las restricciones del skill (solo archivos del contrato; no tocar CHANGELOG ni version; commit `<tipo>: <que> (#N)`; nunca `$PLUGIN_ROOT`, rutas relativas a su CWD; informar en su output la rama exacta y la ruta de su worktree).
+Captura la linea base con `git branch --list 'worktree-agent-*'`. Lanza **un** sub-agente `model: "sonnet"`, `isolation: worktree`, con el skill `implement-plugin-change` (`"$PLUGIN_ROOT/skills/implement-plugin-change/SKILL.md"`; dentro del repo del plugin `PLUGIN_ROOT` es la raiz del repo). Prompt: body del issue, contrato de cambio, extracto de la investigacion, y las restricciones del skill (paso 0 antes que nada: sincroniza con la rama de la historia — `git fetch origin && git merge --no-edit origin/hu/N-slug` —, porque el worktree nace de `origin/main`; solo archivos del contrato; no tocar CHANGELOG ni version; commit `<tipo>: <que> (#N)`; nunca `$PLUGIN_ROOT`, rutas relativas a su CWD; informar en su output la rama exacta y la ruta de su worktree).
 
 Al terminar, recalcula `git branch --list 'worktree-agent-*'` y toma el **delta** contra la linea base — nunca confies solo en el auto-reporte del sub-agente: usalo para contrastar, no como autoridad. Segun la cardinalidad del delta:
 
-- **Delta = 1, con commits en esa rama**: caso normal. Guarda esa rama como `branch_worktree` para `consolidate-story`.
+- **Delta = 1, con commits en esa rama**: caso normal **si ademas** `git merge-base --is-ancestor hu/N-slug worktree-agent-<id>` confirma que el commit de `hu/N-slug` llego al worktree — no le creas al auto-reporte del sub-agente sobre si sincronizo, contrastalo vos. Si el merge-base falla, la sincronizacion del paso 0 no se aplico: reportalo antes de consolidar. Con el merge-base en verde, guarda esa rama como `branch_worktree` para `consolidate-story`.
 - **Delta = 1, rama sin commits**: merge no-op. Reporta que el sub-agente no commiteo nada; **no borres el worktree** (puede tener trabajo sin commitear).
 - **Delta = 0** porque el sub-agente no cambio nada (el harness limpia worktree y rama solo): **no es un pase**. La Fase 3 no produjo nada que consolidar: detente y reporta.
 - **Delta = 0 y ademas hay commits nuevos en `hu/N-slug`** que no estaban en la linea base: el sub-agente escribio en el arbol de trabajo de la sesion en vez de en su worktree — **el aislamiento fallo**. Detente y reporta el/los commits.
@@ -86,7 +86,7 @@ Al terminar, recalcula `git branch --list 'worktree-agent-*'` y toma el **delta*
 
 Marca `- [x] Implementación` (o `Backend`) solo en el caso normal, y salta a Fases 4-5.
 
-**Perfil consumidor**: lanza los sub-agentes **en el mismo mensaje** con el Agent tool, `isolation: worktree`, `model: "sonnet"` (nunca hereden opus): uno con el skill `implement-backend-story` y otro con `implement-frontend-story`, segun el alcance. El aislamiento se declara aca, en el mismo parrafo que nombra cada skill, a proposito: esa es la unidad que verifica `WorktreeDeImplementacionTests`, y una declaracion que viva en otro parrafo no cubre a estos skills. Por el mismo motivo esta frase no repite el literal: una segunda copia en el parrafo volveria a satisfacer la asercion cuando el lanzamiento real ya la perdio.
+**Perfil consumidor**: antes de lanzar, verifica la base del worktree igual que el perfil plugin: `git fetch origin main` y compara `hu/N-slug` contra `origin/main` (`git rev-list --left-right --count hu/N-slug...origin/main`); si `hu/N-slug` esta adelantada (el commit de modelos de la Fase 2, casi siempre), resuelvela con `git push -u origin hu/N-slug` — el mismo push que le da a `implement-backend-story` e `implement-frontend-story` algo que sincronizar con `git fetch origin && git merge --no-edit origin/hu/N-slug` al arrancar (si el push no es posible, advierte y deten, igual que en perfil plugin). Con eso resuelto, lanza los sub-agentes **en el mismo mensaje** con el Agent tool, `isolation: worktree`, `model: "sonnet"` (nunca hereden opus): uno con el skill `implement-backend-story` y otro con `implement-frontend-story`, segun el alcance. El aislamiento se declara aca, en el mismo parrafo que nombra cada skill, a proposito: esa es la unidad que verifica `WorktreeDeImplementacionTests`, y una declaracion que viva en otro parrafo no cubre a estos skills. Por el mismo motivo esta frase no repite el literal de isolation: una segunda copia en el parrafo volveria a satisfacer esa asercion cuando el lanzamiento real ya la perdio.
 
 Cada prompt incluye: (1) el body completo del issue, (2) el contrato aprobado, (3) la lista de modelos compartidos ya commiteados, (4) la instruccion de usar el skill con ruta absoluta, (5) los valores del config que necesita.
 
@@ -103,6 +103,7 @@ MODELOS COMPARTIDOS (ya commiteados): {lista}
 INVESTIGACION (archivos de referencia y patron a replicar): {extracto del comentario timonel:investigacion}
 
 RESTRICCIONES DEL ORQUESTADOR:
+- Paso 0: sincroniza con `origin/hu/N-slug` antes de implementar — tu worktree nace de `origin/main`, no de esta rama
 - NO modifiques {modelos.path} — ya esta implementado
 - NO modifiques {api.moduleFile} — documenta en tu output los providers a registrar
 - NO ejecutes nx test — el orquestador lo hara tras el merge
@@ -123,6 +124,7 @@ INVESTIGACION (archivos de referencia y patron a replicar): {extracto del coment
 {backend NO desplegado → mocks con of() y `// TODO: Reemplazar con HTTP call real` | backend desplegado → HTTP real}
 
 RESTRICCIONES DEL ORQUESTADOR:
+- Paso 0: sincroniza con `origin/hu/N-slug` antes de implementar — tu worktree nace de `origin/main`, no de esta rama
 - NO modifiques {modelos.path}
 - NO modifiques {frontend.routesFile} — documenta en tu output las rutas a registrar
 - NO ejecutes nx test

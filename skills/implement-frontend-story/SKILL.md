@@ -7,6 +7,8 @@ Recibes del orquestador el body del issue, el contrato API a consumir, la lista 
 
 ## Pasos
 
+0. **Sincroniza tu worktree con la rama de la historia**: naces de `origin/main`, no de `hu/<issue>-*` (#122) — `git fetch origin && git merge --no-edit origin/hu/<issue>-*` antes de leer nada. Sin este paso no vas a ver los modelos compartidos que el orquestador ya commiteo y pusheo en la Fase 2. Si la rama remota no existe todavia (el push no fue posible) o el merge trae conflictos, detente y reportalo en tu output.
+
 1. **Leer la spec**: criterios de aceptacion, UI, reglas, endpoints, necesidades de estado. Lee `CLAUDE.md` del consumidor: sus convenciones mandan.
 
 2. **Explorar contexto (acotado)**: solo `<app.path>/src/app/<modulo>/`. Busca el componente o feature mas parecido y sigue sus patrones. No recorras todo el codebase.
