@@ -1,0 +1,3 @@
+SONDA-122: marcador de divergencia.
+Este archivo existe en hu/122-worktrees-desde-rama-historia y NO en origin/main.
+Si un worktree de sub-agente no lo ve, nace de origin/main y no de la rama de la historia.
