@@ -22,6 +22,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
+import detectar_commit as dc  # noqa: E402
 import guard_integracion as gi  # noqa: E402
 
 BLOQUEADO = "bloqueado"
@@ -559,15 +560,6 @@ class GuardCommitsResuelveRepoDestinoTests(unittest.TestCase):
     la fila, no solo dejarla en un estado casualmente igual.
     """
 
-    # Nota sobre los `cmd_template` con `-C`: la compuerta externa de cada entry
-    # (`case "$cmd" in *'git commit'*)`, sin tocar en #174) exige que el TEXTO crudo
-    # del comando contenga el literal contiguo "git commit". Una invocacion real de
-    # `git -C <ruta> commit -m "..."` NO lo contiene (queda "-C <ruta> commit", no
-    # "git commit"), asi que sin ese literal en algun lugar del comando la compuerta
-    # ni siquiera llega a correr la logica de resolucion de rama que #174 arregla --
-    # el caso "pasaria" IGUAL con el fix revertido (falso verde, vacuo). Por eso los
-    # mensajes de commit de estas filas incluyen la frase "git commit" de forma
-    # natural (es, literalmente, un commit sobre la resolucion de `git commit`).
     def _escenario(self, comando, perfil_cwd, rama_cwd, rama_destino, cmd_template, config_extra=None):
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
@@ -587,7 +579,7 @@ class GuardCommitsResuelveRepoDestinoTests(unittest.TestCase):
             "git -C explicito: la rama sale del destino, no del cwd",
             "hu/999-y",  # si se usara el cwd (no es main), pasaria -- bug enmascarado
             "main",      # el destino SI es base -> debe bloquear
-            'git -C {destino} commit -m "arregla resolucion de rama de git commit via -C (#1)"',
+            'git -C {destino} commit -m "arregla resolucion de rama via -C (#1)"',
             BLOQUEADO,
         ),
         (
@@ -619,7 +611,7 @@ class GuardCommitsResuelveRepoDestinoTests(unittest.TestCase):
             "reproduccion real: cwd en rama base + commit dirigido a otro repo en rama de trabajo -> no bloquea por rama base",
             "main",
             "hu/174-x",
-            'git -C {destino} commit -m "fix #174: resuelve rama de git commit via -C"',
+            'git -C {destino} commit -m "fix #174: resuelve rama via -C"',
             PERMITIDO,
         ),
     ]
@@ -645,7 +637,7 @@ class GuardCommitsResuelveRepoDestinoTests(unittest.TestCase):
             "git -C explicito: bloquea porque el DESTINO es base, aunque el cwd no lo sea",
             "feature-abc",  # no es base ni hu/* -> si se usara el cwd, pasaria
             "main",         # el destino SI es base -> debe bloquear
-            'git -C {destino} commit -m "arregla resolucion de rama de git commit via -C"',
+            'git -C {destino} commit -m "arregla resolucion de rama via -C"',
             BLOQUEADO,
         ),
         (
@@ -677,7 +669,7 @@ class GuardCommitsResuelveRepoDestinoTests(unittest.TestCase):
             "reproduccion real (issue #174): cwd en rama base + commit dirigido a otro repo en rama de trabajo -> no bloquea por rama base",
             "main",
             "feature-xyz",
-            'git -C {destino} commit -m "arregla resolucion de rama de git commit via -C"',
+            'git -C {destino} commit -m "arregla resolucion de rama via -C"',
             PERMITIDO,
         ),
         (
@@ -685,7 +677,7 @@ class GuardCommitsResuelveRepoDestinoTests(unittest.TestCase):
             "el numero de issue exigido sale del hu/<N> del DESTINO, no del cwd",
             "hu/999-x",     # si se usara el cwd, exigiria #999 y el mensaje trae #174 -> bloquearia
             "hu/174-y",     # el destino exige #174
-            'git -C {destino} commit -m "fix #174: resuelve rama de git commit via -C"',
+            'git -C {destino} commit -m "fix #174: resuelve rama via -C"',
             PERMITIDO,
         ),
     ]
@@ -796,6 +788,251 @@ class HookVersionRepoInstaladaTests(unittest.TestCase):
             resultado = _correr_hook(comando, "", tmp_path, plugin_root="")
             self.assertEqual(resultado.returncode, 0, f"stderr={resultado.stderr!r}")
             self.assertEqual(resultado.stdout, "")
+
+
+class DetectarCommitUnitarioTests(unittest.TestCase):
+    """Tabla B del contrato de #176: `invoca_commit()` puro, sin disco ni procesos.
+    Cubre la CLASE de formas de invocar (o no invocar) un commit real, no un
+    representante (`heuristics/general/enumerar-la-clase-no-el-representante.md`)."""
+
+    SI, NO, NOSE = True, False, None
+
+    CASOS = [
+        ("git commit", 'git commit -m "x"', SI),
+        ("git -C <r> commit, valor separado", 'git -C /tmp/r commit -m "x"', SI),
+        ("git -C<r> commit, valor pegado", 'git -C/tmp/r commit -m "x"', SI),
+        ("git --no-pager commit (flag booleano)", 'git --no-pager commit -m "x"', SI),
+        ("git -c user.name=x commit (flag con valor)", 'git -c user.name=x commit -m "x"', SI),
+        ("GIT_DIR=.git git commit (asignacion de entorno)", 'GIT_DIR=.git git commit -m "x"', SI),
+        ("cd <r> && git commit", 'cd /tmp/r && git commit -m "x"', SI),
+        ("git commit tras ;", 'git status; git commit -m "x"', SI),
+        ("git commit tras ||", 'git status || git commit -m "x"', SI),
+        ("git commit tras |", 'git status | git commit -m "x"', SI),
+        ("git commit tras salto de linea", 'git status\ngit commit -m "x"', SI),
+        ('echo con la cadena entre comillas', 'echo "git commit"', NO),
+        ("grep con la cadena como patron", "grep -n 'git commit' archivo.txt", NO),
+        ("printf con la cadena", 'printf "git commit"', NO),
+        ("bash -n sobre un archivo llamado commit-msg", "bash -n .githooks/commit-msg", NO),
+        ("git status", "git status", NO),
+        ("git log", "git log", NO),
+        ("git commit-graph write: subcomando DISTINTO que empieza con commit", "git commit-graph write", NO),
+        ("comando vacio", "", NO),
+        ("comilla sin cerrar: no se, no False", 'git commit -m "sin cerrar', NOSE),
+    ]
+
+    def test_tabla_de_casos(self):
+        for descripcion, cmd, esperado in self.CASOS:
+            with self.subTest(caso=descripcion, cmd=cmd):
+                self.assertIs(dc.invoca_commit(cmd), esperado)
+
+
+class GuardCommitsDetectaCommitRealTests(unittest.TestCase):
+    """Tabla A del contrato de #176: los escenarios de deteccion de commit real contra
+    CADA entry por separado. Unidad de verificacion: el `command` real de cada entry
+    via `_correr_hook` -- nunca `assertIn`/`assertRegex` sobre el texto de
+    `hooks/hooks.json`, `scripts/detectar_commit.py` ni `scripts/guard_integracion.py`
+    (asercion prohibida del contrato, `heuristics/general/unidad-de-verificacion.md`).
+
+    AC8 (filas `-C` sin la frase del matcher) se verifica en
+    `GuardCommitsResuelveRepoDestinoTests`, ya editada para no incluir la frase. AC9
+    (mutacion de un solo entry) es evidencia manual del reporte del implementador, no
+    un test persistido."""
+
+    HEREDOC_MATCHER = (
+        "cat > /tmp/heredoc-176.md <<'TIMONEL_EOF'\n"
+        "- Archivo: `hooks/hooks.json`, los dos entries `PreToolUse`/`Bash` que filtran "
+        "por `*'git commit'*`.\n"
+        "TIMONEL_EOF"
+    )
+
+    def _bloqueado(self, resultado):
+        return resultado.returncode == 2 and "[timonel] Bloqueado" in resultado.stderr
+
+    def _permitido(self, resultado):
+        return resultado.returncode == 0 and resultado.stderr == ""
+
+    def _con_repo(self, perfil, rama):
+        tmp = tempfile.TemporaryDirectory()
+        tmp_path = Path(tmp.name)
+        _preparar_repo(tmp_path, rama, perfil=perfil)
+        return tmp, tmp_path
+
+    # --- Entry plugin (bases fijas main/master, exige #N en cualquier parte) ---
+
+    def test_entry_plugin_ac1_bloquea_commit_sin_numero_en_rama_hu(self):
+        comando = _comando_guard_commits_plugin()
+        tmp, tmp_path = self._con_repo("plugin", "hu/1-x")
+        with tmp:
+            resultado = _correr_hook(comando, 'git commit -m "sin numero"', tmp_path, plugin_root=str(ROOT))
+            self.assertTrue(self._bloqueado(resultado), resultado.stderr)
+
+    def test_entry_plugin_ac2_bloquea_por_rama_base_del_destino_con_dashC(self):
+        comando = _comando_guard_commits_plugin()
+        tmp, tmp_path = self._con_repo("plugin", "hu/999-y")
+        with tmp:
+            destino = _preparar_repo_destino(tmp_path, "main")
+            resultado = _correr_hook(comando, f'git -C {destino} commit -m "x #1"', tmp_path, plugin_root=str(ROOT))
+            self.assertTrue(self._bloqueado(resultado), resultado.stderr)
+
+    def test_entry_plugin_ac3_bloquea_por_rama_base_del_destino_con_cd(self):
+        comando = _comando_guard_commits_plugin()
+        tmp, tmp_path = self._con_repo("plugin", "hu/999-y")
+        with tmp:
+            destino = _preparar_repo_destino(tmp_path, "main")
+            resultado = _correr_hook(comando, f'cd {destino} && git commit -m "x #1"', tmp_path, plugin_root=str(ROOT))
+            self.assertTrue(self._bloqueado(resultado), resultado.stderr)
+
+    def test_entry_plugin_ac4_heredoc_que_cita_la_cadena_no_bloquea(self):
+        comando = _comando_guard_commits_plugin()
+        tmp, tmp_path = self._con_repo("plugin", "main")
+        with tmp:
+            resultado = _correr_hook(comando, self.HEREDOC_MATCHER, tmp_path, plugin_root=str(ROOT))
+            self.assertTrue(self._permitido(resultado), resultado.stderr)
+
+    def test_entry_plugin_ac5_echo_grep_printf_no_bloquean(self):
+        comando = _comando_guard_commits_plugin()
+        for cmd in ('echo "git commit"', "grep -n 'git commit' archivo.txt", 'printf "git commit"'):
+            with self.subTest(cmd=cmd):
+                tmp, tmp_path = self._con_repo("plugin", "main")
+                with tmp:
+                    resultado = _correr_hook(comando, cmd, tmp_path, plugin_root=str(ROOT))
+                    self.assertTrue(self._permitido(resultado), resultado.stderr)
+
+    def test_entry_plugin_ac6_nombre_de_archivo_commit_msg_no_es_commit(self):
+        comando = _comando_guard_commits_plugin()
+        for cmd in ("bash -n .githooks/commit-msg", "bash -n scripts/_common.sh .githooks/commit-msg"):
+            with self.subTest(cmd=cmd):
+                tmp, tmp_path = self._con_repo("plugin", "main")
+                with tmp:
+                    resultado = _correr_hook(comando, cmd, tmp_path, plugin_root=str(ROOT))
+                    self.assertTrue(self._permitido(resultado), resultado.stderr)
+
+    def test_entry_plugin_ac7_subcomandos_de_git_que_no_son_commit_no_bloquean(self):
+        comando = _comando_guard_commits_plugin()
+        for cmd in ("git status --short", "git log --oneline -5"):
+            with self.subTest(cmd=cmd):
+                tmp, tmp_path = self._con_repo("plugin", "main")
+                with tmp:
+                    resultado = _correr_hook(comando, cmd, tmp_path, plugin_root=str(ROOT))
+                    self.assertTrue(self._permitido(resultado), resultado.stderr)
+
+    # --- Entry consumidor (bases configurables, exige #N solo si la rama es hu/*) ---
+
+    def test_entry_consumidor_ac1_bloquea_commit_sin_numero_en_rama_hu(self):
+        comando = _comando_guard_commits_consumidor()
+        tmp, tmp_path = self._con_repo("consumidor", "hu/1-x")
+        with tmp:
+            resultado = _correr_hook(comando, 'git commit -m "sin numero"', tmp_path, plugin_root=str(ROOT))
+            self.assertTrue(self._bloqueado(resultado), resultado.stderr)
+
+    def test_entry_consumidor_ac2_bloquea_por_rama_base_del_destino_con_dashC(self):
+        comando = _comando_guard_commits_consumidor()
+        tmp, tmp_path = self._con_repo("consumidor", "feature-abc")
+        with tmp:
+            destino = _preparar_repo_destino(tmp_path, "main")
+            resultado = _correr_hook(comando, f'git -C {destino} commit -m "x"', tmp_path, plugin_root=str(ROOT))
+            self.assertTrue(self._bloqueado(resultado), resultado.stderr)
+
+    def test_entry_consumidor_ac3_bloquea_por_rama_base_del_destino_con_cd(self):
+        comando = _comando_guard_commits_consumidor()
+        tmp, tmp_path = self._con_repo("consumidor", "feature-abc")
+        with tmp:
+            destino = _preparar_repo_destino(tmp_path, "main")
+            resultado = _correr_hook(comando, f'cd {destino} && git commit -m "x"', tmp_path, plugin_root=str(ROOT))
+            self.assertTrue(self._bloqueado(resultado), resultado.stderr)
+
+    def test_entry_consumidor_ac4_heredoc_que_cita_la_cadena_no_bloquea(self):
+        comando = _comando_guard_commits_consumidor()
+        tmp, tmp_path = self._con_repo("consumidor", "main")
+        with tmp:
+            resultado = _correr_hook(comando, self.HEREDOC_MATCHER, tmp_path, plugin_root=str(ROOT))
+            self.assertTrue(self._permitido(resultado), resultado.stderr)
+
+    def test_entry_consumidor_ac5_echo_grep_printf_no_bloquean(self):
+        comando = _comando_guard_commits_consumidor()
+        for cmd in ('echo "git commit"', "grep -n 'git commit' archivo.txt", 'printf "git commit"'):
+            with self.subTest(cmd=cmd):
+                tmp, tmp_path = self._con_repo("consumidor", "main")
+                with tmp:
+                    resultado = _correr_hook(comando, cmd, tmp_path, plugin_root=str(ROOT))
+                    self.assertTrue(self._permitido(resultado), resultado.stderr)
+
+    def test_entry_consumidor_ac6_nombre_de_archivo_commit_msg_no_es_commit(self):
+        comando = _comando_guard_commits_consumidor()
+        for cmd in ("bash -n .githooks/commit-msg", "bash -n scripts/_common.sh .githooks/commit-msg"):
+            with self.subTest(cmd=cmd):
+                tmp, tmp_path = self._con_repo("consumidor", "main")
+                with tmp:
+                    resultado = _correr_hook(comando, cmd, tmp_path, plugin_root=str(ROOT))
+                    self.assertTrue(self._permitido(resultado), resultado.stderr)
+
+    def test_entry_consumidor_ac7_subcomandos_de_git_que_no_son_commit_no_bloquean(self):
+        comando = _comando_guard_commits_consumidor()
+        for cmd in ("git status --short", "git log --oneline -5"):
+            with self.subTest(cmd=cmd):
+                tmp, tmp_path = self._con_repo("consumidor", "main")
+                with tmp:
+                    resultado = _correr_hook(comando, cmd, tmp_path, plugin_root=str(ROOT))
+                    self.assertTrue(self._permitido(resultado), resultado.stderr)
+
+
+class GuardCommitsRespaldoSinSensorTests(unittest.TestCase):
+    """Tabla C del contrato de #176: sin el sensor disponible (`CLAUDE_PLUGIN_ROOT`
+    apunta a una instalacion sin `detectar_commit.py`, y el cwd del repo temporal no
+    tiene `./scripts/detectar_commit.py`), el comportamiento debe ser IDENTICO al de
+    hoy -- la compuerta literal `case "$cmd" in *'git commit'*)` como respaldo. Se
+    verifica en caja negra (comportamiento), no leyendo el texto del entry."""
+
+    HEREDOC_MATCHER = GuardCommitsDetectaCommitRealTests.HEREDOC_MATCHER
+
+    def _plugin_root_sin_sensor(self, tmp_path):
+        root = tmp_path / "instalada-sin-sensor"
+        (root / "scripts").mkdir(parents=True, exist_ok=True)
+        return root
+
+    def test_entry_plugin_heredoc_reaparece_como_falso_positivo_sin_sensor(self):
+        """Sin sensor, el falso positivo de #174 reaparece -- es el respaldo
+        degradado, no una regresion del arreglo."""
+        comando = _comando_guard_commits_plugin()
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            _preparar_repo(tmp_path, "main", perfil="plugin")
+            plugin_root = self._plugin_root_sin_sensor(tmp_path)
+            resultado = _correr_hook(comando, self.HEREDOC_MATCHER, tmp_path, plugin_root=str(plugin_root))
+            self.assertEqual(resultado.returncode, 2, resultado.stderr)
+            self.assertIn("[timonel] Bloqueado", resultado.stderr)
+
+    def test_entry_plugin_dashC_no_reconocido_sin_sensor(self):
+        """Sin sensor, el falso negativo de #174 reaparece: `git -C <ruta> commit` no
+        contiene el literal contiguo `git commit`, la compuerta de respaldo lo deja pasar."""
+        comando = _comando_guard_commits_plugin()
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            _preparar_repo(tmp_path, "hu/999-y", perfil="plugin")
+            destino = _preparar_repo_destino(tmp_path, "main")
+            plugin_root = self._plugin_root_sin_sensor(tmp_path)
+            resultado = _correr_hook(comando, f'git -C {destino} commit -m "x #1"', tmp_path, plugin_root=str(plugin_root))
+            self.assertEqual(resultado.returncode, 0, resultado.stderr)
+
+    def test_entry_consumidor_heredoc_reaparece_como_falso_positivo_sin_sensor(self):
+        comando = _comando_guard_commits_consumidor()
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            _preparar_repo(tmp_path, "main", perfil="consumidor")
+            plugin_root = self._plugin_root_sin_sensor(tmp_path)
+            resultado = _correr_hook(comando, self.HEREDOC_MATCHER, tmp_path, plugin_root=str(plugin_root))
+            self.assertEqual(resultado.returncode, 2, resultado.stderr)
+            self.assertIn("[timonel] Bloqueado", resultado.stderr)
+
+    def test_entry_consumidor_dashC_no_reconocido_sin_sensor(self):
+        comando = _comando_guard_commits_consumidor()
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            _preparar_repo(tmp_path, "feature-abc", perfil="consumidor")
+            destino = _preparar_repo_destino(tmp_path, "main")
+            plugin_root = self._plugin_root_sin_sensor(tmp_path)
+            resultado = _correr_hook(comando, f'git -C {destino} commit -m "x"', tmp_path, plugin_root=str(plugin_root))
+            self.assertEqual(resultado.returncode, 0, resultado.stderr)
 
 
 if __name__ == "__main__":

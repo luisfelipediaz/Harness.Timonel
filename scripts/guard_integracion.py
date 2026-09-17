@@ -96,6 +96,13 @@ GitHub, #85), no este guard. Este guard es defensa en profundidad contra el
 error honesto y contra que el propio orquestador se autoautorice un merge sin
 PR: atrapa la equivocacion, no al adversario. No debe pretender ser un
 sandbox ni perseguir cada evasion deliberada (ver limitacion de arriba).
+
+Seam publico adicional (#176): `segmentar(cmd) -> list[list[str]] | None`
+envuelve la misma tokenizacion de arriba (`_normalizar_separadores` +
+`shlex.split` + `_partir_en_segmentos`) para que `scripts/detectar_commit.py`
+reconozca si un comando invoca un `git commit` real sin reimplementar el
+parser. No cambia nada de lo anterior: ni `MANEJADORES`, ni `decidir()`, ni
+sus mensajes, ni la politica de fail-open.
 """
 
 from __future__ import annotations
@@ -602,6 +609,22 @@ def _partir_en_segmentos(tokens: list[str]) -> list[list[str]]:
         else:
             segmentos[-1].append(token)
     return [s for s in segmentos if s]
+
+
+def segmentar(cmd: str) -> list[list[str]] | None:
+    """Seam publico (#176): tokeniza `cmd` y lo parte en sub-comandos
+    independientes por los separadores de shell (`&&`, `||`, `;`, `&`, `|`,
+    `(`, `)`, salto de linea), exactamente como lo hace `decidir()` por
+    dentro. Envuelve `_normalizar_separadores` + `shlex.split` +
+    `_partir_en_segmentos`; devuelve `None` si `shlex` no puede tokenizar
+    (comillas sin cerrar, etc.), el mismo caso que `decidir()` trata como
+    fail-open. Lo consume `scripts/detectar_commit.py` para no reimplementar
+    este parser (`heuristics/general/sensor-importa-no-reimplementa.md`)."""
+    try:
+        tokens = shlex.split(_normalizar_separadores(cmd), posix=True)
+    except ValueError:
+        return None
+    return _partir_en_segmentos(tokens)
 
 
 def decidir(cmd: str, rama: str, bases: list[str]) -> str | None:
