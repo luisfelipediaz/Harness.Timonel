@@ -7,7 +7,10 @@ Recibes del orquestador el body del issue (historia + ficha tecnica), el contrat
 
 ## Pasos
 
-0. **Sincroniza tu worktree con la rama de la historia**: naces de `origin/main`, no de `hu/<issue>-*` (#122) — `git fetch origin && git merge --no-edit origin/hu/<issue>-*` antes de leer nada. Sin este paso no vas a ver los modelos compartidos que el orquestador ya commiteo y pusheo en la Fase 2. Si la rama remota no existe todavia (el push no fue posible) o el merge trae conflictos, detente y reportalo en tu output.
+0. **Sincroniza tu worktree con la rama de la historia, solo si el orquestador te la indico**: naces de `origin/main`, nunca de esa rama (#122). El orquestador te pasa `RAMA_HISTORIA` en el prompt cuando ya la pusheo; que no te la pase no es un error, es una respuesta valida por su cuenta — no la trates como "la rama no existe". Tres casos, nunca dos:
+   - **Te indico `RAMA_HISTORIA` y existe en el remoto**: `git fetch origin && git merge --no-edit origin/<RAMA_HISTORIA>` antes de leer nada (para una historia normal: `git merge --no-edit origin/hu/N-slug`). Sin este paso no vas a ver los modelos compartidos que el orquestador ya commiteo y pusheo en la Fase 2.
+   - **Te indico `RAMA_HISTORIA` y no existe en el remoto, o el merge trae conflictos**: detente y reportalo en tu output; no sigas al paso 1.
+   - **No te indico ninguna `RAMA_HISTORIA`**: no hay nada que sincronizar — tu worktree ya equivale a la base. Segui normalmente al paso 1 (es el camino normal de un hotfix nuevo de `flechodiezx-hotfix`, cuya rama `fix/N-<slug>` no se pushea salvo en reanudacion).
 
 1. **Leer la spec**: entidad, operaciones, reglas de negocio, permiso, endpoints (de la ficha y del contrato). Lee tambien `CLAUDE.md` del consumidor: sus convenciones mandan sobre las de este skill si difieren.
 
