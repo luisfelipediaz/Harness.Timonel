@@ -9,14 +9,16 @@ simetricas -- se activa con un `echo`/heredoc que solo NOMBRA la cadena
 porque entre `git` y `commit` queda `-C <ruta>`. Ambas evidenciadas en #174
 y consolidadas en #176.
 
-Reutiliza el tokenizador ya probado de `scripts/guard_integracion.py` via su
-seam publico `segmentar()` (envuelve `_normalizar_separadores` + `shlex.split`
-+ `_partir_en_segmentos`) y `_clave_y_resto()` (que ya sabe saltar flags
-globales de `git` -C/-c/--git-dir/etc., con valor pegado o separado, y
-descartar asignaciones `VAR=valor` delante del programa) para reconocer el
-subcomando real de cada segmento de un comando compuesto. NO se escribe un
-segundo parser, ni en shell ni en Python
-(`heuristics/general/sensor-importa-no-reimplementa.md`).
+Reutiliza el tokenizador ya probado de `scripts/guard_integracion.py` via sus
+DOS seams publicos: `segmentar()` (envuelve `_normalizar_separadores` +
+`shlex.split` + `_partir_en_segmentos`) y `clave_de_segmento()` (que delega en
+el parser interno que ya sabe saltar flags globales de `git`
+-C/-c/--git-dir/etc., con valor pegado o separado, y descartar asignaciones
+`VAR=valor` delante del programa) para reconocer el subcomando real de cada
+segmento de un comando compuesto. NO se escribe un segundo parser, ni en shell
+ni en Python (`heuristics/general/sensor-importa-no-reimplementa.md`), y
+tampoco se llama a ninguna funcion privada de `guard_integracion.py`: los dos
+seams publicos de arriba son el contrato completo entre ambos modulos.
 
 Tres respuestas, nunca dos (`heuristics/general/ausencia-de-evidencia.md`):
 `invoca_commit(cmd)` devuelve `True` (si invoca un commit real), `False` (no
@@ -84,7 +86,7 @@ def invoca_commit(cmd: str) -> bool | None:
         return None
     try:
         for segmento in segmentos:
-            clave, _resto = gi._clave_y_resto(segmento)
+            clave = gi.clave_de_segmento(segmento)
             if clave == CLAVE_COMMIT:
                 return True
         return False
