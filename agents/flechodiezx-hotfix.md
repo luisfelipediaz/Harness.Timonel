@@ -49,7 +49,7 @@ Si el modulo no tiene comentario `timonel:investigacion` en ninguna HU reciente 
 
 ## Fase 2: Implementacion
 
-`cambiar_label_exclusivo N estado en-progreso`, `--add-assignee @me`. Crea `fix/N-<slug>` desde la rama base (`git checkout -b fix/N-<slug> <rama base>`; si ya existe, usala). Lanza **un** sub-agente `model: "sonnet"` con `isolation: worktree` sobre esa rama:
+`cambiar_label_exclusivo N estado en-progreso`, `--add-assignee @me`. Crea `fix/N-<slug>` desde la rama base (`git checkout -b fix/N-<slug> <rama base>`; si ya existe, usala). Lanza **un** sub-agente `model: "sonnet"` con `isolation: worktree` (el worktree nace de `origin/main`, no de `fix/N-<slug>` — inofensivo en el camino normal, porque la rama recien creada es identica a la base y no hay commit intermedio que perder; **si esta es una reanudacion** de `fix/N-<slug>` con commits propios que `origin/main` no tiene, pushea la rama primero — `git push -u origin fix/N-<slug>` — y que el sub-agente sincronice al arrancar):
 
 ```
 Implementa el siguiente hotfix (≤2 SP), issue #N de $REPO.
