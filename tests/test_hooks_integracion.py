@@ -813,6 +813,7 @@ class DetectarCommitUnitarioTests(unittest.TestCase):
         ("grep con la cadena como patron", "grep -n 'git commit' archivo.txt", NO),
         ("printf con la cadena", 'printf "git commit"', NO),
         ("bash -n sobre un archivo llamado commit-msg", "bash -n .githooks/commit-msg", NO),
+        ("bash -n con el glob CRUDO sin expandir (AC6, #176/#122)", "bash -n scripts/*.sh .githooks/*", NO),
         ("git status", "git status", NO),
         ("git log", "git log", NO),
         ("git commit-graph write: subcomando DISTINTO que empieza con commit", "git commit-graph write", NO),
@@ -824,6 +825,55 @@ class DetectarCommitUnitarioTests(unittest.TestCase):
         for descripcion, cmd, esperado in self.CASOS:
             with self.subTest(caso=descripcion, cmd=cmd):
                 self.assertIs(dc.invoca_commit(cmd), esperado)
+
+
+class DetectarCommitSoloUsaSeamsPublicosDeGuardIntegracionTests(unittest.TestCase):
+    """Contrato entre modulos (#176, hallazgo 1 del code review): `detectar_commit.py`
+    solo puede depender de los DOS seams publicos de `guard_integracion.py` --
+    `segmentar()` y `clave_de_segmento()` -- nunca de una privada (prefijo `_`) como
+    `_clave_y_resto`, que el docstring de `guard_integracion.py` trata como zona
+    interna sujeta a cambiar sin aviso.
+
+    Prueba de COMPORTAMIENTO, no un `assertIn` sobre el texto del archivo (esa clase
+    de asercion esta prohibida en esta HU por vacua,
+    `heuristics/general/unidad-de-verificacion.md`): se sustituye el seam publico
+    `clave_de_segmento` por un doble que MIENTE deliberadamente, y se confirma que
+    `invoca_commit()` sigue el resultado del doble en vez del que devolveria el
+    parser real. Si `detectar_commit` llamara a `_clave_y_resto` directamente (el
+    defecto original), el doble de abajo no tendria ningun efecto y el test fallaria
+    -- es la mutacion que reproduce el hallazgo 1."""
+
+    def test_invoca_commit_sigue_el_resultado_del_seam_publico_no_la_privada(self):
+        original = gi.clave_de_segmento
+
+        def doble_que_miente(segmento):
+            # 'git status' NO invoca un commit real; el doble dice que si.
+            # Si invoca_commit usa el VALOR DEVUELTO por el seam publico, el
+            # resultado sigue al doble (True). Si en cambio resolviera la clave
+            # llamando `_clave_y_resto` por su cuenta (bypaseando este doble), el
+            # resultado real para 'git status' seria False y el test fallaria.
+            return dc.CLAVE_COMMIT
+
+        gi.clave_de_segmento = doble_que_miente
+        try:
+            resultado = dc.invoca_commit("git status")
+        finally:
+            gi.clave_de_segmento = original
+
+        self.assertTrue(
+            resultado,
+            "invoca_commit no siguio el resultado de clave_de_segmento(): "
+            "sugiere que resuelve la clave por otro camino (posible privada directa)",
+        )
+
+    def test_segmentar_y_clave_de_segmento_son_los_dos_seams_que_el_sensor_usa(self):
+        """Los dos seams publicos existen, son invocables desde fuera del modulo (sin
+        tocar `_clave_y_resto`) y, encadenados, reproducen la deteccion de un commit
+        real -- el mismo camino que sigue `invoca_commit()`."""
+        segmentos = gi.segmentar('git status && git commit -m "x"')
+        self.assertIsNotNone(segmentos)
+        claves = [gi.clave_de_segmento(s) for s in segmentos]
+        self.assertIn(dc.CLAVE_COMMIT, claves)
 
 
 class GuardCommitsDetectaCommitRealTests(unittest.TestCase):
@@ -900,7 +950,11 @@ class GuardCommitsDetectaCommitRealTests(unittest.TestCase):
 
     def test_entry_plugin_ac6_nombre_de_archivo_commit_msg_no_es_commit(self):
         comando = _comando_guard_commits_plugin()
-        for cmd in ("bash -n .githooks/commit-msg", "bash -n scripts/_common.sh .githooks/commit-msg"):
+        for cmd in (
+            "bash -n .githooks/commit-msg",
+            "bash -n scripts/_common.sh .githooks/commit-msg",
+            "bash -n scripts/*.sh .githooks/*",
+        ):
             with self.subTest(cmd=cmd):
                 tmp, tmp_path = self._con_repo("plugin", "main")
                 with tmp:
@@ -959,7 +1013,11 @@ class GuardCommitsDetectaCommitRealTests(unittest.TestCase):
 
     def test_entry_consumidor_ac6_nombre_de_archivo_commit_msg_no_es_commit(self):
         comando = _comando_guard_commits_consumidor()
-        for cmd in ("bash -n .githooks/commit-msg", "bash -n scripts/_common.sh .githooks/commit-msg"):
+        for cmd in (
+            "bash -n .githooks/commit-msg",
+            "bash -n scripts/_common.sh .githooks/commit-msg",
+            "bash -n scripts/*.sh .githooks/*",
+        ):
             with self.subTest(cmd=cmd):
                 tmp, tmp_path = self._con_repo("consumidor", "main")
                 with tmp:

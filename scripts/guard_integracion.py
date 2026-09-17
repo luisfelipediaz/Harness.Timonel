@@ -103,6 +103,17 @@ envuelve la misma tokenizacion de arriba (`_normalizar_separadores` +
 reconozca si un comando invoca un `git commit` real sin reimplementar el
 parser. No cambia nada de lo anterior: ni `MANEJADORES`, ni `decidir()`, ni
 sus mensajes, ni la politica de fail-open.
+
+Segundo seam publico (#176, hallazgo 1 del code review): `clave_de_segmento(segmento)
+-> tuple[str, ...] | None` toma UN segmento ya tokenizado (como los que devuelve
+`segmentar()`) y devuelve la clave de subcomando reconocida (p. ej. `("git",
+"commit")`, `("gh", "pr", "merge")`), o `None` si no matchea ninguna. Delega en
+`_clave_y_resto` -- que sigue siendo zona interna de este modulo, con el mismo
+derecho a cambiar sin aviso que ya declaraba el parser -- para no duplicar el
+salto de flags globales de `git` (`-C`/`-c`/`--git-dir`/etc.). Junto con
+`segmentar()`, son los DOS unicos seams publicos que `scripts/detectar_commit.py`
+consume; ninguno de los dos cambia `MANEJADORES`, `decidir()`, sus mensajes ni
+la politica de fail-open.
 """
 
 from __future__ import annotations
@@ -625,6 +636,19 @@ def segmentar(cmd: str) -> list[list[str]] | None:
     except ValueError:
         return None
     return _partir_en_segmentos(tokens)
+
+
+def clave_de_segmento(segmento: list[str]) -> tuple[str, ...] | None:
+    """Segundo seam publico (#176): dado UN segmento ya tokenizado (uno de los
+    que devuelve `segmentar()`), devuelve la clave de subcomando reconocida
+    (p. ej. `("git", "commit")`) o `None` si el segmento no matchea ninguna
+    clave conocida. Delega en `_clave_y_resto` y descarta el resto (los
+    argumentos posteriores al subcomando), que es un detalle de `decidir()`
+    que un consumidor externo como `scripts/detectar_commit.py` no necesita.
+    No reimplementa nada del salto de flags globales de `git` -- lo hereda de
+    `_clave_y_resto` (`heuristics/general/sensor-importa-no-reimplementa.md`)."""
+    clave, _resto = _clave_y_resto(segmento)
+    return clave
 
 
 def decidir(cmd: str, rama: str, bases: list[str]) -> str | None:
