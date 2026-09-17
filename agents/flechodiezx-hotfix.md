@@ -49,13 +49,14 @@ Si el modulo no tiene comentario `timonel:investigacion` en ninguna HU reciente 
 
 ## Fase 2: Implementacion
 
-`cambiar_label_exclusivo N estado en-progreso`, `--add-assignee @me`. Crea `fix/N-<slug>` desde la rama base (`git checkout -b fix/N-<slug> <rama base>`; si ya existe, usala). Lanza **un** sub-agente `model: "sonnet"` con `isolation: worktree` sobre esa rama:
+`cambiar_label_exclusivo N estado en-progreso`, `--add-assignee @me`. Crea `fix/N-<slug>` desde la rama base (`git checkout -b fix/N-<slug> <rama base>`; si ya existe, usala). Lanza **un** sub-agente `model: "sonnet"` con `isolation: worktree` (el worktree nace de `origin/main`, no de `fix/N-<slug>` — inofensivo en el camino normal, porque la rama recien creada es identica a la base y no hay commit intermedio que perder; en ese camino **no** incluyas `RAMA_HISTORIA` en el prompt de abajo, porque el Paso 0 de `implement-backend-story`/`implement-frontend-story` trata su ausencia como "nada que sincronizar" y sigue derecho — es el 100% de los hotfixes nuevos, #122. **Si esta es una reanudacion** de `fix/N-<slug>` con commits propios que `origin/main` no tiene, pushea la rama primero — `git push -u origin fix/N-<slug>` — y agrega `RAMA_HISTORIA: fix/N-<slug>` al prompt para que el sub-agente la sincronice en su Paso 0):
 
 ```
 Implementa el siguiente hotfix (≤2 SP), issue #N de $REPO.
 Usa el skill implement-<backend|frontend>-story: lee "$PLUGIN_ROOT/skills/implement-<backend|frontend>-story/SKILL.md".
 CONFIG: {api.* o frontend.* y modelos.alias segun capa}
 HISTORIA: {body del issue}
+{solo si es reanudacion: RAMA_HISTORIA: fix/N-<slug> — sincronizala en tu Paso 0 antes de implementar}
 RESTRICCIONES: trabajas en un worktree aislado, propio de este hotfix, sobre `fix/N-<slug>`. NO introduzcas endpoints, modelos compartidos, providers ni rutas nuevos; si lo necesitas, aborta e informa (no es hotfix). Commit final "fix(<modulo>): #N <descripcion>". NO ejecutes nx test. Informa en tu output el nombre exacto de la rama de tu worktree: la necesito para consolidar.
 ```
 

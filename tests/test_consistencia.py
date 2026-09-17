@@ -536,6 +536,162 @@ class WorktreeDeImplementacionTests(unittest.TestCase):
                     )
 
 
+class SincronizacionDelWorktreeTests(unittest.TestCase):
+    """Push + sincronizacion al arrancar (#122): el worktree de un sub-agente nace de
+    `origin/main`, nunca de la rama de la historia (#84, reconfirmado con sonda en vivo
+    por #122). La Fase 2 pushea la rama de la historia y cada sub-agente de un skill
+    `implement-*` sincroniza su worktree contra el remoto de esa rama (fetch + merge sin
+    editor) antes de empezar a trabajar. Molde de `WorktreeDeImplementacionTests`: ambito
+    parrafo, propiedad existencial, skills por glob (nunca lista de nombres).
+
+    Igual que la invariante de `isolation: worktree`, la unidad de verificacion es el
+    PARRAFO, no la seccion `## Fase 3`: esa seccion agrupa los lanzamientos de los tres
+    skills `implement-*`, y una asercion sobre toda la seccion (o sobre el archivo
+    entero) daria falso verde si el literal solo sobrevive en el parrafo del perfil
+    plugin (que ya lo tenia para la divergencia desde #84) mientras el parrafo del
+    perfil consumidor -- el que agrega esta HU -- se queda sin el. Es la reincidencia de
+    `heuristics/general/unidad-de-verificacion.md` que el contrato de #122 nombro por
+    adelantado.
+
+    Ronda de correccion del code review: dos casos mas. El primero (`RAMA_LITERAL`)
+    corrige el CRITICO 1 -- el Paso 0 original hardcodeaba `hu/<issue>-*` y por lo tanto
+    asumia que el orquestador SIEMPRE indica una rama, lo que rompe a
+    `flechodiezx-hotfix` en su camino normal (rama `fix/N-<slug>` no pusheada: no hay
+    nada que sincronizar, y no es lo mismo que "la rama no existe"). La correccion
+    parametriza el paso con `RAMA_HISTORIA`; este test verifica que cada `SKILL.md`
+    `implement-*` menciona esa variable en el mismo parrafo que declara la
+    sincronizacion -- no que el comportamiento condicional funcione en runtime (eso no
+    es verificable por texto), sino que el paso dejo de estar hardcodeado a una rama fija.
+    El segundo (`MERGE_BASE_LITERAL`) corrige el CRITICO 2 -- la verificacion objetiva
+    `git merge-base --is-ancestor` solo vivia en el perfil plugin; el perfil consumidor,
+    que es el que describe el Gherkin 1 de la HU, seguia confiando en el auto-reporte del
+    sub-agente."""
+
+    SYNC_LITERAL = "git merge --no-edit origin/hu"
+    DIVERGENCIA_LITERAL = "rev-list --left-right --count"
+    RAMA_LITERAL = "RAMA_HISTORIA"
+    MERGE_BASE_LITERAL = "merge-base --is-ancestor"
+
+    @staticmethod
+    def _skills_implement() -> list[str]:
+        return sorted(p.parent.name for p in (ROOT / "skills").glob("implement-*/SKILL.md"))
+
+    @staticmethod
+    def _parrafos(texto: str) -> list[str]:
+        """Bloques separados por linea en blanco: la unidad mas chica que todavia
+        contiene una instruccion de lanzamiento completa."""
+        return re.split(r"\n[ \t]*\n", texto)
+
+    def _parrafos_que_mencionan(self, skill: str) -> list[tuple]:
+        encontrados = []
+        for agente in sorted((ROOT / "agents").glob("*.md")):
+            for parrafo in self._parrafos(agente.read_text(encoding="utf-8")):
+                if skill in parrafo:
+                    encontrados.append((agente, parrafo))
+        return encontrados
+
+    def test_1_cada_skill_implement_tiene_un_parrafo_que_declara_sincronizacion(self):
+        for skill in self._skills_implement():
+            parrafos = self._parrafos_que_mencionan(skill)
+            self.assertTrue(parrafos, f"ningun agente menciona el skill `{skill}` en ningun parrafo")
+            sincronizados = [(a, p) for a, p in parrafos if self.SYNC_LITERAL in p]
+            self.assertTrue(
+                sincronizados,
+                f"ningun parrafo que menciona `{skill}` declara la sincronizacion con la "
+                f"rama de la historia: lo mencionan {[a.name for a, _ in parrafos]}, pero "
+                "ninguno en el mismo parrafo trae el fetch+merge contra el remoto de esa "
+                "rama. Un fetch+merge que vive en otro parrafo no cubre a este skill",
+            )
+
+    def test_2_cada_skill_md_implement_contiene_su_paso_de_sincronizacion(self):
+        for skill in self._skills_implement():
+            archivo = ROOT / "skills" / skill / "SKILL.md"
+            texto = archivo.read_text(encoding="utf-8")
+            self.assertIn(
+                self.SYNC_LITERAL, texto,
+                f"{archivo.relative_to(ROOT)} no declara el paso de sincronizacion con "
+                "la rama de la historia (fetch+merge contra el remoto de esa rama)",
+            )
+
+    def test_3_fase_3_mide_divergencia_en_los_dos_perfiles(self):
+        texto = (ROOT / "agents/flechodiezx.md").read_text(encoding="utf-8")
+        parrafos_con_divergencia = [p for p in self._parrafos(texto) if self.DIVERGENCIA_LITERAL in p]
+        self.assertTrue(
+            parrafos_con_divergencia,
+            f"agents/flechodiezx.md no mide divergencia ({self.DIVERGENCIA_LITERAL}) en ningun parrafo",
+        )
+        parrafo_consumidor = next(
+            (p for p in parrafos_con_divergencia if "**Perfil consumidor**" in p), None
+        )
+        self.assertIsNotNone(
+            parrafo_consumidor,
+            "ningun parrafo que arranca declarando el perfil consumidor mide la "
+            f"divergencia ({self.DIVERGENCIA_LITERAL}): esa medicion solo sobrevive en el "
+            "parrafo del perfil plugin (#84); el parrafo del perfil consumidor -- el que "
+            "agrega #122 -- se quedo sin ella",
+        )
+
+    def test_4_hotfix_no_afirma_que_el_worktree_nazca_sobre_su_rama_fix(self):
+        texto = (ROOT / "agents/flechodiezx-hotfix.md").read_text(encoding="utf-8")
+        self.assertNotIn(
+            "worktree` sobre esa rama",
+            texto,
+            "flechodiezx-hotfix.md no debe afirmar que el worktree nace sobre "
+            "`fix/N-<slug>`: como en flechodiezx, nace de `origin/main` (#122)",
+        )
+
+    def test_5_skill_implement_no_hardcodea_la_rama_de_sincronizacion(self):
+        """CRITICO 1 del review de correccion: el Paso 0 no puede asumir que el
+        orquestador siempre indica una rama -- `flechodiezx-hotfix` en su camino normal
+        no tiene ninguna que pasar. Cada `SKILL.md` `implement-*` debe declarar, en el
+        mismo parrafo que sincroniza, la variable `RAMA_HISTORIA` que distingue
+        "no me la indicaron" de "la rama no existe"."""
+        for skill in self._skills_implement():
+            archivo = ROOT / "skills" / skill / "SKILL.md"
+            texto = archivo.read_text(encoding="utf-8")
+            parrafos_con_sync = [p for p in self._parrafos(texto) if self.SYNC_LITERAL in p]
+            self.assertTrue(
+                parrafos_con_sync,
+                f"{archivo.relative_to(ROOT)} no declara el paso de sincronizacion",
+            )
+            parametrizados = [p for p in parrafos_con_sync if self.RAMA_LITERAL in p]
+            self.assertTrue(
+                parametrizados,
+                f"{archivo.relative_to(ROOT)} hardcodea la rama de sincronizacion: su "
+                f"parrafo de Paso 0 no menciona `{self.RAMA_LITERAL}`, la variable que "
+                "el orquestador usa para indicar (o no) la rama. Sin ella el paso no "
+                "distingue 'no me indicaron rama' de 'la rama no existe', y todo hotfix "
+                "nuevo que reuse este skill sobre `fix/N-<slug>` (nunca pusheada en el "
+                "camino normal) aborta buscando una rama que no aplica",
+            )
+
+    def test_6_fase_3_contrasta_merge_base_en_perfil_consumidor(self):
+        """CRITICO 2 del review de correccion: el contrato promete que el orquestador
+        'no le cree al sub-agente' y lo contraste con `git merge-base --is-ancestor`.
+        Esa verificacion objetiva solo vivia en el perfil plugin; el perfil consumidor
+        -- el que describe el Gherkin 1 de la HU -- no tenia ningun paso posterior al
+        lanzamiento que confirmara desde el arbol principal que la sincronizacion
+        ocurrio de verdad."""
+        texto = (ROOT / "agents/flechodiezx.md").read_text(encoding="utf-8")
+        parrafos_con_merge_base = [p for p in self._parrafos(texto) if self.MERGE_BASE_LITERAL in p]
+        self.assertTrue(
+            parrafos_con_merge_base,
+            f"agents/flechodiezx.md no contrasta la sincronizacion con "
+            f"`{self.MERGE_BASE_LITERAL}` en ningun parrafo",
+        )
+        parrafo_consumidor = next(
+            (p for p in parrafos_con_merge_base if "**Perfil consumidor**" in p), None
+        )
+        self.assertIsNotNone(
+            parrafo_consumidor,
+            "ningun parrafo que arranca declarando el perfil consumidor contrasta la "
+            f"sincronizacion con `{self.MERGE_BASE_LITERAL}`: esa verificacion objetiva "
+            "solo sobrevive en el parrafo del perfil plugin; el perfil consumidor -- el "
+            "que describe el Gherkin 1 de #122 -- seguia apoyado enteramente en el "
+            "auto-reporte del sub-agente",
+        )
+
+
 class DodEstrictoTests(unittest.TestCase):
     """DoD estricto (gap 3 de la auditoria #24, issue #28): sin autoevaluacion sin evaluador."""
 
