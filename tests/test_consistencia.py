@@ -571,6 +571,7 @@ class SincronizacionDelWorktreeTests(unittest.TestCase):
     DIVERGENCIA_LITERAL = "rev-list --left-right --count"
     RAMA_LITERAL = "RAMA_HISTORIA"
     MERGE_BASE_LITERAL = "merge-base --is-ancestor"
+    PUSH_LITERAL = "git push -u origin"
 
     @staticmethod
     def _skills_implement() -> list[str]:
@@ -581,6 +582,20 @@ class SincronizacionDelWorktreeTests(unittest.TestCase):
         """Bloques separados por linea en blanco: la unidad mas chica que todavia
         contiene una instruccion de lanzamiento completa."""
         return re.split(r"\n[ \t]*\n", texto)
+
+    @staticmethod
+    def _seccion(texto: str, titulo: str) -> str:
+        """Recorta desde `## <titulo>` hasta el siguiente encabezado de nivel 2
+        (`\\n## `), o el fin del archivo. Ancla real de #194: un parrafo que
+        menciona el literal correcto pero vive en otra seccion (o en `## Notas`)
+        no debe satisfacer un caso acotado a una fase concreta -- de lo
+        contrario el ancla no hace ningun trabajo (M8 del contrato)."""
+        inicio = texto.find(titulo)
+        if inicio == -1:
+            return ""
+        resto = texto[inicio + len(titulo):]
+        fin = resto.find("\n## ")
+        return resto if fin == -1 else resto[:fin]
 
     def _parrafos_que_mencionan(self, skill: str) -> list[tuple]:
         encontrados = []
@@ -689,6 +704,102 @@ class SincronizacionDelWorktreeTests(unittest.TestCase):
             "solo sobrevive en el parrafo del perfil plugin; el perfil consumidor -- el "
             "que describe el Gherkin 1 de #122 -- seguia apoyado enteramente en el "
             "auto-reporte del sub-agente",
+        )
+
+    def test_7_cada_skill_implement_mide_divergencia_contra_la_rama_local(self):
+        """Gherkin 3 y 7 de #194: la cuarta respuesta del Paso 0 -- `origin/<RAMA>`
+        atrasada respecto de la rama local -- vive en el MISMO parrafo que la
+        sincronizacion, no en un parrafo aparte (p. ej. el reporte de salida) donde
+        un `Already up to date` legitimo quedaria indistinguible del que miente."""
+        for skill in self._skills_implement():
+            with self.subTest(skill=skill):
+                archivo = ROOT / "skills" / skill / "SKILL.md"
+                texto = archivo.read_text(encoding="utf-8")
+                parrafos_con_sync = [p for p in self._parrafos(texto) if self.SYNC_LITERAL in p]
+                self.assertTrue(
+                    parrafos_con_sync,
+                    f"{archivo.relative_to(ROOT)} no declara el paso de sincronizacion",
+                )
+                con_divergencia = [p for p in parrafos_con_sync if self.DIVERGENCIA_LITERAL in p]
+                self.assertTrue(
+                    con_divergencia,
+                    f"{archivo.relative_to(ROOT)}: el parrafo del Paso 0 no mide "
+                    f"divergencia contra la rama local ({self.DIVERGENCIA_LITERAL}) -- sin "
+                    "eso, un `Already up to date` con el remoto atrasado se confunde con "
+                    "el no-op legitimo (heuristics/general/sensor-declara-su-evidencia.md)",
+                )
+
+    def test_8_consolidate_story_pushea_la_rama_de_la_historia(self):
+        """Gherkin 1 y 6 de #194: `consolidate-story` es el archivo que hoy no
+        aparece en ningun grep del mecanismo (`RAMA_HISTORIA` ni el literal de
+        sync) -- es justo donde nacen los commits que el remoto no ve tras la
+        consolidacion (merge de worktrees, providers/rutas, linea del CHANGELOG)."""
+        archivo = ROOT / "skills/consolidate-story/SKILL.md"
+        texto = archivo.read_text(encoding="utf-8")
+        con_push = [p for p in self._parrafos(texto) if self.PUSH_LITERAL in p]
+        self.assertTrue(
+            con_push,
+            f"{archivo.relative_to(ROOT)} no pushea la rama de la historia al cerrar "
+            f"la consolidacion (falta un parrafo con `{self.PUSH_LITERAL}`)",
+        )
+
+    def test_9_flechodiezx_pushea_antes_de_relanzar(self):
+        """Gherkin 2 de #194: antes de relanzar un sub-agente posterior a la
+        consolidacion (ronda de correccion del review en `## Fase 5.5`, o una
+        reanudacion en `## Fase 0.5`), el orden es push -> verificar -> pasar
+        `RAMA_HISTORIA`. El ancla es la SECCION, no el archivo entero:
+        `flechodiezx.md` ya trae cuatro `git push -u origin` desde antes de esta
+        HU (Fase 2, Fase 3 x2, Fase 6.5) -- una asercion de archivo entero pasa
+        hoy, con el arreglo revertido."""
+        texto = (ROOT / "agents/flechodiezx.md").read_text(encoding="utf-8")
+        for titulo in ("## Fase 0.5", "## Fase 5.5"):
+            with self.subTest(seccion=titulo):
+                seccion = self._seccion(texto, titulo)
+                self.assertTrue(seccion, f"agents/flechodiezx.md no tiene la seccion `{titulo}`")
+                parrafos = [
+                    p for p in self._parrafos(seccion)
+                    if self.PUSH_LITERAL in p and self.RAMA_LITERAL in p
+                ]
+                self.assertTrue(
+                    parrafos,
+                    f"la seccion `{titulo}` de agents/flechodiezx.md no tiene un parrafo "
+                    f"que pushee ({self.PUSH_LITERAL}) y recien despues pase "
+                    f"`{self.RAMA_LITERAL}` antes de relanzar un sub-agente",
+                )
+
+    def test_10_flechodiezx_pushea_al_cerrar_la_consolidacion(self):
+        """Gherkin 1 de #194: red de seguridad del orquestador sobre el push que
+        ya intento `consolidate-story` en su Fase C -- no un reemplazo."""
+        texto = (ROOT / "agents/flechodiezx.md").read_text(encoding="utf-8")
+        seccion = self._seccion(texto, "## Fases 4 y 5")
+        self.assertTrue(seccion, "agents/flechodiezx.md no tiene la seccion `## Fases 4 y 5`")
+        parrafos = [p for p in self._parrafos(seccion) if self.PUSH_LITERAL in p]
+        self.assertTrue(
+            parrafos,
+            "la seccion `## Fases 4 y 5` de agents/flechodiezx.md no pushea la rama de "
+            f"la historia al cerrar la consolidacion (falta un parrafo con "
+            f"`{self.PUSH_LITERAL}`)",
+        )
+
+    def test_11_hotfix_pushea_antes_de_relanzar_tras_el_review(self):
+        """Gherkin 2 (hotfix) de #194: misma precondicion push -> verificar ->
+        pasar `RAMA_HISTORIA`, ahora para `fix/N-<slug>`, acotada a la seccion
+        `## Fase 3`. `flechodiezx-hotfix.md` ya trae un parrafo con PUSH_LITERAL
+        y RAMA_LITERAL juntos en la Fase 2 (reanudacion) desde #122 -- ese
+        parrafo no debe satisfacer este caso, que es sobre la ronda de
+        correccion del review."""
+        texto = (ROOT / "agents/flechodiezx-hotfix.md").read_text(encoding="utf-8")
+        seccion = self._seccion(texto, "## Fase 3")
+        self.assertTrue(seccion, "agents/flechodiezx-hotfix.md no tiene la seccion `## Fase 3`")
+        parrafos = [
+            p for p in self._parrafos(seccion)
+            if self.PUSH_LITERAL in p and self.RAMA_LITERAL in p
+        ]
+        self.assertTrue(
+            parrafos,
+            "la seccion `## Fase 3` de agents/flechodiezx-hotfix.md no tiene un parrafo "
+            f"que pushee ({self.PUSH_LITERAL}) y recien despues pase "
+            f"`{self.RAMA_LITERAL}` antes de relanzar el sub-agente de correccion",
         )
 
 
