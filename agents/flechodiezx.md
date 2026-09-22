@@ -35,6 +35,8 @@ Si `REANUDAR_EN` no es `inicio`, anuncia "Reanudo #N desde la fase X" y **salta*
 
 Ademas, antes de lanzar cualquier sub-agente revisa si ya hay worktrees bajo `.claude/worktrees/` (`git worktree list --porcelain`) y clasificalos por `locked` y por si el pid que anoto el lock sigue vivo (`ps -p <pid>`): `locked` + pid vivo = un sub-agente sigue corriendo, no lo toques; sin `locked` y sin mergear = termino y falta consolidar (normal entre Fase 3 y Fase 4); `locked` + pid **muerto** = sesion caida a mitad de camino. Para este ultimo caso **reporta** el worktree, su rama y si tiene commits sin mergear, y **pregunta**: reusarlo (mergear su rama y saltar Fase 3) o descartarlo. Si el humano elige reusarlo, **esa rama es la que se guarda como `branch_worktree`** para `consolidate-story` (Fases 4-5), igual que si la hubiera devuelto el delta de la Fase 3. Nunca lo borres ni lo reuses por tu cuenta.
 
+Antes de relanzar cualquier sub-agente en esta reanudacion (Fase 3, Fase 5.5 o cualquier otra), la misma precondicion que la ronda de correccion de la Fase 5.5: push, verificar, recien entonces pasar la variable. `git push -u origin hu/N-slug`, despues `git rev-list --left-right --count hu/N-slug...origin/hu/N-slug`, y **solo si el resultado es `0 0`** agregas `RAMA_HISTORIA: hu/N-slug` al prompt y lanzas el sub-agente. Si el conteo no da `0 0`, no lo lances: reportalo (#194).
+
 ## Fase 1: Analisis del issue
 
 1. Si no recibiste numero: `gh issue list -R "$REPO" --label tipo:hu --label estado:listo --state open --json number,title,labels` y pide elegir uno. No leas otros issues.
@@ -141,9 +143,13 @@ Al terminar cada uno, marca `- [x] Backend` / `- [x] Frontend` segun corresponda
 
 **Perfil consumidor**: sub-agente `model: "sonnet"`, **sin** worktree, con el skill `consolidate-story` (`"$PLUGIN_ROOT/skills/consolidate-story/SKILL.md"`). Parametros: `issue`, `repo`, `modulo`, `alcance`, `app_destino`, `branch_worktree_backend|frontend` (o `N/A`), `output_sub_agente_backend|frontend`, `api.moduleFile`, `frontend.routesFile`, `api.project`, `frontend.project`. Devuelve el bloque `ARCHIVOS_*`, `LINT_RESULTADO`, `TESTS_RESULTADO`, etc. y publica `<!-- timonel:consolidacion -->`. Guarda el reporte para las fases siguientes.
 
+Con la consolidacion en verde (Fase B/lint+tests, ambos perfiles), verifica que `consolidate-story` efectivamente dejo pusheada la rama de la historia: `git rev-list --left-right --count hu/N-slug...origin/hu/N-slug`. Si el resultado no es `0 0`, pushea vos mismo -- `git push -u origin hu/N-slug` -- antes de seguir a la Fase 5.5: es la red de seguridad del orquestador sobre el push que el propio skill ya intento en su Fase C, no un reemplazo de ese push (#194).
+
 ## Fase 5.5: Code review (siempre)
 
 Sub-agente `model: "sonnet"`, sin worktree, skill `code-review`. Parametros: `issue`, `repo`, `modulo`, `alcance`, `archivos_modificados`, `plugin_root`. Devuelve `VEREDICTO`, `HALLAZGOS_CRITICOS`, `HALLAZGOS_WARNING`, `BLOQUEA_DOD`; publica `<!-- timonel:review -->` y label `review:*`. **No abortes** con `REQUIERE CAMBIOS`: la Fase 7 lo reporta y el humano decide. Si falla en ejecucion, **reintenta una vez** antes de marcar `VEREDICTO: NO_GENERADO` y continuar; `NO_GENERADO` produce `FALLAS_CRITICAS` en la Fase 7 (el issue no se cierra: el code review es obligatorio en `tipo:hu`).
+
+**Ronda de correccion**: si decidis relanzar un sub-agente de implementacion (mismo skill que uso la Fase 3, mismo perfil) para cerrar hallazgos `CRITICO` del review antes de seguir, el orden es estricto -- push, verificar, recien entonces pasar la variable: `git push -u origin hu/N-slug`, despues `git rev-list --left-right --count hu/N-slug...origin/hu/N-slug`, y **solo si el resultado es `0 0`** agregas `RAMA_HISTORIA: hu/N-slug` al prompt del sub-agente y lo lanzas. Si el conteo no es `0 0`, no pasas la variable y no lo lanzas: reportalo (el push fallo o no llego al remoto) antes de reintentar. Pushear y pasar la variable sin medir el conteo reproduce el defecto que esta HU cierra, una vuelta mas abajo -- un `Already up to date` que el sub-agente no puede distinguir de un no-op legitimo (#194).
 
 ## Fase 6: Retrospectiva (no bloqueante)
 

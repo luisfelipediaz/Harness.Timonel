@@ -83,6 +83,8 @@ Registra `LINT_RESULTADO`, `TESTS_RESULTADO` (`PASSED|FAILED|NO_SPECS`). Si fall
 
 Sub-agente `model: "sonnet"`, dentro de la rama `fix/N-<slug>` (ya consolidada tras el merge de la Fase 2), con `"$PLUGIN_ROOT/skills/code-review/SKILL.md"`. Parametros: `issue`, `repo`, `modulo`, `alcance`, `archivos_modificados`, `plugin_root`. Publica `<!-- timonel:review -->` + label `review:*`. No abortes con `REQUIERE CAMBIOS`. Si falla en ejecucion, **reintenta una vez** antes de marcar `VEREDICTO: NO_GENERADO`. Marca `- [x] Code review`.
 
+**Ronda de correccion**: si decidis relanzar el sub-agente de implementacion para cerrar hallazgos `CRITICO` del review antes de seguir a la Fase 4, la misma precondicion que en `flechodiezx`: push, verificar, recien entonces pasar la variable. `git push -u origin fix/N-<slug>`, despues `git rev-list --left-right --count fix/N-<slug>...origin/fix/N-<slug>`, y **solo si el resultado es `0 0`** agregas `RAMA_HISTORIA: fix/N-<slug>` al prompt del sub-agente y lo lanzas. Si el conteo no es `0 0`, no pasas la variable y no lo lanzas: reportalo. El camino normal de la Fase 2 (hotfix nuevo, sin reanudacion) no cambia: sigue sin pushear y sin pasar `RAMA_HISTORIA` (#194).
+
 ## Fase 4: Retro opcional
 
 Solo si el SP real difiere del estimado, el fix revelo un problema sistemico, o el review marco warnings repetidos. Usa `generate-retro` con los mismos parametros que `flechodiezx`. Si la saltas, dilo en el resumen final.
