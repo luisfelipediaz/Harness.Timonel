@@ -572,6 +572,8 @@ class SincronizacionDelWorktreeTests(unittest.TestCase):
     RAMA_LITERAL = "RAMA_HISTORIA"
     MERGE_BASE_LITERAL = "merge-base --is-ancestor"
     PUSH_LITERAL = "git push -u origin"
+    CONCLUSION_DIVERGENCIA_LITERAL = "no sigas al paso 1"
+    CONDICION_PUSH_LITERAL = "`0 0`"
 
     @staticmethod
     def _skills_implement() -> list[str]:
@@ -582,6 +584,27 @@ class SincronizacionDelWorktreeTests(unittest.TestCase):
         """Bloques separados por linea en blanco: la unidad mas chica que todavia
         contiene una instruccion de lanzamiento completa."""
         return re.split(r"\n[ \t]*\n", texto)
+
+    @staticmethod
+    def _casos(parrafo: str) -> list[str]:
+        """Recorta un parrafo en sus items de lista (bullets `- **...**: ...`):
+        los cuatro casos del Paso 0 ("Cuatro casos, nunca dos") viven en el
+        MISMO parrafo -- sin linea en blanco entre bullets -- asi que una
+        asercion a nivel parrafo no distingue el caso que mide divergencia del
+        caso vecino que tambien dice "no sigas al paso 1" por otro motivo
+        (WARNING 1 del review de #194: una mutacion que vacia la conclusion de
+        un solo caso no hace fallar nada si el chequeo mira el parrafo entero)."""
+        return re.split(r"\n(?=[ \t]*-\s)", parrafo)
+
+    @staticmethod
+    def _oraciones(texto: str) -> list[str]:
+        """Divide en oraciones por punto seguido de espacio: la unidad mas chica
+        donde push, la condicion `0 0` y RAMA_HISTORIA conviven en la prosa de
+        la Fase 5.5/0.5/3. El mismo parrafo repite `0 0` en la oracion vecina
+        que describe el camino negativo ("Si el conteo no es `0 0`, no pasas la
+        variable..."), asi que una asercion a nivel parrafo no distingue la
+        condicion vinculante de esa repeticion (WARNING 2 del review de #194)."""
+        return re.split(r"(?<=\.)\s+", texto)
 
     @staticmethod
     def _seccion(texto: str, titulo: str) -> str:
@@ -728,6 +751,29 @@ class SincronizacionDelWorktreeTests(unittest.TestCase):
                     "eso, un `Already up to date` con el remoto atrasado se confunde con "
                     "el no-op legitimo (heuristics/general/sensor-declara-su-evidencia.md)",
                 )
+                casos_con_divergencia = [
+                    caso
+                    for p in con_divergencia
+                    for caso in self._casos(p)
+                    if self.DIVERGENCIA_LITERAL in caso
+                ]
+                self.assertTrue(
+                    casos_con_divergencia,
+                    f"{archivo.relative_to(ROOT)}: ningun caso (bullet) del Paso 0 mide "
+                    f"divergencia ({self.DIVERGENCIA_LITERAL})",
+                )
+                casos_con_conclusion = [
+                    caso for caso in casos_con_divergencia
+                    if self.CONCLUSION_DIVERGENCIA_LITERAL in caso
+                ]
+                self.assertTrue(
+                    casos_con_conclusion,
+                    f"{archivo.relative_to(ROOT)}: el caso (bullet) que mide divergencia "
+                    f"({self.DIVERGENCIA_LITERAL}) no concluye deteniendose "
+                    f"({self.CONCLUSION_DIVERGENCIA_LITERAL}) en ese MISMO bullet -- una "
+                    "medicion sin la conclusion condicional que el Gherkin exige es el "
+                    "\"no se\" colapsado en \"no\" otra vez, una capa mas arriba",
+                )
 
     def test_8_consolidate_story_pushea_la_rama_de_la_historia(self):
         """Gherkin 1 y 6 de #194: `consolidate-story` es el archivo que hoy no
@@ -766,6 +812,20 @@ class SincronizacionDelWorktreeTests(unittest.TestCase):
                     f"que pushee ({self.PUSH_LITERAL}) y recien despues pase "
                     f"`{self.RAMA_LITERAL}` antes de relanzar un sub-agente",
                 )
+                oraciones_con_condicion = [
+                    o
+                    for p in parrafos
+                    for o in self._oraciones(p)
+                    if self.PUSH_LITERAL in o and self.RAMA_LITERAL in o
+                    and self.CONDICION_PUSH_LITERAL in o
+                ]
+                self.assertTrue(
+                    oraciones_con_condicion,
+                    f"la seccion `{titulo}` de agents/flechodiezx.md pushea y pasa "
+                    f"`{self.RAMA_LITERAL}` pero ninguna ORACION ata esa secuencia a la "
+                    f"condicion vinculante ({self.CONDICION_PUSH_LITERAL}) -- pasar la "
+                    "variable sin la condicion reproduce el defecto que #194 cierra",
+                )
 
     def test_10_flechodiezx_pushea_al_cerrar_la_consolidacion(self):
         """Gherkin 1 de #194: red de seguridad del orquestador sobre el push que
@@ -800,6 +860,20 @@ class SincronizacionDelWorktreeTests(unittest.TestCase):
             "la seccion `## Fase 3` de agents/flechodiezx-hotfix.md no tiene un parrafo "
             f"que pushee ({self.PUSH_LITERAL}) y recien despues pase "
             f"`{self.RAMA_LITERAL}` antes de relanzar el sub-agente de correccion",
+        )
+        oraciones_con_condicion = [
+            o
+            for p in parrafos
+            for o in self._oraciones(p)
+            if self.PUSH_LITERAL in o and self.RAMA_LITERAL in o
+            and self.CONDICION_PUSH_LITERAL in o
+        ]
+        self.assertTrue(
+            oraciones_con_condicion,
+            "la seccion `## Fase 3` de agents/flechodiezx-hotfix.md pushea y pasa "
+            f"`{self.RAMA_LITERAL}` pero ninguna ORACION ata esa secuencia a la condicion "
+            f"vinculante ({self.CONDICION_PUSH_LITERAL}) -- pasar la variable sin la "
+            "condicion reproduce el defecto que #194 cierra",
         )
 
 
