@@ -74,6 +74,7 @@ duplicada|CFD3D7|Duplicada de otra HU
 obsoleta|CFD3D7|Reemplazada o ya no aplica
 insights|5319E7|Insights destilados (retro/review)
 harness-audit|0E8A16|Auditoria de madurez del harness
+draft-intencional|CFD3D7|PR en draft a propósito: PoC o rama que no se mergea
 EOF
 }
 LABELS="$(labels_base)"
