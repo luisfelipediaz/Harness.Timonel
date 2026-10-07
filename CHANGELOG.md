@@ -1,7 +1,8 @@
 # Changelog
 
-## 0.8.0 — en desarrollo
+## 0.8.0 — 2026-10-07
 
+- Skill nuevo `disenar`: guia el diseño de una interfaz desde la investigacion de tendencias y el sistema de diseño del proyecto hasta un prototipo interactivo con escenarios reproducibles, y lo entrega como canvas de Claude Design (un artboard por estado de cada pantalla). Sus scripts node (`capture.js`, `build.js`, `verify.js`) congelan cada estado, arman los `.dc.html` con un solo `<helmet>` y los empaquetan en el editor del canvas publicado; se resuelven desde `PLUGIN_ROOT` (#205)
 - El orquestador `flechodiezx` (y su variante `flechodiezx-hotfix`) mide, no asume, que `hu/N-slug` (`fix/N-slug` en el hotfix) quedo pusheada antes de relanzar cualquier sub-agente de implementacion (Fase 3, ronda de correccion de la Fase 5.5): `git push -u origin <rama>` y recien despues `git rev-list --left-right --count <rama>...origin/<rama>`, y solo pasa `RAMA_HISTORIA` al sub-agente si el resultado es `0 0` — pushear y confiar sin medir reproducia el defecto que esta HU cierra un nivel mas abajo, porque `git merge --no-edit origin/<rama>` responde el mismo `Already up to date` tanto si no habia nada que traer como si el remoto consultado estaba atrasado. `consolidate-story` agrega el punto 3 de su Fase C (y el paso equivalente del perfil plugin): pushea la rama de la historia despues del commit del CHANGELOG y del comentario `timonel:consolidacion`, y reporta `PUSH_RAMA_HISTORIA: si | no (<motivo>)`. Los sub-agentes `implement-backend-story`, `implement-frontend-story` e `implement-plugin-change` suman el cuarto caso de su Paso 0: `RAMA_HISTORIA` existe en el remoto pero atrasada respecto de la rama local, detectado con el mismo `git rev-list --left-right --count` antes de mergear, y tratado como "no se" (se detienen y reportan) en vez de "no" (#194)
 
 ## 0.7.0 — 2026-09-21
