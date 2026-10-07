@@ -41,7 +41,7 @@ No hay providers ni rutas que registrar. Orden estricto: **merge → Fase B (tes
   Nunca `--force` en `worktree remove` ni `-D` en `branch -d`: si cualquiera falla (cambios sin commitear en el worktree, o la rama no quedo mergeada), no insistas — repórtalo y segui.
 - **Fase B**: recien ahora, sobre `hu/<issue>-*` ya con el merge aplicado: `python3 -m unittest discover -s tests` → `TESTS_RESULTADO`; `bash -n scripts/*.sh .githooks/*` y `jq . .claude-plugin/plugin.json .claude-plugin/marketplace.json hooks/hooks.json >/dev/null` → `LINT_RESULTADO`. Mismas reglas de 2 intentos.
 - **CHANGELOG**: con la Fase B en verde y siempre desde el checkout de `hu/<issue>-*` (nunca desde el worktree, que ya se borro), agrega bajo `## <version_en_desarrollo> — en desarrollo` una linea `- <resumen del cambio> (#<issue>)` (crea la seccion si no existe y actualiza `.claude-plugin/plugin.json` a esa version). Commit `chore: changelog #<issue>`.
-- **Fase C** igual: el checklist `## Tareas` es el estandar de `plantilla-hu.md`; marca `Backend` (la implementacion), `Consolidación (lint + tests)` y, si `Contrato API aprobado`/`Modelos compartidos` no aplican, dejalos sin marcar (el DoD los trata como SKIPPED en perfil plugin). Publica el comentario `timonel:consolidacion` con `providers_registrados: n-a`, `rutas_registradas: n-a`.
+- **Fase C** igual: el checklist `## Tareas` es el estandar de `plantilla-hu.md`; marca `Backend` (la implementacion), `Consolidación (lint + tests)` y, si `Contrato API aprobado`/`Modelos compartidos` no aplican, dejalos sin marcar (el DoD los trata como SKIPPED en perfil plugin). Publica el comentario `timonel:consolidacion` con `providers_registrados: n-a`, `rutas_registradas: n-a`, y hace tambien el push del punto 3 de la Fase C general -- queda despues del commit del CHANGELOG, con la Fase B ya en verde.
 
 ## Fase A: Consolidacion
 
@@ -74,6 +74,7 @@ Sigue el skill `github-issues` (`PLUGIN_ROOT/skills/github-issues/SKILL.md`):
 
 1. Marca en `## Tareas`: `- [x] Consolidación (lint + tests)` solo si lint y tests son `PASSED` o `NO_SPECS`.
 2. Publica `<!-- timonel:consolidacion -->` con el formato de `references/marcadores.md` (YAML: fecha, lint, tests, providers_registrados, rutas_registradas; secciones Archivos, Correcciones aplicadas, Pendientes y notas de migracion). Valida con `python3 PLUGIN_ROOT/scripts/validar_marcador.py <archivo> --tipo consolidacion` y luego `publicar_marcador` (edita si ya existe).
+3. Con la Fase B en verde y el comentario `timonel:consolidacion` ya publicado, pushea la rama de la historia: `git push -u origin <rama de la historia>` (ejemplo real: `git push -u origin hu/N-slug`). La consolidacion dejo commits locales que el remoto todavia no tiene -- el merge `--no-ff` de los worktrees, el registro de providers/rutas y la linea del CHANGELOG -- y son justo los que el Paso 0 de una ronda posterior (correccion de review, reanudacion) necesita encontrar pusheados; sin este push, ese Paso 0 mide divergencia contra un remoto atrasado y no puede distinguirlo de estar al dia (#194). Si el push falla (sin remoto, sin permisos), no lo reintentes: registralo en `PENDIENTES` y reporta `PUSH_RAMA_HISTORIA: no (<motivo>)`; si tuvo exito, `PUSH_RAMA_HISTORIA: si`.
 
 ## Reporte de salida (obligatorio)
 
@@ -89,6 +90,7 @@ TESTS_RESULTADO: [PASSED | FAILED | NO_SPECS | <error exacto>]
 ERRORES_CORREGIDOS: [descripcion breve, o "Ninguno"]
 PENDIENTES: [lista, o "Ninguno"]
 NOTAS_MIGRACION: [env vars, cambios de BD, o "Ninguno"]
+PUSH_RAMA_HISTORIA: [si | no | <motivo>]
 ```
 
 ## Manejo de errores
