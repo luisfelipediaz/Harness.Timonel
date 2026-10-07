@@ -7,6 +7,7 @@ de comentarios con marcador (TIM-ADR-0001) y modelos Retro/Review.
 
 from __future__ import annotations
 
+import argparse
 import json
 import re
 import subprocess
@@ -14,6 +15,16 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 CONFIG_PATH = Path(".claude/timonel.config.json")
+
+
+def numero_issue(valor: str) -> int:
+    """`type=` de argparse para el posicional `issue`: acepta `223` y `#223` (#231)."""
+    texto = valor.strip()
+    numero = texto[1:] if texto.startswith("#") else texto
+    if not numero.isdigit():
+        raise argparse.ArgumentTypeError(f"numero de issue invalido: {valor!r} (usa 223 o #223)")
+    return int(numero)
+
 
 MARCADOR_RETRO = "retro"
 MARCADOR_REVIEW = "review"

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.0 — en desarrollo
+
+- Los sensores que reciben el numero de issue como posicional (`dor_check`, `estado_historia`, `contrato_check`, `integracion`, `cosechar_retro`, `pr_check`) lo aceptan con o sin `#` (`223` y `#223`) via `numero_issue()` en `scripts/timonel_gh.py`: `/timonel:implement #223` pasaba `#223` tal cual y `argparse` salia 2 con `invalid int value`. Un valor no numerico sigue saliendo 2 con mensaje claro (#231)
+
 ## 0.8.0 — 2026-10-07
 
 - Skill nuevo `disenar`: guia el diseño de una interfaz desde la investigacion de tendencias y el sistema de diseño del proyecto hasta un prototipo interactivo con escenarios reproducibles, y lo entrega como canvas de Claude Design (un artboard por estado de cada pantalla). Sus scripts node (`capture.js`, `build.js`, `verify.js`) congelan cada estado, arman los `.dc.html` con un solo `<helmet>` y los empaquetan en el editor del canvas publicado; se resuelven desde `PLUGIN_ROOT` (#205)
