@@ -877,6 +877,159 @@ class SincronizacionDelWorktreeTests(unittest.TestCase):
         )
 
 
+class ModoRamaDelUsuarioTests(unittest.TestCase):
+    """Modo de trabajo "rama del usuario" (#221): el usuario pide una rama y un worktree
+    propios (una PoC, una rama que no se mergea) y ese modo es un caso de primera clase
+    en cada fase de `agents/flechodiezx.md`, de la Fase 1 al DoD, mas `consolidate-story`
+    y `verify-dod`. Escenarios 1-6 de la HU: un caso por fase/archivo, **por parrafo**
+    (molde de `SincronizacionDelWorktreeTests`; `_seccion` y `_parrafos` se reusan de ahi,
+    no se reimplementan).
+
+    Cada parrafo del modo empieza con `**Modo rama del usuario (Fase X ...)**` y vive en
+    su propia seccion `## Fase ...`: un literal correcto en otro parrafo o en otra fase no
+    satisface el caso (heuristics/general/unidad-de-verificacion.md). Cada caso busca SU
+    parrafo por marcador y exige exactamente uno: quitar ese parrafo rompe ese caso y
+    ninguno otro.
+
+    D9 (contra la trampa de `WorktreeDeImplementacionTests`): esos parrafos van aparte del
+    que lanza `implement-*` con aislamiento, **no nombran** ningun skill `implement-*` y
+    **no contienen** el literal de isolation (dicen "sin `isolation`"). Asi ni satisfacen
+    ni rompen esa asercion. `test_d9_...` lo verifica por glob y es no vacuo: exige al
+    menos un parrafo del modo, no un numero fijo, para que quitar uno solo no lo rompa.
+
+    Escenario 7 (verificado a mano por mutacion, #221): quitar solo el parrafo
+    `**Modo rama del usuario — perfil plugin (Fase 3)**` hace fallar unicamente
+    `test_3a_fase_3_perfil_plugin`; `WorktreeDeImplementacionTests` (los tres casos) y
+    `SincronizacionDelWorktreeTests` siguen en verde, y `test_d9_...` tambien (quedan los
+    otros parrafos del modo). Lo inverso tambien se verifico: mover `isolation: worktree`
+    al parrafo del modo usuario no lo salva a `WorktreeDeImplementacionTests`, que lo
+    sigue exigiendo en el parrafo del lanzamiento original."""
+
+    MARCADOR = "**Modo rama del usuario"
+    PARRAFO = staticmethod(SincronizacionDelWorktreeTests._parrafos)
+    SECCION = staticmethod(SincronizacionDelWorktreeTests._seccion)
+
+    @staticmethod
+    def _flechodiezx() -> str:
+        return (ROOT / "agents/flechodiezx.md").read_text(encoding="utf-8")
+
+    def _parrafo_del_modo(self, titulo_seccion: str, marcador: str) -> str:
+        seccion = self.SECCION(self._flechodiezx(), titulo_seccion)
+        self.assertTrue(seccion, f"agents/flechodiezx.md no tiene la seccion `{titulo_seccion}`")
+        encontrados = [p for p in self.PARRAFO(seccion) if p.lstrip().startswith(marcador)]
+        self.assertEqual(
+            len(encontrados), 1,
+            f"`{titulo_seccion}` debe tener exactamente un parrafo que empieza con `{marcador}` "
+            f"(hay {len(encontrados)}): el modo rama del usuario de esa fase no esta documentado",
+        )
+        return encontrados[0]
+
+    def _exige(self, parrafo: str, literales: tuple[str, ...], donde: str) -> None:
+        for literal in literales:
+            self.assertIn(literal, parrafo, f"{donde}: el parrafo del modo usuario debe contener `{literal}`")
+
+    def test_1_fase_1_paso_7_no_crea_rama_y_aplica_guardas(self):
+        parrafo = self._parrafo_del_modo("## Fase 1: Analisis del issue", f"{self.MARCADOR} (Fase 1, paso 7)")
+        self._exige(parrafo, (
+            "no crees `hu/N-<slug>`", "nunca `git checkout`", "`main` o `master`", "**detente**",
+            "git -C <ruta> branch --show-current", '"no se"',
+            "`rama`, `ruta`, `base` y `pr_draft_intencional`", "--add-label draft-intencional",
+        ), "Fase 1")
+
+    def test_2_fase_2_declara_la_seccion_modo_de_trabajo_en_el_contrato(self):
+        parrafo = self._parrafo_del_modo("## Fase 2: Contrato API y modelos compartidos", f"{self.MARCADOR} (Fase 2")
+        self._exige(parrafo, (
+            "`### Modo de trabajo`", "`rama`, `ruta`, `base` y `pr_draft_intencional`", "timonel:contrato-api",
+        ), "Fase 2")
+
+    def test_3a_fase_3_perfil_plugin(self):
+        parrafo = self._parrafo_del_modo("## Fase 3: Ejecucion paralela", f"{self.MARCADOR} — perfil plugin (Fase 3)")
+        self._exige(parrafo, (
+            "sin `isolation`", "sin `RAMA_HISTORIA`", "`worktree-agent-*`",
+            "git -C <ruta> rev-list --count <base>..<rama>", "mas de 0", "da `0`", '"no se"', "nunca lo trates como `0`",
+        ), "Fase 3 plugin")
+
+    def test_3b_fase_3_perfil_consumidor(self):
+        parrafo = self._parrafo_del_modo("## Fase 3: Ejecucion paralela", f"{self.MARCADOR} — perfil consumidor (Fase 3)")
+        self._exige(parrafo, (
+            "sin `isolation`", "sin `RAMA_HISTORIA`", "`worktree-agent-*`", "en secuencia",
+            "git -C <ruta> rev-list --count <base>..<rama>", '"no se"',
+        ), "Fase 3 consumidor")
+
+    def test_4_fases_4_y_5_pasan_modo_rama_y_ruta_a_consolidate_story(self):
+        parrafo = self._parrafo_del_modo("## Fases 4 y 5: Consolidacion", f"{self.MARCADOR} (Fases 4-5")
+        self._exige(parrafo, (
+            "`consolidate-story`", "`modo_rama: usuario`", "`ruta_trabajo: <ruta>`",
+            "git -C <ruta> rev-list --left-right --count <rama>...origin/<rama>", "`0 0`",
+        ), "Fases 4-5")
+
+    def test_5_fase_6_5_abre_el_pr_de_la_rama_del_usuario_con_draft_condicional(self):
+        parrafo = self._parrafo_del_modo("## Fase 6.5: Integracion", f"{self.MARCADOR} (Fase 6.5)")
+        self._exige(parrafo, (
+            "git -C <ruta> push -u origin <rama>", "--rama <rama del usuario>", "--base <base declarada>",
+            "`--draft` solo si `pr_draft_intencional: si`", "gh pr create --draft",
+        ), "Fase 6.5")
+
+    def test_6_fase_7_verifica_en_la_ruta_y_el_draft_sano_es_pendiente(self):
+        parrafo = self._parrafo_del_modo("## Fase 7: Definition of Done", f"{self.MARCADOR} (Fase 7)")
+        self._exige(parrafo, (
+            "`directorio_trabajo: <ruta>`", "`PENDIENTES`", "**no** vuelve a `estado:en-progreso`",
+        ), "Fase 7")
+
+    def test_7_consolidate_story_declara_parametros_y_distingue_el_caso_del_motivo(self):
+        texto = (ROOT / "skills/consolidate-story/SKILL.md").read_text(encoding="utf-8")
+        tabla = self.SECCION(texto, "## Parametros de entrada")
+        self._exige(tabla, ("| `modo_rama` |", "`harness` (default)", "| `ruta_trabajo`"), "consolidate-story, tabla")
+        seccion = self.SECCION(texto, "## Modo rama del usuario (`modo_rama: usuario`)")
+        self.assertTrue(seccion, "consolidate-story no tiene la seccion del modo rama del usuario")
+        casos = SincronizacionDelWorktreeTests._casos(seccion)
+        fase_a = [c for c in casos if c.lstrip().startswith("- **Fase A**")]
+        fase_b = [c for c in casos if c.lstrip().startswith("- **Fase B**")]
+        self.assertEqual((len(fase_a), len(fase_b)), (1, 1), "faltan los bullets Fase A / Fase B del modo usuario")
+        self._exige(fase_a[0], ("sin merge", "`git worktree remove`", "`git branch -d`"), "consolidate-story, Fase A")
+        self._exige(fase_b[0], ("`ruta_trabajo`",), "consolidate-story, Fase B")
+        self._exige(seccion, (
+            "`branch_worktree` trae un motivo", "se detiene sin Fase B",
+            "Merge: n-a — rama pedida por el usuario (<rama>, <ruta>)",
+        ), "consolidate-story, modo usuario")
+
+    def test_8_verify_dod_declara_directorio_de_trabajo_para_pr_check_y_los_diff(self):
+        texto = (ROOT / "skills/verify-dod/SKILL.md").read_text(encoding="utf-8")
+        self._exige(self.SECCION(texto, "## Parametros de entrada"), ("| `directorio_trabajo` |",), "verify-dod, tabla")
+        parrafos = [p for p in self.PARRAFO(texto) if p.startswith("**`directorio_trabajo`**")]
+        self.assertEqual(len(parrafos), 1, "verify-dod debe explicar `directorio_trabajo` en un parrafo propio")
+        self._exige(parrafos[0], ("`pr_check.py`", "items 3, 5 y 10", "git -C <directorio_trabajo>"), "verify-dod")
+
+    def test_9_el_modo_harness_queda_identico(self):
+        """Escenario 6: el modo de hoy sigue entero, cada literal en su fase."""
+        texto = self._flechodiezx()
+        esperado = {
+            "## Fase 1: Analisis del issue": ("git checkout -b hu/N-<slug>",),
+            "## Fase 3: Ejecucion paralela": (
+                "isolation: worktree", "git branch --list 'worktree-agent-*'", "merge-base --is-ancestor hu/N-slug",
+            ),
+            "## Fases 4 y 5: Consolidacion": ("`branch_worktree`", "git push -u origin hu/N-slug"),
+            "## Fase 6.5: Integracion": ("--rama hu/N-<slug>", "git push -u origin hu/N-<slug>"),
+        }
+        for titulo, literales in esperado.items():
+            seccion = self.SECCION(texto, titulo)
+            fuera_del_modo = "\n\n".join(p for p in self.PARRAFO(seccion) if not p.lstrip().startswith(self.MARCADOR))
+            self._exige(fuera_del_modo, literales, f"{titulo} (modo harness, fuera de los parrafos del modo usuario)")
+
+    def test_d9_los_parrafos_del_modo_usuario_no_tocan_la_asercion_de_aislamiento(self):
+        parrafos = [p for p in self.PARRAFO(self._flechodiezx()) if p.lstrip().startswith(self.MARCADOR)]
+        self.assertTrue(parrafos, "no hay ningun parrafo del modo rama del usuario: la regla seria vacua")
+        skills = sorted(p.parent.name for p in (ROOT / "skills").glob("implement-*/SKILL.md"))
+        self.assertTrue(skills, "glob de skills implement-* vacio: la regla seria vacua")
+        for parrafo in parrafos:
+            titulo = parrafo.splitlines()[0][:60]
+            self.assertNotIn("isolation: worktree", parrafo, f"{titulo}: no repitas el literal de isolation (D9)")
+            for skill in skills:
+                self.assertNotIn(skill, parrafo, f"{titulo}: no nombres `{skill}` (D9: dice 'el mismo skill de implementacion')")
+            for frase in WorktreeDeImplementacionTests.FRASES_PROHIBIDAS:
+                self.assertNotIn(frase, parrafo, f"{titulo}: no digas `{frase}`")
+
+
 class DodEstrictoTests(unittest.TestCase):
     """DoD estricto (gap 3 de la auditoria #24, issue #28): sin autoevaluacion sin evaluador."""
 
