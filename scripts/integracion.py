@@ -82,31 +82,33 @@ def datos_remote(url: str) -> dict[str, str]:
 
 # Todo valor interpolado pasa por shlex.quote: el agente ejecuta el comando con `eval`,
 # y un titulo con apostrofo (o un cuerpo con `$(...)`) no debe romperlo ni ejecutarse.
-def _cmd_gh(datos: dict[str, str], rama: str, base: str, titulo: str, body_file: str) -> str:
+def _cmd_gh(datos: dict[str, str], rama: str, base: str, titulo: str, body_file: str, draft: bool = False) -> str:
     q = shlex.quote
-    return f"gh pr create --base {q(base)} --head {q(rama)} --title {q(titulo)} --body-file {q(body_file)}"
+    marca = "--draft " if draft else ""
+    return f"gh pr create {marca}--base {q(base)} --head {q(rama)} --title {q(titulo)} --body-file {q(body_file)}"
 
 
-def _cmd_az(datos: dict[str, str], rama: str, base: str, titulo: str, body_file: str) -> str:
+def _cmd_az(datos: dict[str, str], rama: str, base: str, titulo: str, body_file: str, draft: bool = False) -> str:
     q = shlex.quote
+    marca = "--draft true " if draft else ""
     return (
-        f"az repos pr create --source-branch {q(rama)} --target-branch {q(base)} "
+        f"az repos pr create {marca}--source-branch {q(rama)} --target-branch {q(base)} "
         f"--title {q(titulo)} --description {q('@' + body_file)} "
         f"--repository {q(datos['repo'])} --organization {q(datos['organization_url'])} --project {q(datos['project'])}"
     )
 
 
-COMANDOS: dict[str, Callable[[dict[str, str], str, str, str, str], str]] = {
+COMANDOS: dict[str, Callable[[dict[str, str], str, str, str, str, bool], str]] = {
     "github": _cmd_gh,
     "azure-devops": _cmd_az,
 }
 
 
-def comando_pr(url: str, rama: str, base: str, titulo: str, body_file: str) -> str:
+def comando_pr(url: str, rama: str, base: str, titulo: str, body_file: str, draft: bool = False) -> str:
     tipo = tipo_remote(url)
     if tipo not in COMANDOS:
         raise ValueError(f"tipo de remote desconocido: {url!r}")
-    return COMANDOS[tipo](datos_remote(url), rama, base, titulo, body_file)
+    return COMANDOS[tipo](datos_remote(url), rama, base, titulo, body_file, draft)
 
 
 def titulo_pr(titulo_issue: str, issue: int) -> str:
@@ -165,6 +167,7 @@ def main() -> None:
     parser.add_argument("--repo")
     parser.add_argument("--body-out")
     parser.add_argument("--tipo-remote", action="store_true")
+    parser.add_argument("--draft", action="store_true")
     args = parser.parse_args()
 
     url = args.remote_url or _remote_actual()
@@ -191,7 +194,7 @@ def main() -> None:
         body_file = "<archivo>"
 
     try:
-        print(comando_pr(url, args.rama, args.base, titulo, body_file))
+        print(comando_pr(url, args.rama, args.base, titulo, body_file, args.draft))
     except ValueError as exc:
         print(str(exc), file=sys.stderr)
         sys.exit(1)
