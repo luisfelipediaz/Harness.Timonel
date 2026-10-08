@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.10.0 — en desarrollo
+
+- `test_labels_script_incluye_labels_documentados` (`tests/test_consistencia.py`) deriva los labels de la primera celda de las tablas de `skills/github-issues/references/labels.md` en vez de una lista a mano: celda literal `x` cuenta, plantillas con `<` o `…` se excluyen, una celda con backticks no clasificable falla, una extraccion vacia falla, y hay un `subTest` por label (#225)
+
 ## 0.9.0 — 2026-10-08
 
 - `guard_integracion.py` juzga la rama por segmento del comando, no la del cwd: resuelve el directorio de cada segmento (`cd <ruta> &&`, `git -C <ruta>`) y consulta su rama real (`git -C dir branch --show-current`, con cache y timeout de 5s); si no la puede resolver, falla abierto con la razon `rama-no-resuelta`. `tests/test_hooks_integracion.py` suma `GuardRamaPorSegmentoPuroTests` y `GuardRamaPorSegmentoCajaNegraTests` (#229)
