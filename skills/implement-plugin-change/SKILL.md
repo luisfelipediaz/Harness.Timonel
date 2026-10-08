@@ -49,3 +49,8 @@ Recibes del orquestador: `issue`, el body del issue, el **contrato de cambio** (
 - **Rama exacta y ruta de tu worktree** (`git branch --show-current` y `pwd`): el orquestador los necesita para consolidar
 - Hash del commit
 - Si la verificacion fallo: error exacto y lo intentado
+- `### Tests verdes en su primera corrida` — exactamente una de tres formas (nunca vacio ni en prosa libre):
+  - una linea por test que paso en su primera corrida: `` - `<test>` — mutación: <qué se cambió> — fallos: N de M `` (N≥1; si N=0 el test es vacuo: reportalo como tal, no lo cuentes como evidencia);
+  - `Ninguno`: corriste tests y ninguno nacio verde;
+  - `No medido: <motivo>`: distinto de `Ninguno`, para cuando no corriste tests.
+
