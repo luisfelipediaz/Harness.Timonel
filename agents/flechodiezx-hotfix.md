@@ -57,12 +57,14 @@ Usa el skill implement-<backend|frontend>-story: lee "$PLUGIN_ROOT/skills/implem
 CONFIG: {api.* o frontend.* y modelos.alias segun capa}
 HISTORIA: {body del issue}
 {solo si es reanudacion: RAMA_HISTORIA: fix/N-<slug> — sincronizala en tu Paso 0 antes de implementar}
-RESTRICCIONES: trabajas en un worktree aislado, propio de este hotfix, sobre `fix/N-<slug>`. NO introduzcas endpoints, modelos compartidos, providers ni rutas nuevos; si lo necesitas, aborta e informa (no es hotfix). Commit final "fix(<modulo>): #N <descripcion>". NO ejecutes nx test. Informa en tu output el nombre exacto de la rama de tu worktree: la necesito para consolidar.
+RESTRICCIONES: trabajas en un worktree aislado, propio de este hotfix, sobre `fix/N-<slug>`. NO introduzcas endpoints, modelos compartidos, providers ni rutas nuevos; si lo necesitas, aborta e informa (no es hotfix). Commit final "fix(<modulo>): #N <descripcion>". NO ejecutes nx test. Tu Output cierra con el bloque `### Tests verdes en su primera corrida`, tal como lo pide tu skill. Informa en tu output el nombre exacto de la rama de tu worktree: la necesito para consolidar.
 ```
 
 Full-stack (raro): dos sub-agentes **secuenciales**, backend primero, cada uno en su propio worktree.
 
-Con el sub-agente terminado y su rama de worktree conocida, consolidas vos mismo (no delegues en `consolidate-story`: publicaria un marcador que este agente no tiene, y su perfil plugin lo rediseña #84):
+Con el sub-agente terminado, valida que su Output traiga el bloque `### Tests verdes en su primera corrida` con exactamente una de tres formas: una linea por test con su mutacion y `fallos: N de M`; `Ninguno`; o `No medido: <motivo>`. Si falta, o una linea no trae mutacion o conteo, registralo como pendiente y relanza al sub-agente **una vez** pidiendo el bloque; si vuelve sin el, reportalo al usuario y no consolides. Guarda el bloque tal cual como `tests_primera_corrida` para la Fase 3.
+
+Con su rama de worktree conocida, consolidas vos mismo (no delegues en `consolidate-story`: publicaria un marcador que este agente no tiene, y su perfil plugin lo rediseña #84):
 
 ```bash
 git merge <rama_worktree> --no-ff -m "fix(<modulo>): #N <descripcion>"
@@ -81,7 +83,7 @@ Registra `LINT_RESULTADO`, `TESTS_RESULTADO` (`PASSED|FAILED|NO_SPECS`). Si fall
 
 ## Fase 3: Code review (siempre)
 
-Sub-agente `model: "sonnet"`, dentro de la rama `fix/N-<slug>` (ya consolidada tras el merge de la Fase 2), con `"$PLUGIN_ROOT/skills/code-review/SKILL.md"`. Parametros: `issue`, `repo`, `modulo`, `alcance`, `archivos_modificados`, `plugin_root`. Publica `<!-- timonel:review -->` + label `review:*`. No abortes con `REQUIERE CAMBIOS`. Si falla en ejecucion, **reintenta una vez** antes de marcar `VEREDICTO: NO_GENERADO`. Marca `- [x] Code review`.
+Sub-agente `model: "sonnet"`, dentro de la rama `fix/N-<slug>` (ya consolidada tras el merge de la Fase 2), con `"$PLUGIN_ROOT/skills/code-review/SKILL.md"`. Parametros: `issue`, `repo`, `modulo`, `alcance`, `archivos_modificados`, `plugin_root` y `tests_primera_corrida` (el bloque de la Fase 2 tal cual). Publica `<!-- timonel:review -->` + label `review:*`. No abortes con `REQUIERE CAMBIOS`. Si falla en ejecucion, **reintenta una vez** antes de marcar `VEREDICTO: NO_GENERADO`. Marca `- [x] Code review`.
 
 **Ronda de correccion**: si decidis relanzar el sub-agente de implementacion para cerrar hallazgos `CRITICO` del review antes de seguir a la Fase 4, la misma precondicion que en `flechodiezx`: push, verificar, recien entonces pasar la variable. `git push -u origin fix/N-<slug>`, despues `git rev-list --left-right --count fix/N-<slug>...origin/fix/N-<slug>`, y **solo si el resultado es `0 0`** agregas `RAMA_HISTORIA: fix/N-<slug>` al prompt del sub-agente y lo lanzas. Si el conteo no es `0 0`, no pasas la variable y no lo lanzas: reportalo. El camino normal de la Fase 2 (hotfix nuevo, sin reanudacion) no cambia: sigue sin pushear y sin pasar `RAMA_HISTORIA` (#194).
 

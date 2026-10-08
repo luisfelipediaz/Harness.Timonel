@@ -15,6 +15,7 @@ Revisa la implementacion de una historia contra su issue y las convenciones del 
 | `alcance` | `Backend` \| `Frontend` \| `Full-stack` |
 | `archivos_modificados` | Lista consolidada (ARCHIVOS_BACKEND + ARCHIVOS_FRONTEND + MODELOS_COMPARTIDOS) |
 | `plugin_root` | Raiz absoluta del plugin (para heuristicas y plantillas) |
+| `tests_primera_corrida` | **Opcional.** El bloque `Tests verdes en su primera corrida` del sub-agente, tal cual. Ausente = no informado |
 
 Si falta alguno, detente y reporta.
 
@@ -54,6 +55,8 @@ Aplica **todas** las heuristicas que el glob del Paso 1 trajo a disco (`general/
 
 ### 3.5 Tests (`Tests`)
 `.spec.ts` para codigo nuevo; cubren los Gherkin; usa `TESTS_RESULTADO` de consolidacion (no re-ejecutes salvo duda). Faltantes no directos de Gherkin → WARNING; directos → CRITICO con tipo `Gherkin`.
+
+Con `tests_primera_corrida` informado: `No medido: <motivo>` → WARNING "evidencia faltante: tests no vistos fallar", nunca lo cuentes como verificado; una linea sin mutacion o sin conteo `fallos: N de M` → WARNING; una con N=0 es un test vacuo → WARNING. Ausente el parametro, no lo infieras: es "no informado".
 
 ### 3.6 Retro previa
 Si un error recurrente documentado se repite, registralo (WARNING salvo que viole un Gherkin).
