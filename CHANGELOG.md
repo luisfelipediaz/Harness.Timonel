@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.12.0 — en desarrollo
+
+- `scripts/mutar_literal.py` mide por mutación si un test cubre un literal: copia el repo a un directorio temporal, borra el literal de las líneas que lo contienen o mueve esas líneas al final de la sección `--a`, corre `unittest` en la copia y reporta `lineas mutadas: K` y `fallos: N de M`; todo "no sé" (literal ausente, copia idéntica, destino inexistente, 0 tests, salida no parseable, ruta inválida) sale con código 2; 31 tests en `tests/test_mutar_literal.py`; 375 en verde (#263)
+
 ## 0.11.0 — 2026-10-08
 
 - `cosechar_retro.py` omite las respuestas "Ninguno (motivo)", "Ninguna — motivo", "N/A: motivo" y "No aplica (motivo)" (la palabra debe ir sola o seguida de `.`, `(`, `:`, `—`, `–` o `-`; "Ningunos de…" y "Ninguno de los tests cubre X" siguen cosechandose) y `_titulo` conserva el `_` de los identificadores (`test_consistencia.py`) quitando solo el de enfasis (`_x_`); tests en `CosecharRetroTests` (#237)
