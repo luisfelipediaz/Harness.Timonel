@@ -990,6 +990,107 @@ class PrCheckTests(unittest.TestCase):
         self.assertIn("2 PRs abiertos", v.motivo)
         self.assertIn("ambigüedad", v.motivo)
 
+    # --- #223: rama fuera de hu/ y fix/, y draft intencional ---
+
+    POC = "poc/mcp-apps"
+
+    def _evaluar_poc(self, prs, **over):
+        return self._evaluar(prs, issue=213, rama=self.POC, **over)
+
+    def test_esc1_rama_sin_prefijo_se_vincula_por_cuerpo(self):
+        """Escenario 1. Mutacion verificada a mano (escenario 9): si en `evaluar()`
+        se quita SOLO la vinculacion por cuerpo (la rama sin prefijo cae siempre
+        en el critico "ni la rama ni su PR referencian"), falla este caso y
+        ningun caso preexistente de `PrCheckTests`: los preexistentes usan la
+        rama `hu/31-x`, que nunca llega a la rama (c)."""
+        pr = self._pr(body="Closes #213", headRefName=self.POC)
+        v = self._evaluar_poc([pr])
+        self.assertEqual((v.estado, v.criticidad), ("PASSED", "n-a"))
+        self.assertEqual(v.pr, pr["url"])
+
+    def test_esc2_rama_sin_prefijo_y_pr_sin_mencion_es_critico(self):
+        v = self._evaluar_poc([self._pr(body="Sin referencias")])
+        self.assertEqual((v.estado, v.criticidad), ("FAILED", "critico"))
+        self.assertIn(self.POC, v.motivo)
+        self.assertIn("ni la rama ni su PR referencian el issue #213", v.motivo)
+
+    def test_esc3_rama_con_prefijo_y_otro_issue_no_mira_el_cuerpo(self):
+        # El cuerpo SI menciona #213: si se consultara, vincularia. No debe.
+        v = self._evaluar([self._pr(body="Closes #213")], issue=213, rama="hu/214-otra-historia")
+        self.assertEqual((v.estado, v.criticidad), ("FAILED", "critico"))
+        self.assertIn("la rama actual hu/214-otra-historia no corresponde al issue #213", v.motivo)
+
+    def test_esc4_draft_intencional_sano_es_failed_no_critico(self):
+        v = self._evaluar([self._pr(isDraft=True)], draft_intencional=True)
+        self.assertEqual((v.estado, v.criticidad), ("FAILED", "no-critico"))
+        self.assertIn("draft intencional declarado (label draft-intencional)", v.motivo)
+
+    def test_esc4_draft_intencional_sin_checks_ni_con_checks_verdes_tambien(self):
+        # Los dos `return PASSED` (sin checks / checks verdes) no deben escaparse.
+        verde = [{"__typename": "CheckRun", "name": "ci", "status": "COMPLETED", "conclusion": "SUCCESS"}]
+        for etiqueta, checks in (("sin checks", []), ("checks verdes", verde)):
+            with self.subTest(etiqueta):
+                v = self._evaluar([self._pr(isDraft=True, statusCheckRollup=checks)], draft_intencional=True)
+                self.assertEqual((v.estado, v.criticidad), ("FAILED", "no-critico"))
+
+    def test_esc5_draft_intencional_no_oculta_un_check_en_rojo(self):
+        rojo = [{"__typename": "CheckRun", "name": "ci", "status": "COMPLETED", "conclusion": "FAILURE"}]
+        v = self._evaluar([self._pr(isDraft=True, statusCheckRollup=rojo)], draft_intencional=True)
+        self.assertEqual((v.estado, v.criticidad), ("FAILED", "critico"))
+        self.assertIn("ci", v.motivo)
+        self.assertNotIn("draft intencional", v.motivo)
+
+    def test_esc6_draft_sin_declarar_es_el_critico_de_hoy(self):
+        v = self._evaluar([self._pr(isDraft=True)], draft_intencional=False)
+        self.assertEqual((v.estado, v.criticidad), ("FAILED", "critico"))
+        self.assertIn("el PR #31 está en draft; un humano no puede mergearlo", v.motivo)
+
+    def test_esc7_draft_con_label_ilegible_es_no_se_y_distinto_de_sin_declarar(self):
+        v = self._evaluar([self._pr(isDraft=True)], draft_intencional=None)
+        self.assertEqual((v.estado, v.criticidad), ("FAILED", "critico"))
+        self.assertIn("no se pudo saber si el draft es intencional", v.motivo)
+        self.assertNotIn("un humano no puede mergearlo", v.motivo)
+
+    def test_pr_no_draft_ignora_draft_intencional(self):
+        for valor in (None, False, True):
+            with self.subTest(valor=valor):
+                v = self._evaluar([self._pr()], draft_intencional=valor)
+                self.assertEqual(v.estado, "PASSED")
+
+    def test_refs_vincula_pero_no_cierra(self):
+        v = self._evaluar_poc([self._pr(body="Refs #213")])
+        self.assertEqual((v.estado, v.criticidad), ("FAILED", "no-critico"))
+        self.assertIn("no cierra #213", v.motivo)
+
+    def test_refs_de_un_numero_mas_largo_no_vincula(self):
+        v = self._evaluar([self._pr(body="Refs #2130")], issue=213, rama=self.POC)
+        self.assertEqual((v.estado, v.criticidad), ("FAILED", "critico"))
+        self.assertIn("ni la rama ni su PR referencian", v.motivo)
+
+    def test_rama_head_detached_sin_vinculo_es_critico(self):
+        v = self._evaluar([], rama="HEAD")
+        self.assertEqual((v.estado, v.criticidad), ("FAILED", "critico"))
+        v = self._evaluar([self._pr(body="nada")], rama="HEAD")
+        self.assertEqual((v.estado, v.criticidad), ("FAILED", "critico"))
+        self.assertIn("HEAD", v.motivo)
+
+    def test_draft_intencional_con_refs_combina_ambos_motivos_draft_primero(self):
+        pr = self._pr(isDraft=True, body="Refs #213")
+        v = self._evaluar_poc([pr], draft_intencional=True)
+        self.assertEqual((v.estado, v.criticidad), ("FAILED", "no-critico"))
+        self.assertIn("draft intencional declarado (label draft-intencional)", v.motivo)
+        self.assertIn("no cierra #213", v.motivo)
+        self.assertLess(v.motivo.index("draft intencional"), v.motivo.index("no cierra"))
+        self.assertIn("; ", v.motivo)
+
+    def test_esc8_cli_help_no_expone_pr_y_si_rama(self):
+        proc = subprocess.run(
+            [sys.executable, str(Path(pc.__file__)), "--help"], capture_output=True, text=True,
+        )
+        self.assertEqual(proc.returncode, 0)
+        self.assertNotRegex(proc.stdout, r"--pr\b")
+        self.assertIn("--rama", proc.stdout)
+
     # --- Hallazgo #3 del code review (#81): propiedad de entrada degenerada ---
 
     def test_propiedad_entrada_degenerada_nunca_passed_ni_lanza(self):

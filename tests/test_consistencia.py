@@ -975,7 +975,7 @@ class VersionTests(unittest.TestCase):
     def test_labels_script_incluye_labels_documentados(self):
         doc = (ROOT / "skills/github-issues/references/labels.md").read_text(encoding="utf-8")
         script = (ROOT / "scripts/setup-github-labels.sh").read_text(encoding="utf-8")
-        for label in re.findall(r"^\| `([a-z-]+:[a-z-]+|bloqueado|bug|duplicada|obsoleta|insights|harness-audit)` \|", doc, re.MULTILINE):
+        for label in re.findall(r"^\| `([a-z-]+:[a-z-]+|bloqueado|bug|duplicada|obsoleta|insights|harness-audit|draft-intencional)` \|", doc, re.MULTILINE):
             if label.startswith("mod:") or label.startswith("sp:"):
                 continue
             self.assertIn(f"\n{label}|", script, f"labels.md documenta `{label}` pero setup-github-labels.sh no lo crea")
