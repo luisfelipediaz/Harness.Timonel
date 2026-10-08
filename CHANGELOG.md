@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.0 — en desarrollo
+
+- `guard_integracion.py` juzga la rama por segmento del comando, no la del cwd: resuelve el directorio de cada segmento (`cd <ruta> &&`, `git -C <ruta>`) y consulta su rama real (`git -C dir branch --show-current`, con cache y timeout de 5s); si no la puede resolver, falla abierto con la razon `rama-no-resuelta`. `tests/test_hooks_integracion.py` suma `GuardRamaPorSegmentoPuroTests` y `GuardRamaPorSegmentoCajaNegraTests` (#229)
+
 ## 0.8.0 — 2026-10-07
 
 - Skill nuevo `disenar`: guia el diseño de una interfaz desde la investigacion de tendencias y el sistema de diseño del proyecto hasta un prototipo interactivo con escenarios reproducibles, y lo entrega como canvas de Claude Design (un artboard por estado de cada pantalla). Sus scripts node (`capture.js`, `build.js`, `verify.js`) congelan cada estado, arman los `.dc.html` con un solo `<helmet>` y los empaquetan en el editor del canvas publicado; se resuelven desde `PLUGIN_ROOT` (#205)
