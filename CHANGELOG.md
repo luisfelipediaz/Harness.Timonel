@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.9.0 — en desarrollo
+## 0.9.0 — 2026-10-08
 
 - `guard_integracion.py` juzga la rama por segmento del comando, no la del cwd: resuelve el directorio de cada segmento (`cd <ruta> &&`, `git -C <ruta>`) y consulta su rama real (`git -C dir branch --show-current`, con cache y timeout de 5s); si no la puede resolver, falla abierto con la razon `rama-no-resuelta`. `tests/test_hooks_integracion.py` suma `GuardRamaPorSegmentoPuroTests` y `GuardRamaPorSegmentoCajaNegraTests` (#229)
 - Los sensores que reciben el numero de issue como posicional (`dor_check`, `estado_historia`, `contrato_check`, `integracion`, `cosechar_retro`, `pr_check`) lo aceptan con o sin `#` (`223` y `#223`) via `numero_issue()` en `scripts/timonel_gh.py`: `/timonel:implement #223` pasaba `#223` tal cual y `argparse` salia 2 con `invalid int value`. Un valor no numerico sigue saliendo 2 con mensaje claro (#231)
