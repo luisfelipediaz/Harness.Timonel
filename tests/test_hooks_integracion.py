@@ -380,12 +380,26 @@ class GuardRamaPorSegmentoPuroTests(unittest.TestCase):
         self.assertIsNone(self._decidir(cmd, "main", {"/wt": "hu/229-x", "/otro": "hu/1-y"}))
 
     def test_la_rama_simulada_por_checkout_se_lleva_por_dir(self):
-        """`git -C /a checkout main` no cambia la rama de /b ni la de la sesion."""
+        """`git -C /a checkout main` no cambia la rama de /b: /b se consulta ANTES del
+        checkout en /a y su push posterior se juzga con la rama propia de /b."""
         ramas = {"/a": "hu/1-x", "/b": "hu/2-y"}
-        # checkout en /a lo deja en main; el push posterior en /b sigue en hu/2-y.
-        self.assertIsNone(self._decidir("git -C /a checkout main ; git -C /b push", "hu/3-z", ramas))
+        cmd = "git -C /b push ; git -C /a checkout main ; git -C /b push"
+        self.assertIsNone(self._decidir(cmd, "hu/3-z", ramas))
         # espejo: el push posterior en /a SI ve el checkout.
-        self.assertIsNotNone(self._decidir("git -C /a checkout main ; git -C /a push", "hu/3-z", ramas))
+        cmd_a = "git -C /b push ; git -C /a checkout main ; git -C /a push"
+        self.assertIsNotNone(self._decidir(cmd_a, "hu/3-z", ramas))
+
+    def test_cd_en_pipe_o_background_no_se_aplica_y_queda_la_rama_de_la_sesion(self):
+        """En bash un `cd` en pipeline/background corre en un subshell: el dir de los
+        segmentos siguientes no cambia. Sesion en main -> sigue bloqueando."""
+        ramas = {self.WT: "hu/229-x"}
+        # Push sin refspec o `HEAD`: el destino es la rama vigente (con refspec
+        # explicito a hu/N nunca bloquea, asi que no distinguiria nada).
+        for cmd in ("cd /wt | git push origin HEAD", "cd /wt & git push", "cd /wt | git push"):
+            with self.subTest(cmd=cmd):
+                self.assertIsNotNone(self._decidir(cmd, "main", ramas))
+        # espejo: con && el cd si aplica.
+        self.assertIsNone(self._decidir("cd /wt && git push", "main", ramas))
 
     def test_git_C_acumulativo_se_resuelve_sobre_el_dir_vigente(self):
         self.assertIsNone(self._decidir("git -C /a -C b push", "main", {"/a/b": "hu/1-x"}))
