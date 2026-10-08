@@ -955,7 +955,8 @@ class ModoRamaDelUsuarioTests(unittest.TestCase):
         parrafo = self._parrafo_del_modo("## Fase 3: Ejecucion paralela", f"{self.MARCADOR} — perfil consumidor (Fase 3)")
         self._exige(parrafo, (
             "sin `isolation`", "sin `RAMA_HISTORIA`", "`worktree-agent-*`", "en secuencia",
-            "git -C <ruta> rev-list --count <base>..<rama>", '"no se"',
+            "git -C <ruta> rev-list --count <base>..<rama>",
+            "mas de 0 sigue", "`0` detiene", 'comando que falla es "no se" y detiene',
         ), "Fase 3 consumidor")
 
     def test_4_fases_4_y_5_pasan_modo_rama_y_ruta_a_consolidate_story(self):
@@ -976,7 +977,26 @@ class ModoRamaDelUsuarioTests(unittest.TestCase):
         parrafo = self._parrafo_del_modo("## Fase 7: Definition of Done", f"{self.MARCADOR} (Fase 7)")
         self._exige(parrafo, (
             "`directorio_trabajo: <ruta>`", "`PENDIENTES`", "**no** vuelve a `estado:en-progreso`",
+            "presenta al usuario la tabla del DoD y el link al PR", "**termina**",
         ), "Fase 7")
+
+    def test_0_5_reanudacion_en_la_rama_del_usuario(self):
+        parrafo = self._parrafo_del_modo("## Fase 0.5", f"{self.MARCADOR} (Fase 0.5)")
+        self._exige(parrafo, (
+            "<rama>", "<ruta>", "sin `RAMA_HISTORIA`",
+            "git -C <ruta> rev-list --left-right --count <rama>...origin/<rama>",
+        ), "Fase 0.5")
+
+    def test_5_5_review_en_la_ruta_del_usuario(self):
+        parrafo = self._parrafo_del_modo("## Fase 5.5", f"{self.MARCADOR} (Fase 5.5, review)")
+        self._exige(parrafo, ("`directorio_trabajo: <ruta>`", "<base>...<rama>"), "Fase 5.5, review")
+
+    def test_5_5_ronda_de_correccion_en_la_ruta_del_usuario(self):
+        parrafo = self._parrafo_del_modo("## Fase 5.5", f"{self.MARCADOR} (Fase 5.5, ronda de correccion)")
+        self._exige(parrafo, (
+            "sin `isolation`", "sin `RAMA_HISTORIA`", "git -C <ruta> push -u origin <rama>",
+            "git -C <ruta> rev-list --left-right --count <rama>...origin/<rama>", "`0 0`",
+        ), "Fase 5.5, ronda de correccion")
 
     def test_7_consolidate_story_declara_parametros_y_distingue_el_caso_del_motivo(self):
         texto = (ROOT / "skills/consolidate-story/SKILL.md").read_text(encoding="utf-8")
@@ -1001,6 +1021,11 @@ class ModoRamaDelUsuarioTests(unittest.TestCase):
         parrafos = [p for p in self.PARRAFO(texto) if p.startswith("**`directorio_trabajo`**")]
         self.assertEqual(len(parrafos), 1, "verify-dod debe explicar `directorio_trabajo` en un parrafo propio")
         self._exige(parrafos[0], ("`pr_check.py`", "items 3, 5 y 10", "git -C <directorio_trabajo>"), "verify-dod")
+
+    def test_10_code_review_declara_directorio_de_trabajo(self):
+        texto = (ROOT / "skills/code-review/SKILL.md").read_text(encoding="utf-8")
+        self._exige(self.SECCION(texto, "## Parametros de entrada"), ("| `directorio_trabajo` |",), "code-review, tabla")
+        self._exige(self.SECCION(texto, "## Paso 2"), ("git -C <directorio_trabajo> diff <rama-base>...HEAD",), "code-review, Paso 2")
 
     def test_9_el_modo_harness_queda_identico(self):
         """Escenario 6: el modo de hoy sigue entero, cada literal en su fase."""
