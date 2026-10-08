@@ -1187,6 +1187,47 @@ class EvalsTests(unittest.TestCase):
         self.assertIn("evals/results/", gitignore, ".gitignore debe ignorar evals/results/")
 
 
+class TestsVerdesPrimeraCorridaTests(unittest.TestCase):
+    """Reporte con la mutacion vista de los tests que nacen verdes (#230). Cinco
+    archivos exigen el bloque: los tres skills `implement-*` (por glob, nunca por
+    lista de nombres) en su `## Output (obligatorio)`, y los dos orquestadores donde
+    aceptan el reporte (`## Fase 3` de flechodiezx, `## Fase 2` de flechodiezx-hotfix).
+
+    La unidad de verificacion es la SECCION de cada archivo, no el archivo entero:
+    un literal que sobrevive en otra seccion (p. ej. `## Notas`) no cubre la
+    obligacion donde se ejerce. El texto exigido vive en una constante de la clase,
+    no en esta prosa, para que el docstring no sea una segunda copia que satisfaga
+    por si sola la asercion (`heuristics/general/unidad-de-verificacion.md`)."""
+
+    LITERAL = "Tests verdes en su primera corrida"
+    SECCION_ORQUESTADORES = {
+        "agents/flechodiezx.md": "## Fase 3",
+        "agents/flechodiezx-hotfix.md": "## Fase 2",
+    }
+    SECCION_SKILLS = "## Output (obligatorio)"
+
+    def _destinos(self) -> list[tuple[str, str]]:
+        skills = sorted((ROOT / "skills").glob("implement-*/SKILL.md"))
+        self.assertGreaterEqual(
+            len(skills), 3,
+            "el glob skills/implement-*/SKILL.md trajo menos de 3 skills: la invariante "
+            "quedaria vacua si el descubrimiento se rompe",
+        )
+        destinos = [(str(p.relative_to(ROOT)), self.SECCION_SKILLS) for p in skills]
+        return destinos + list(self.SECCION_ORQUESTADORES.items())
+
+    def test_cada_archivo_exige_el_bloque_en_su_seccion(self):
+        for ruta, seccion in self._destinos():
+            with self.subTest(archivo=ruta):
+                texto = (ROOT / ruta).read_text(encoding="utf-8")
+                recorte = SincronizacionDelWorktreeTests._seccion(texto, seccion)
+                self.assertIn(
+                    self.LITERAL, recorte,
+                    f"{ruta}: `{seccion}` no exige el bloque `{self.LITERAL}`. Sin el, un test "
+                    "que nunca se vio fallar entra a consolidacion como evidencia",
+                )
+
+
 class HeuristicasDescubriblesTests(unittest.TestCase):
     """Una heuristica escrita que ningun skill puede descubrir no cambia ninguna decision (#134).
 
