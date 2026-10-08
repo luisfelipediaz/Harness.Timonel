@@ -1,3 +1,5 @@
+import argparse
+import json
 import subprocess
 import sys
 import unittest
@@ -14,6 +16,7 @@ import eval_dor as ed  # noqa: E402
 import integracion as ig  # noqa: E402
 import metricas_flujo as mf  # noqa: E402
 import pr_check as pc  # noqa: E402
+import timonel_gh as tg  # noqa: E402
 import validar_marcador as vm  # noqa: E402
 from test_markers import RETRO_COMMENT, REVIEW_COMMENT  # noqa: E402
 
@@ -207,6 +210,40 @@ class ValidarDodTests(unittest.TestCase):
         # DOD_OK ya no declara `perfil`: los DoD historicos deben seguir siendo validos.
         self.assertNotIn("perfil", vm.parse_yaml_plano(DOD_OK))
         self.assertEqual(vm.validar(DOD_OK), [])
+
+
+class NumeroIssueTests(unittest.TestCase):
+    """#231: los sensores aceptan `#N` ademas de `N` como numero de issue."""
+
+    def test_acepta_con_y_sin_numeral(self):
+        self.assertEqual(tg.numero_issue("223"), 223)
+        self.assertEqual(tg.numero_issue("#223"), 223)
+        self.assertEqual(tg.numero_issue(" #223 "), 223)
+
+    def test_rechaza_lo_que_no_es_numero(self):
+        for valor in ("#abc", "", "#", "##5"):
+            with self.subTest(valor=valor):
+                with self.assertRaises(argparse.ArgumentTypeError):
+                    tg.numero_issue(valor)
+
+    def test_dor_check_cli_acepta_numeral_sin_red(self):
+        script = Path(__file__).resolve().parents[1] / "scripts" / "dor_check.py"
+        resultado = subprocess.run(
+            [sys.executable, str(script), "#223", "--json", json.dumps(HU_OK)],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(resultado.returncode, 0, resultado.stderr)
+
+    def test_sensores_cablean_numero_issue(self):
+        """Cada sensor con posicional `issue` usa `numero_issue`: el rechazo de `#abc`
+        sale con su mensaje, no con el `invalid int value` de `type=int` (que es lo
+        que rechazaba tambien `#223`). argparse falla antes de cualquier llamada a gh."""
+        for nombre in ("dor_check", "estado_historia", "contrato_check", "integracion", "cosechar_retro", "pr_check"):
+            with self.subTest(sensor=nombre):
+                script = Path(__file__).resolve().parents[1] / "scripts" / f"{nombre}.py"
+                resultado = subprocess.run([sys.executable, str(script), "#abc"], capture_output=True, text=True)
+                self.assertEqual(resultado.returncode, 2, resultado.stderr)
+                self.assertIn("numero de issue invalido", resultado.stderr)
 
 
 class DorCheckTests(unittest.TestCase):

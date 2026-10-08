@@ -19,7 +19,7 @@ import json
 import re
 import sys
 
-from timonel_gh import gh_json, label_value, repo_from_config
+from timonel_gh import gh_json, label_value, numero_issue, repo_from_config
 
 SP_VALIDOS = {"1", "2", "3", "5", "8", "13", "21"}
 SECCION = lambda body, prefijo: re.search(rf"^##\s+{prefijo}", body, re.MULTILINE | re.IGNORECASE) is not None  # noqa: E731
@@ -115,7 +115,7 @@ def _fetch(repo: str, num: int) -> dict:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Definition of Ready de un issue de Timonel.")
-    parser.add_argument("issue", nargs="?", type=int)
+    parser.add_argument("issue", nargs="?", type=numero_issue)
     parser.add_argument("--repo")
     parser.add_argument("--para", choices=["listo", "implementar"], default="listo")
     parser.add_argument("--json", help="issue como JSON (tests)")

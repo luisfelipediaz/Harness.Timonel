@@ -16,7 +16,7 @@ import json
 import re
 import subprocess
 
-from timonel_gh import find_marker_comment, gh_json, label_value, repo_from_config
+from timonel_gh import find_marker_comment, gh_json, label_value, numero_issue, repo_from_config
 
 CHECKLISTS: dict[str, list[str]] = {
     "hu": ["Contrato API aprobado", "Modelos compartidos", "Backend", "Frontend",
@@ -133,7 +133,7 @@ def formato(e: dict) -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Estado de una historia para reanudar /implement.")
-    parser.add_argument("issue", type=int)
+    parser.add_argument("issue", type=numero_issue)
     parser.add_argument("--repo")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()

@@ -326,6 +326,205 @@ class GuardIntegracionPuroTests(unittest.TestCase):
                 os.chdir(cwd)
 
 
+class GuardRamaPorSegmentoPuroTests(unittest.TestCase):
+    """#229: `decidir(..., rama_de=...)` juzga cada segmento contra la rama del repo
+    donde corre (`git -C <dir>` / `cd <dir> &&`), no contra la del cwd de la sesion.
+
+    Todo con `rama_de` inyectado (un dict), sin subprocess. Cada escenario tiene su
+    espejo con las ramas intercambiadas: si `decidir` ignorara `rama_de` (o usara la
+    rama del dir equivocado), el espejo daria el resultado contrario y fallaria -- la
+    aseveracion no es vacua (heuristics/general/aserciones-no-vacuas.md)."""
+
+    WT = "/wt"
+
+    @staticmethod
+    def _decidir(cmd, rama_sesion, ramas_por_dir):
+        return gi.decidir(cmd, rama_sesion, BASES, rama_de=ramas_por_dir.get)
+
+    def test_escenario_1_git_C_en_worktree_de_historia_desde_sesion_en_main(self):
+        # `git push` sin refspec empuja la rama actual: es lo que distingue.
+        for cmd in ("git -C /wt push", "git -C /wt push origin HEAD", "git -C /wt push origin hu/229-x"):
+            with self.subTest(cmd=cmd):
+                self.assertIsNone(self._decidir(cmd, "main", {self.WT: "hu/229-x"}))
+
+    def test_escenario_1_espejo_el_dir_en_main_bloquea_aunque_la_sesion_este_en_hu(self):
+        for cmd in ("git -C /wt push", "git -C /wt push origin HEAD"):
+            with self.subTest(cmd=cmd):
+                self.assertIsNotNone(self._decidir(cmd, "hu/229-x", {self.WT: "main"}))
+
+    def test_escenario_1_sin_rama_de_el_falso_positivo_original_persiste(self):
+        """Control: sin `rama_de` es el comportamiento de antes (rama de la sesion)."""
+        self.assertIsNotNone(gi.decidir("git -C /wt push", "main", BASES))
+
+    def test_escenario_2_cd_a_worktree_de_historia_desde_sesion_en_main(self):
+        self.assertIsNone(self._decidir("cd /wt && git push", "main", {self.WT: "hu/229-x"}))
+        self.assertIsNone(self._decidir("cd /wt && git push origin hu/229-x", "main", {self.WT: "hu/229-x"}))
+
+    def test_escenario_2_espejo_cd_a_dir_en_main_bloquea(self):
+        self.assertIsNotNone(self._decidir("cd /wt && git push", "hu/229-x", {self.WT: "main"}))
+
+    def test_escenario_2_cd_relativo_se_resuelve_contra_el_dir_vigente(self):
+        ramas = {"/a/b": "hu/229-x", "/a": "main"}
+        self.assertIsNone(self._decidir("cd /a && cd b && git push", "main", ramas))
+        self.assertIsNotNone(self._decidir("cd /a && cd b && git push", "hu/229-x", {"/a/b": "main"}))
+
+    def test_escenario_3_cada_segmento_usa_la_rama_de_su_dir(self):
+        cmd = "git -C /wt commit -m 'x #229' ; git -C /wt push"
+        self.assertIsNone(self._decidir(cmd, "main", {self.WT: "hu/229-x"}))
+        self.assertIsNotNone(self._decidir(cmd, "hu/229-x", {self.WT: "main"}))
+
+    def test_escenario_3_dos_dirs_distintos_cada_uno_con_su_rama(self):
+        cmd = "git -C /wt push ; git -C /otro push"
+        ramas = {"/wt": "hu/229-x", "/otro": "main"}
+        self.assertIsNotNone(self._decidir(cmd, "hu/229-x", ramas))
+        self.assertIsNone(self._decidir(cmd, "main", {"/wt": "hu/229-x", "/otro": "hu/1-y"}))
+
+    def test_la_rama_simulada_por_checkout_se_lleva_por_dir(self):
+        """`git -C /a checkout main` no cambia la rama de /b: /b se consulta ANTES del
+        checkout en /a y su push posterior se juzga con la rama propia de /b."""
+        ramas = {"/a": "hu/1-x", "/b": "hu/2-y"}
+        cmd = "git -C /b push ; git -C /a checkout main ; git -C /b push"
+        self.assertIsNone(self._decidir(cmd, "hu/3-z", ramas))
+        # espejo: el push posterior en /a SI ve el checkout.
+        cmd_a = "git -C /b push ; git -C /a checkout main ; git -C /a push"
+        self.assertIsNotNone(self._decidir(cmd_a, "hu/3-z", ramas))
+
+    def test_cd_en_pipe_o_background_no_se_aplica_y_queda_la_rama_de_la_sesion(self):
+        """En bash un `cd` en pipeline/background corre en un subshell: el dir de los
+        segmentos siguientes no cambia. Sesion en main -> sigue bloqueando."""
+        ramas = {self.WT: "hu/229-x"}
+        # Push sin refspec o `HEAD`: el destino es la rama vigente (con refspec
+        # explicito a hu/N nunca bloquea, asi que no distinguiria nada).
+        for cmd in ("cd /wt | git push origin HEAD", "cd /wt & git push", "cd /wt | git push"):
+            with self.subTest(cmd=cmd):
+                self.assertIsNotNone(self._decidir(cmd, "main", ramas))
+        # espejo: con && el cd si aplica.
+        self.assertIsNone(self._decidir("cd /wt && git push", "main", ramas))
+
+    def test_git_C_acumulativo_se_resuelve_sobre_el_dir_vigente(self):
+        self.assertIsNone(self._decidir("git -C /a -C b push", "main", {"/a/b": "hu/1-x"}))
+        self.assertIsNotNone(self._decidir("git -C /a -C b push", "hu/1-x", {"/a/b": "main"}))
+
+    def test_git_C_pegado_y_cd_mas_C_relativo(self):
+        self.assertIsNone(self._decidir("git -C/wt push", "main", {self.WT: "hu/1-x"}))
+        self.assertIsNone(self._decidir("cd /a && git -C b push", "main", {"/a/b": "hu/1-x"}))
+        self.assertIsNotNone(self._decidir("git -C/wt push", "hu/1-x", {self.WT: "main"}))
+
+    def test_escenario_4_sesion_en_hu_repo_en_main_sigue_bloqueando(self):
+        ramas = {"/repo": "main"}
+        mensaje_push = self._decidir("git -C /repo push origin main", "hu/229-x", ramas)
+        self.assertEqual(mensaje_push, gi.decidir("git push origin main", "hu/229-x", BASES))
+        mensaje_merge = self._decidir("git -C /repo merge hu/229-x", "hu/229-x", ramas)
+        self.assertEqual(mensaje_merge, gi.decidir("git merge hu/229-x", "main", BASES))
+        self.assertIsNotNone(mensaje_merge)
+        # espejo: el mismo merge con /repo en una rama de historia se permite.
+        self.assertIsNone(self._decidir("git -C /repo merge hu/229-x", "main", {"/repo": "hu/229-y"}))
+
+    def test_escenario_5_dir_no_resoluble_usa_la_rama_de_la_sesion_y_deja_rastro(self):
+        import os
+
+        casos = (
+            ("git -C /no-existe push", {}),  # rama_de -> None
+            ("cd /no-existe && git push", {}),
+        )
+        for cmd, ramas in casos:
+            for rama_sesion, esperado_bloquea in (("main", True), ("hu/1-x", False)):
+                with self.subTest(cmd=cmd, rama_sesion=rama_sesion):
+                    with tempfile.TemporaryDirectory() as tmp:
+                        cwd = Path.cwd()
+                        try:
+                            os.chdir(tmp)
+                            mensaje = self._decidir(cmd, rama_sesion, ramas)
+                        finally:
+                            os.chdir(cwd)
+                        self.assertEqual(mensaje is not None, esperado_bloquea)
+                        log = (Path(tmp) / ".timonel/events.log").read_text(encoding="utf-8")
+                        self.assertIn("guard-integracion-fail-open rama-no-resuelta", log)
+
+    def test_escenario_5_formas_no_resolubles_caen_a_la_sesion_con_fail_open(self):
+        import os
+
+        cmds = (
+            "cd && git push",
+            "cd - && git push",
+            "cd ~/x && git push",
+            "cd $WT && git push",
+            "git --git-dir=/x/.git push",
+            "git --work-tree /x push",
+            "git -C $WT push",
+        )
+        for cmd in cmds:
+            with self.subTest(cmd=cmd):
+                with tempfile.TemporaryDirectory() as tmp:
+                    cwd = Path.cwd()
+                    try:
+                        os.chdir(tmp)
+                        # rama_de que explotaria si se la consultara: no debe llamarse.
+                        def rama_de(_d):
+                            raise AssertionError("no debe consultar rama_de de un dir no resoluble")
+
+                        self.assertIsNotNone(gi.decidir(cmd, "main", BASES, rama_de=rama_de))
+                        self.assertIsNone(gi.decidir(cmd, "hu/1-x", BASES, rama_de=rama_de))
+                    finally:
+                        os.chdir(cwd)
+                    log = (Path(tmp) / ".timonel/events.log").read_text(encoding="utf-8")
+                    self.assertIn("rama-no-resuelta", log)
+
+    def test_cd_en_comando_con_subshell_no_se_aplica(self):
+        ramas = {self.WT: "hu/1-x"}
+        # sin subshell el cd se aplica: permite desde sesion en main.
+        self.assertIsNone(self._decidir("cd /wt && git push", "main", ramas))
+        # con subshell el cd NO se modela: rama de la sesion (main) -> bloquea.
+        import os
+
+        with tempfile.TemporaryDirectory() as tmp:
+            cwd = Path.cwd()
+            try:
+                os.chdir(tmp)
+                self.assertIsNotNone(self._decidir("(cd /wt && git push)", "main", ramas))
+            finally:
+                os.chdir(cwd)
+
+    def test_escenario_6_decidir_es_pura_no_lanza_subprocess(self):
+        from unittest import mock
+
+        with mock.patch.object(gi.subprocess, "run", side_effect=AssertionError("subprocess")):
+            self.assertIsNone(self._decidir("git -C /wt push", "main", {self.WT: "hu/1-x"}))
+            self.assertIsNotNone(self._decidir("git -C /wt push", "hu/1-x", {self.WT: "main"}))
+
+    def test_dir_de_segmento_es_pura_y_resuelve_las_formas_del_contrato(self):
+        casos = (
+            # segmento, dir_actual, (efectivo, siguiente)
+            (["cd", "wt"], ".", (".", "wt")),
+            (["cd", "/a"], "wt", ("wt", "/a")),
+            (["cd", "b"], "/a", ("/a", "/a/b")),
+            (["cd", ".."], "/a/b", ("/a/b", "/a")),
+            (["git", "-C", "/a", "-C", "b", "push"], ".", ("/a/b", ".")),
+            (["git", "-C/a", "push"], ".", ("/a", ".")),
+            (["git", "push"], "/a", ("/a", "/a")),
+            (["git", "-c", "x=y", "-C", "wt", "push"], ".", ("wt", ".")),
+            (["git", "--git-dir=/x", "push"], ".", (None, ".")),
+            (["cd"], ".", (".", None)),
+            (["cd", "-"], ".", (".", None)),
+            (["cd", "~/x"], ".", (".", None)),
+            (["cd", "$X"], ".", (".", None)),
+            (["cd", "rel"], None, (None, None)),
+            (["cd", "/abs"], None, (None, "/abs")),
+            (["echo", "x"], "/a", ("/a", "/a")),
+        )
+        for segmento, dir_actual, esperado in casos:
+            with self.subTest(segmento=segmento, dir_actual=dir_actual):
+                self.assertEqual(gi._dir_de_segmento(segmento, dir_actual), esperado)
+
+    def test_casos_35_y_58_con_la_rama_del_dir_explicita(self):
+        """Reescritura de los casos 35 (`-C /otro/repo`) y 58 (`-Cpath`) de la tabla:
+        el push a `main` bloquea sea cual sea la rama del dir (se juzga el destino)."""
+        for cmd, dir_ in (("git -C /otro/repo push origin main", "/otro/repo"), ("git -Cpath push origin main", "path")):
+            for rama_del_dir in ("main", "hu/82-x"):
+                with self.subTest(cmd=cmd, rama_del_dir=rama_del_dir):
+                    self.assertIsNotNone(self._decidir(cmd, "hu/82-x", {dir_: rama_del_dir}))
+
+
 def _comandos_pretooluse() -> list[str]:
     """Extrae, del hooks.json REAL, los comandos del bloque PreToolUse/Bash."""
     hooks = json.loads((ROOT / "hooks/hooks.json").read_text(encoding="utf-8"))
@@ -1091,6 +1290,75 @@ class GuardCommitsRespaldoSinSensorTests(unittest.TestCase):
             plugin_root = self._plugin_root_sin_sensor(tmp_path)
             resultado = _correr_hook(comando, f'git -C {destino} commit -m "x"', tmp_path, plugin_root=str(plugin_root))
             self.assertEqual(resultado.returncode, 0, resultado.stderr)
+
+
+class GuardRamaPorSegmentoCajaNegraTests(unittest.TestCase):
+    """#229: el hook REAL (`bash -c` + `main()` con `rama_de` real) sobre repos git
+    reales. La sesion (cwd = `tmp`) y el directorio destino tienen ramas opuestas, de
+    modo que juzgar contra la rama equivocada daria el resultado contrario."""
+
+    def _worktree_de_historia(self, tmp: Path, rama: str = "hu/229-x") -> Path:
+        wt = tmp / "wt"
+        subprocess.run(["git", "worktree", "add", "-q", "-b", rama, str(wt)], cwd=tmp, check=True)
+        return wt
+
+    def test_sesion_en_main_push_desde_worktree_en_hu_se_permite(self):
+        comando = _comando_guard_integracion()
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            _preparar_repo(tmp_path, "main", perfil="plugin")
+            wt = self._worktree_de_historia(tmp_path)
+            for cmd in (
+                f"git -C {wt} push",
+                f"git -C {wt} push origin hu/229-x",
+                f"cd {wt} && git push",
+                f"cd {wt} && git push origin hu/229-x",
+                f"git -C {wt} commit -m 'x #229' ; git -C {wt} push",
+            ):
+                with self.subTest(cmd=cmd):
+                    r = _correr_hook(comando, cmd, tmp_path, plugin_root=str(ROOT))
+                    self.assertEqual(r.returncode, 0, r.stderr)
+                    self.assertEqual(r.stderr, "")
+
+    def test_control_sin_resolver_el_mismo_push_bloquea_si_el_dir_esta_en_main(self):
+        """Espejo: mismas formas, pero el dir destino esta en `main` y la sesion en hu."""
+        comando = _comando_guard_integracion()
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            _preparar_repo(tmp_path, "hu/229-x", perfil="plugin")
+            destino = _preparar_repo_destino(tmp_path, "main")
+            for cmd in (f"git -C {destino} push", f"cd {destino} && git push"):
+                with self.subTest(cmd=cmd):
+                    r = _correr_hook(comando, cmd, tmp_path, plugin_root=str(ROOT))
+                    self.assertEqual(r.returncode, 2, r.stderr)
+
+    def test_sesion_en_hu_repo_en_main_sigue_bloqueando_con_el_mismo_mensaje(self):
+        comando = _comando_guard_integracion()
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            _preparar_repo(tmp_path, "hu/229-x", perfil="plugin")
+            repo = _preparar_repo_destino(tmp_path, "main", nombre="repo")
+            # mensajes de referencia: los de `decidir` sin `-C`, parado en cada rama.
+            ref_push = gi.decidir("git push origin main", "hu/229-x", BASES)
+            ref_merge = gi.decidir("git merge hu/229-x", "main", BASES)
+            r_push = _correr_hook(comando, f"git -C {repo} push origin main", tmp_path, plugin_root=str(ROOT))
+            r_merge = _correr_hook(comando, f"git -C {repo} merge hu/229-x", tmp_path, plugin_root=str(ROOT))
+            self.assertEqual(r_push.returncode, 2, r_push.stderr)
+            self.assertEqual(r_push.stderr, ref_push + "\n")
+            self.assertEqual(r_merge.returncode, 2, r_merge.stderr)
+            self.assertEqual(r_merge.stderr, ref_merge + "\n")
+
+    def test_dir_inexistente_mantiene_el_comportamiento_actual_y_deja_rastro(self):
+        comando = _comando_guard_integracion()
+        for rama_sesion, esperado in (("main", 2), ("hu/229-x", 0)):
+            with self.subTest(rama_sesion=rama_sesion):
+                with tempfile.TemporaryDirectory() as tmp:
+                    tmp_path = Path(tmp)
+                    _preparar_repo(tmp_path, rama_sesion, perfil="plugin")
+                    r = _correr_hook(comando, f"git -C {tmp_path}/no-existe push", tmp_path, plugin_root=str(ROOT))
+                    self.assertEqual(r.returncode, esperado, r.stderr)
+                    log = (tmp_path / ".timonel/events.log").read_text(encoding="utf-8")
+                    self.assertIn("guard-integracion-fail-open rama-no-resuelta", log)
 
 
 if __name__ == "__main__":

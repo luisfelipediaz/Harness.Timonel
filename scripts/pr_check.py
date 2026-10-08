@@ -74,7 +74,7 @@ from pathlib import Path
 
 from estado_historia import PREFIJOS_RAMA
 from integracion import tipo_remote
-from timonel_gh import repo_from_config
+from timonel_gh import numero_issue, repo_from_config
 
 CAMPOS_PR = "number,url,state,isDraft,baseRefName,headRefName,body,mergeable,mergeStateStatus,statusCheckRollup"
 
@@ -436,7 +436,7 @@ def _esperar_mergeable(rama: str, repo: str, prs: list[dict], espera: int) -> li
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Sensor del estado del PR (item 1 del DoD, issue #81).")
-    parser.add_argument("issue", type=int)
+    parser.add_argument("issue", type=numero_issue)
     parser.add_argument("--repo")
     parser.add_argument("--base", default="main")
     parser.add_argument("--espera", type=int, default=60, help="segundos maximos de espera mientras mergeable=UNKNOWN")
