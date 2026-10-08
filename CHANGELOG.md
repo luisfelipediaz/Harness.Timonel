@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.11.0 — en desarrollo
+## 0.11.0 — 2026-10-08
 
 - `cosechar_retro.py` omite las respuestas "Ninguno (motivo)", "Ninguna — motivo", "N/A: motivo" y "No aplica (motivo)" (la palabra debe ir sola o seguida de `.`, `(`, `:`, `—`, `–` o `-`; "Ningunos de…" y "Ninguno de los tests cubre X" siguen cosechandose) y `_titulo` conserva el `_` de los identificadores (`test_consistencia.py`) quitando solo el de enfasis (`_x_`); tests en `CosecharRetroTests` (#237)
 - El contrato de cambio del perfil plugin (`agents/flechodiezx.md`, Fase 2) exige una fila por cada decisión de `main()` de un sensor `scripts/*.py`, con la fila del "no sé" cuando el sensor tiene tres respuestas; `implement-plugin-change` pide un test por fila del cableado de `main()` (no solo la función pura) y lo reporta en la línea `Tests del cableado de main()`. `CableadoDeMainTests` (`tests/test_consistencia.py`) asevera los cinco literales en su sección, verificado por mutación (borrar y mover cada literal: 10 de 10 fallan) (#224)
