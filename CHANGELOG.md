@@ -2,7 +2,7 @@
 
 ## 0.11.0 — en desarrollo
 
-- `cosechar_retro.py` omite las respuestas "Ninguno (motivo)", "Ninguna — motivo", "N/A: motivo" y "No aplica (motivo)" (el regex exige limite de palabra, no el fin de linea; "Ningunos de…" sigue cosechandose) y `_titulo` conserva el `_` de los identificadores (`test_consistencia.py`) quitando solo el de enfasis (`_x_`); tests en `CosecharRetroTests` (#237)
+- `cosechar_retro.py` omite las respuestas "Ninguno (motivo)", "Ninguna — motivo", "N/A: motivo" y "No aplica (motivo)" (la palabra debe ir sola o seguida de `.`, `(`, `:`, `—`, `–` o `-`; "Ningunos de…" y "Ninguno de los tests cubre X" siguen cosechandose) y `_titulo` conserva el `_` de los identificadores (`test_consistencia.py`) quitando solo el de enfasis (`_x_`); tests en `CosecharRetroTests` (#237)
 
 ## 0.10.0 — 2026-10-08
 

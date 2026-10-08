@@ -606,8 +606,10 @@ class CosecharRetroTests(unittest.TestCase):
                 self.assertEqual(cr.extraer_mejoras(retro), [])
 
     def test_no_omite_palabra_que_solo_empieza_como_ninguno(self):
-        retro = self._retro_harness("¿Surgió algo? → Ningunos de los tests cubren X")
-        self.assertEqual(cr.extraer_mejoras(retro), [("harness", "Ningunos de los tests cubren X")])
+        for mejora in ("Ningunos de los tests cubren X", "Ninguno de los tests cubre X", "Ninguna heurística cubre el caso X"):
+            with self.subTest(mejora=mejora):
+                retro = self._retro_harness(f"¿Surgió algo? → {mejora}")
+                self.assertEqual(cr.extraer_mejoras(retro), [("harness", mejora)])
 
     def test_titulo_conserva_guion_bajo_de_identificadores(self):
         for ident in ("retro_query.py", "contrato_check.py", "guard_integracion.py", "test_consistencia.py", "mutar_literal.py"):

@@ -34,7 +34,8 @@ PLUGIN_REPO_DEFAULT = "luisfelipediaz/Harness.Timonel"
 PALABRAS_PLUGIN = ("timonel", "plugin", "skill", "agente", "sub-agente", "orquestador", "plantilla", "marcador",
                    "flechodiezx", "dora", "code-review", "generate-retro", "verify-dod", "consolidate-story", "retro-tools")
 PALABRAS_CONSUMIDOR = ("claude.md", "heur", "convenci", "lint", "eslint", "ci", "pipeline", "test", "modulo", "módulo", "componente", "servicio")
-NINGUNO = re.compile(r"^(ninguno|ninguna|n/a|no aplica)\b", re.IGNORECASE)
+# Respuesta vacia: la palabra sola o seguida de su motivo ("Ninguno (x)", "Ninguna — x", "N/A: x").
+NINGUNO = re.compile(r"^(ninguno|ninguna|n/a|no aplica)\s*(?:$|[.(:—–-])", re.IGNORECASE)
 RESPUESTA_HE = re.compile(r"^¿[^?]+\?\s*→\s*(.+)$")  # "¿Surgió...? → propuesta"
 
 
