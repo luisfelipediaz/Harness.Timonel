@@ -6,6 +6,8 @@ marcadores.md ni en timonel_gh.py, version de plugin.json distinta de la del CHA
 y comandos sin frontmatter completo.
 """
 
+import argparse
+import ast
 import json
 import re
 import sys
@@ -1408,6 +1410,177 @@ class HeuristicasDescubriblesTests(unittest.TestCase):
                 f"la carpeta `heuristics/{carpeta}/` no esta documentada en CLAUDE.md: ningun glob la "
                 "alcanza y sus heuristicas son codigo muerto. Documenta la regla que la deriva o no la crees",
             )
+
+
+class NoSeSiSeLeen(Exception):
+    """El analisis no puede decidir si un argumento se lee: es un no-se, no un no."""
+
+
+_METODOS_DE_PARSEO = {"parse_args", "parse_known_args"}
+_LECTURAS_DINAMICAS = {"vars", "getattr"}
+
+
+def _dest_de_argparse(opciones: list[str], dest: str | None = None) -> str:
+    """Misma regla que argparse: dest= explicito; si no, primer --largo (o primer -corto); posicional = su nombre."""
+    if dest:
+        return dest
+    if not opciones[0].startswith("-"):
+        return opciones[0]
+    largos = [o for o in opciones if o.startswith("--")]
+    return (largos or opciones)[0].lstrip("-").replace("-", "_")
+
+
+def _namespaces_de(arbol: ast.AST) -> set[str]:
+    """Nombres X asignados desde `*.parse_args(...)` o `X, _ = *.parse_known_args(...)`."""
+    nombres: set[str] = set()
+    for nodo in ast.walk(arbol):
+        if not (isinstance(nodo, ast.Assign) and isinstance(nodo.value, ast.Call)):
+            continue
+        funcion = nodo.value.func
+        if not (isinstance(funcion, ast.Attribute) and funcion.attr in _METODOS_DE_PARSEO):
+            continue
+        for destino in nodo.targets:
+            primero = destino.elts[0] if isinstance(destino, ast.Tuple) else destino
+            if isinstance(primero, ast.Name):
+                nombres.add(primero.id)
+    return nombres
+
+
+def _declarados_de(arbol: ast.AST) -> list[tuple[str, str]]:
+    """(dest, como se muestra) por cada add_argument del modulo."""
+    declarados: list[tuple[str, str]] = []
+    for nodo in ast.walk(arbol):
+        if not (isinstance(nodo, ast.Call) and isinstance(nodo.func, ast.Attribute)
+                and nodo.func.attr == "add_argument"):
+            continue
+        opciones = [a.value for a in nodo.args if isinstance(a, ast.Constant) and isinstance(a.value, str)]
+        dests = [k.value.value for k in nodo.keywords
+                 if k.arg == "dest" and isinstance(k.value, ast.Constant) and isinstance(k.value.value, str)]
+        if not opciones or len(opciones) != len(nodo.args):
+            raise NoSeSiSeLeen("add_argument con nombre no literal: no se puede derivar su dest")
+        declarados.append((_dest_de_argparse(opciones, dests[0] if dests else None), opciones[0]))
+    return declarados
+
+
+def _argumentos_no_leidos(fuente: str) -> list[str]:
+    """Flags (o posicionales) declarados con add_argument y nunca leidos como `<namespace>.<dest>`.
+
+    Lanza NoSeSiSeLeen cuando el modulo no permite decidirlo (sin namespace de parse_args, o lectura
+    por vars()/getattr() sobre el namespace)."""
+    arbol = ast.parse(fuente)
+    declarados = _declarados_de(arbol)
+    if not declarados:
+        return []
+    namespaces = _namespaces_de(arbol)
+    if not namespaces:
+        raise NoSeSiSeLeen("hay add_argument pero ninguna asignacion `X = *.parse_args(...)`: namespace no identificable")
+    leidos: set[str] = set()
+    for nodo in ast.walk(arbol):
+        if (isinstance(nodo, ast.Attribute) and isinstance(nodo.ctx, ast.Load)
+                and isinstance(nodo.value, ast.Name) and nodo.value.id in namespaces):
+            leidos.add(nodo.attr)
+        if (isinstance(nodo, ast.Call) and isinstance(nodo.func, ast.Name)
+                and nodo.func.id in _LECTURAS_DINAMICAS and nodo.args
+                and isinstance(nodo.args[0], ast.Name) and nodo.args[0].id in namespaces):
+            raise NoSeSiSeLeen(f"{nodo.func.id}() sobre el namespace: lee los argumentos como atributo (`args.<dest>`)")
+    return [mostrado for dest, mostrado in declarados if dest not in leidos]
+
+
+class ArgumentosDeArgparseLeidosTests(unittest.TestCase):
+    """Un argumento de CLI que se declara y nadie lee es una interfaz que promete un efecto que no tiene.
+
+    Recorre `scripts/*.py` con `ast` y exige que cada `add_argument` se lea como `<namespace>.<dest>`,
+    derivando el namespace de la asignacion desde `parse_args`. Cada caso sintetico aisla una causa."""
+
+    ESCRIPTS = sorted((ROOT / "scripts").glob("*.py"))
+
+    def _fuente(self, declaraciones: str, lecturas: str = "pass", asignacion: str = "args = parser.parse_args()") -> str:
+        return (
+            "import argparse\n"
+            "parser = argparse.ArgumentParser()\n"
+            f"{declaraciones}\n{asignacion}\n{lecturas}\n"
+        )
+
+    # --- casos sinteticos: uno por causa -------------------------------------------
+
+    def test_flag_declarado_y_no_leido_se_reporta(self):
+        self.assertEqual(_argumentos_no_leidos(self._fuente('parser.add_argument("--uno", type=int)')), ["--uno"])
+
+    def test_flag_con_guion_leido_como_atributo_no_se_reporta(self):
+        fuente = self._fuente('parser.add_argument("--dos-palabras", action="store_true")', "print(args.dos_palabras)")
+        self.assertEqual(_argumentos_no_leidos(fuente), [])
+
+    def test_dest_explicito_gana_sobre_el_nombre_del_flag(self):
+        decl = 'parser.add_argument("--uno", dest="otro")'
+        self.assertEqual(_argumentos_no_leidos(self._fuente(decl, "print(args.uno)")), ["--uno"])
+        self.assertEqual(_argumentos_no_leidos(self._fuente(decl, "print(args.otro)")), [])
+
+    def test_posicional_se_lee_por_su_nombre(self):
+        decl = 'parser.add_argument("issue", type=int)'
+        self.assertEqual(_argumentos_no_leidos(self._fuente(decl)), ["issue"])
+        self.assertEqual(_argumentos_no_leidos(self._fuente(decl, "print(args.issue)")), [])
+
+    def test_leer_el_atributo_de_otro_objeto_no_cuenta(self):
+        fuente = self._fuente('parser.add_argument("--modulo")', "r = object()\nprint(r.modulo)")
+        self.assertEqual(_argumentos_no_leidos(fuente), ["--modulo"])
+
+    def test_namespace_con_otro_nombre_se_deriva_de_parse_args(self):
+        fuente = self._fuente('parser.add_argument("--uno")', "print(ns.uno)", "ns = parser.parse_args()")
+        self.assertEqual(_argumentos_no_leidos(fuente), [])
+
+    def test_parse_known_args_usa_el_primer_elemento(self):
+        fuente = self._fuente('parser.add_argument("--uno")', "print(ns.uno)", "ns, resto = parser.parse_known_args()")
+        self.assertEqual(_argumentos_no_leidos(fuente), [])
+
+    def test_vars_sobre_el_namespace_es_no_se(self):
+        with self.assertRaises(NoSeSiSeLeen):
+            _argumentos_no_leidos(self._fuente('parser.add_argument("--uno")', "print(vars(args))"))
+
+    def test_getattr_sobre_el_namespace_es_no_se(self):
+        with self.assertRaises(NoSeSiSeLeen):
+            _argumentos_no_leidos(self._fuente('parser.add_argument("--uno")', 'print(getattr(args, "uno"))'))
+
+    def test_sin_parse_args_es_no_se(self):
+        with self.assertRaises(NoSeSiSeLeen):
+            _argumentos_no_leidos(self._fuente('parser.add_argument("--uno")', "print(args.uno)", "args = []"))
+
+    def test_dest_calculado_coincide_con_argparse_real(self):
+        casos = [
+            (["--solo-bloqueantes"], {"action": "store_true"}, []),
+            (["--uno", "-u"], {}, ["x"]),
+            (["-c", "--largo-x"], {}, ["x"]),
+            (["-s"], {}, ["x"]),
+            (["--uno"], {"dest": "otro"}, ["x"]),
+            (["issue"], {"type": int}, ["3"]),
+        ]
+        for opciones, kwargs, valores in casos:
+            with self.subTest(opciones=opciones, kwargs=kwargs):
+                real = argparse.ArgumentParser()
+                real.add_argument(*opciones, **kwargs)
+                entrada = ([opciones[0]] if opciones[0].startswith("-") else []) + valores
+                self.assertEqual(
+                    list(vars(real.parse_args(entrada))), [_dest_de_argparse(opciones, kwargs.get("dest"))]
+                )
+
+    # --- caso real -----------------------------------------------------------------
+
+    def test_ningun_script_declara_argumentos_que_no_lee(self):
+        for script in self.ESCRIPTS:
+            with self.subTest(script=script.name):
+                try:
+                    muertos = _argumentos_no_leidos(script.read_text(encoding="utf-8"))
+                except NoSeSiSeLeen as motivo:
+                    self.fail(f"{script.name}: no se puede decidir si sus argumentos se leen ({motivo})")
+                for flag in muertos:
+                    self.fail(f"{script.name}: {flag} declarado y nunca leído")
+
+    def test_el_recorrido_no_esta_vacio(self):
+        con_argparse = [
+            s.name for s in self.ESCRIPTS
+            if _declarados_de(ast.parse(s.read_text(encoding="utf-8")))
+        ]
+        self.assertTrue(con_argparse, "ningun script de scripts/ declara add_argument: el recorrido quedo vacio")
+        self.assertIn("pr_check.py", con_argparse)
 
 
 if __name__ == "__main__":
