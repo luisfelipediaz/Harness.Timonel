@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.11.0 — en desarrollo
+
+- `tests/test_consistencia.py` suma `CableadoDeMainTests` (3 tests): `agents/flechodiezx.md` y `skills/implement-plugin-change/SKILL.md` deben nombrar los cinco literales del cableado de `main()` y en el orden correcto; verificado por mutacion (borrar y mover cada literal, 10 de 10 fallan) (#224)
+
 ## 0.10.0 — 2026-10-08
 
 - `test_labels_script_incluye_labels_documentados` (`tests/test_consistencia.py`) deriva los labels de la primera celda de las tablas de `skills/github-issues/references/labels.md` en vez de una lista a mano: celda literal `x` cuenta, plantillas con `<` o `…` se excluyen, una celda con backticks no clasificable falla, una extraccion vacia falla, y hay un `subTest` por label (#225)
