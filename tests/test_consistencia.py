@@ -1237,7 +1237,7 @@ class CableadoDeMainTests(unittest.TestCase):
 
     Tres literales, cada uno en SU seccion (un literal en otra seccion no cubre la
     obligacion donde se ejerce): la regla de contrato en el parrafo `**Perfil plugin**`
-    de la Fase 2 de flechodiezx, el test por fila en `## Pasos` del skill y la linea del
+    de la Fase 2 de flechodiezx, el test por fila en el item `2. **TDD**` de `## Pasos` del skill y la linea del
     reporte en su `## Output (obligatorio)`. Los literales viven en constantes, no en
     esta prosa.
 
@@ -1250,6 +1250,7 @@ class CableadoDeMainTests(unittest.TestCase):
     SECCION_FASE_2 = "## Fase 2: Contrato API y modelos compartidos"
     LITERALES_FASE_2 = ("una fila por cada decisión de `main()`", 'fila del "no sé"')
     SECCION_PASOS = "## Pasos"
+    PASO_TDD = "2. **TDD**"
     LITERALES_PASOS = ("un test por fila del cableado de `main()`",)
     SECCION_OUTPUT = "## Output (obligatorio)"
     LITERALES_OUTPUT = ("Tests del cableado de main()", "Ninguno: el cambio no toca main()")
@@ -1280,9 +1281,15 @@ class CableadoDeMainTests(unittest.TestCase):
         self._exige(self.FLECHODIEZX, parrafos[0], self.LITERALES_FASE_2, f"el parrafo `{self.MARCADOR}` de la Fase 2")
 
     def test_skill_paso_2_exige_test_por_fila_del_cableado(self):
-        self._exige(
-            self.SKILL, self._seccion(self.SKILL, self.SECCION_PASOS), self.LITERALES_PASOS, "`## Pasos`",
+        # El ambito es el item `2.` (TDD), no `## Pasos` entera: el literal en el paso 0,
+        # 3 o 4 no obliga a nada en el TDD (WARNING del review de #224).
+        seccion = self._seccion(self.SKILL, self.SECCION_PASOS)
+        # `_parrafos` de PoliticaDeIntegracion corta por item de lista; el de Sincronizacion solo por linea en blanco.
+        pasos = [p for p in PoliticaDeIntegracionDocumentadaTests._parrafos(seccion) if p.lstrip().startswith(self.PASO_TDD)]
+        self.assertEqual(
+            len(pasos), 1, f"{self.SKILL}: `{self.SECCION_PASOS}` debe tener exactamente un item `{self.PASO_TDD}`",
         )
+        self._exige(self.SKILL, pasos[0], self.LITERALES_PASOS, f"el item `{self.PASO_TDD}` de `## Pasos`")
 
     def test_skill_output_lista_los_tests_del_cableado(self):
         self._exige(
