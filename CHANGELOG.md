@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.12.0 — en desarrollo
+
+- El modo "rama del usuario" de `agents/flechodiezx.md` queda completo: Fase 0.5, review de la Fase 5.5, ronda de corrección y Fase 7 pasan el directorio de trabajo, y `code-review` acepta `directorio_trabajo` y usa `git -C` en su Paso 2. Tests: 4 casos nuevos en `ModoRamaDelUsuarioTests`, `test_3b` y `test_6` endurecidos; 348 en verde (#245)
+
 ## 0.11.0 — 2026-10-08
 
 - `cosechar_retro.py` omite las respuestas "Ninguno (motivo)", "Ninguna — motivo", "N/A: motivo" y "No aplica (motivo)" (la palabra debe ir sola o seguida de `.`, `(`, `:`, `—`, `–` o `-`; "Ningunos de…" y "Ninguno de los tests cubre X" siguen cosechandose) y `_titulo` conserva el `_` de los identificadores (`test_consistencia.py`) quitando solo el de enfasis (`_x_`); tests en `CosecharRetroTests` (#237)
