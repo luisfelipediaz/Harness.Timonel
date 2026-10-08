@@ -66,7 +66,11 @@ sesion). NO se resuelven -- caen a la rama de la sesion y dejan fail-open
 `rama-no-resuelta` -- `cd` sin argumento, `cd -`, `~`, `$VAR`/`$(...)`,
 `--git-dir`/`--work-tree`, un `rama_de` que devuelve None (dir inexistente,
 `git` falla) y cualquier `cd` en un comando con subshell `(`/`)` (decision
-aprobada: no se modela el alcance del subshell).
+aprobada: no se modela el alcance del subshell). Mismo criterio conservador
+para `|` y `&` simple: en bash un `cd` en pipeline o en background corre en un
+subshell y no cambia el dir de los segmentos siguientes, asi que en un comando
+que contiene `|` o `&` (no `&&`/`||`) ningun `cd` se aplica y los segmentos
+siguen en la rama de la sesion (ante la duda, bloquea como antes).
 
 Uso(stdin = payload de un hook PreToolUse de Claude Code):
     echo '{"tool_input": {"command": "git push origin main"}}' | python3 guard_integracion.py
@@ -786,7 +790,7 @@ def decidir(
     try:
         ramas = {SESION: rama}
         dir_actual: str | None = SESION
-        con_subshell = "(" in tokens or ")" in tokens
+        con_subshell = any(t in tokens for t in ("(", ")", "|", "&"))
         for segmento in _partir_en_segmentos(tokens):
             dir_efectivo, dir_siguiente = _dir_de_segmento(segmento, dir_actual)
             if not con_subshell:
