@@ -588,6 +588,41 @@ class CosecharRetroTests(unittest.TestCase):
     def test_titulo_recortado(self):
         self.assertLessEqual(len(cr._titulo("x" * 100)), 70)
 
+    def _retro_harness(self, *bullets: str) -> str:
+        return "### Harness engineering\n\n" + "\n".join(f"- {b}" for b in bullets) + "\n"
+
+    def test_omite_las_dos_lineas_literales_de_la_retro_231(self):
+        retro = self._retro_harness(
+            "¿Faltó contexto que ralentizó? → Ninguno (la regla del orquestador ya está en Mejoras sugeridas)",
+            "¿Un error pudo prevenirse automáticamente? → Ninguno (el test de cableado ya quedó en el commit e1e1e11)",
+        )
+        self.assertEqual(cr.extraer_mejoras(retro), [])
+
+    def test_omite_variantes_de_ninguno_con_motivo(self):
+        variantes = ["Ninguno", "Ninguno.", "Ninguno (motivo)", "Ninguna — motivo", "N/A: motivo", "No aplica (motivo)"]
+        for v in variantes:
+            with self.subTest(variante=v):
+                retro = self._retro_harness(f"¿Surgió algo? → {v}")
+                self.assertEqual(cr.extraer_mejoras(retro), [])
+
+    def test_no_omite_palabra_que_solo_empieza_como_ninguno(self):
+        for mejora in ("Ningunos de los tests cubren X", "Ninguno de los tests cubre X", "Ninguna heurística cubre el caso X"):
+            with self.subTest(mejora=mejora):
+                retro = self._retro_harness(f"¿Surgió algo? → {mejora}")
+                self.assertEqual(cr.extraer_mejoras(retro), [("harness", mejora)])
+
+    def test_titulo_conserva_guion_bajo_de_identificadores(self):
+        for ident in ("retro_query.py", "contrato_check.py", "guard_integracion.py", "test_consistencia.py", "mutar_literal.py"):
+            with self.subTest(ident=ident):
+                self.assertEqual(cr._titulo(f"Agregar `{ident}` al sensor"), f"Agregar {ident} al sensor")
+
+    def test_titulo_quita_enfasis_y_backticks(self):
+        casos = {"Agregar *nota* al skill": "Agregar nota al skill", "Agregar **nota** al skill": "Agregar nota al skill",
+                 "Agregar _nota_ al skill": "Agregar nota al skill", "Agregar `nota` al skill": "Agregar nota al skill"}
+        for entrada, esperado in casos.items():
+            with self.subTest(entrada=entrada):
+                self.assertEqual(cr._titulo(entrada), esperado)
+
 
 class ContratoCheckTests(unittest.TestCase):
     def test_extrae_y_verifica(self):
