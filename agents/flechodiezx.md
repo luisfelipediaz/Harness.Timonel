@@ -57,7 +57,7 @@ Si el issue ya tiene un comentario `timonel:investigacion` vigente (mismo alcanc
 
 ## Fase 2: Contrato API y modelos compartidos
 
-**Perfil plugin**: no hay API. El contrato es un **contrato de cambio**: tabla `Archivo | Cambio` con todo lo que se tocara (agentes, skills, scripts, hooks, tests, docs), las invariantes nuevas para `tests/test_consistencia.py` y los casos de prueba de hooks. Publicalo igual como `timonel:contrato-api` con `Endpoints: Ninguno — explícito` y `backend_desplegado: no`, pide el "si", y salta a Fase 3.
+**Perfil plugin**: no hay API. El contrato es un **contrato de cambio**: tabla `Archivo | Cambio` con todo lo que se tocara (agentes, skills, scripts, hooks, tests, docs), las invariantes nuevas para `tests/test_consistencia.py` y los casos de prueba de hooks. Si el cambio toca un sensor `scripts/*.py` cuyo `main()` decide que valor le pasa a la funcion pura (lo calcula de `gh`, de un JSON, de un label o de la rama), la tabla de casos del contrato lleva una fila por cada decisión de `main()` (entrada que la dispara → valor esperado) y, si el sensor tiene tres respuestas (`main()` puede pasarle a la funcion pura un "no sé": `None` o equivalente), la fila del "no sé" (error de `gh`, stdout no parseable o modo `--json`); ejemplo real: `scripts/pr_check.py` `main()` (#223). Un script que solo imprime o filtra no entra. Publicalo igual como `timonel:contrato-api` con `Endpoints: Ninguno — explícito` y `backend_desplegado: no`, pide el "si", y salta a Fase 3.
 
 **Perfil consumidor** — define, **antes de implementar**:
 
