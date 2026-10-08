@@ -642,6 +642,29 @@ class IntegracionTests(unittest.TestCase):
         for esperado in ("az repos pr create", "--organization https://dev.azure.com/org", "--project proj", "--repository repo"):
             self.assertIn(esperado, cmd)
 
+    def test_comando_pr_draft_github(self):
+        cmd = ig.comando_pr("https://github.com/o/r.git", "poc/x", "main", "Titulo (#31)", "/tmp/pr-31.md", draft=True)
+        self.assertIn("gh pr create --draft ", cmd)
+
+    def test_comando_pr_draft_azure_devops(self):
+        import shlex
+        for url in ("https://dev.azure.com/org/proj/_git/repo", "git@ssh.dev.azure.com:v3/org/proj/repo"):
+            partes = shlex.split(ig.comando_pr(url, "poc/x", "main", "Titulo (#31)", "/tmp/pr-31.md", draft=True))
+            i = partes.index("--draft")
+            self.assertEqual(partes[i + 1], "true")
+
+    def test_comando_pr_sin_draft_no_lo_contiene(self):
+        for url in ("https://github.com/o/r.git", "https://dev.azure.com/org/proj/_git/repo"):
+            self.assertNotIn("--draft", ig.comando_pr(url, "hu/31-x", "main", "Titulo (#31)", "/tmp/pr-31.md"))
+            self.assertNotIn("--draft", ig.comando_pr(url, "hu/31-x", "main", "Titulo (#31)", "/tmp/pr-31.md", draft=False))
+
+    def test_cli_acepta_flag_draft(self):
+        import subprocess, sys
+        proc = subprocess.run(
+            [sys.executable, "scripts/integracion.py", "--tipo-remote", "--draft", "--remote-url", "https://github.com/o/r.git"],
+            capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+
     def test_comando_pr_escapa_titulo_con_apostrofo(self):
         import shlex
         titulo = "Fase 6.5: abrir el PR de 'hu/N-slug' y registrarlo (#31)"
