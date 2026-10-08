@@ -16,8 +16,11 @@ Revisa la implementacion de una historia contra su issue y las convenciones del 
 | `archivos_modificados` | Lista consolidada (ARCHIVOS_BACKEND + ARCHIVOS_FRONTEND + MODELOS_COMPARTIDOS) |
 | `plugin_root` | Raiz absoluta del plugin (para heuristicas y plantillas) |
 | `tests_primera_corrida` | **Opcional.** El bloque `Tests verdes en su primera corrida` del sub-agente, tal cual. Ausente = no informado |
+| `directorio_trabajo` | **Opcional.** Ruta del worktree donde esta checkouteada la rama a revisar (default: el directorio actual). En el modo "rama del usuario" del orquestador es la ruta del usuario |
 
-Si falta alguno, detente y reporta.
+**`directorio_trabajo`**: el `git diff <rama-base>...HEAD` del Paso 2 corre **ahi** (`git -C <directorio_trabajo>`), porque `HEAD` es la rama de ese directorio, no la del arbol del orquestador. Sin el parametro, corre en el directorio actual, como antes.
+
+Si falta alguno de los obligatorios, detente y reporta.
 
 ## Paso 1: Cargar contexto
 
@@ -34,7 +37,7 @@ Si el issue no declara Gherkin verificable, registra WARNING tipo `Gherkin` "iss
 
 ## Paso 2: Localizar el codigo
 
-`archivos_modificados` es la lista autorizada. Complementa con `git diff <rama-base>...HEAD --name-only` si hace falta. No audites el resto del repo.
+`archivos_modificados` es la lista autorizada. Complementa con `git -C <directorio_trabajo> diff <rama-base>...HEAD --name-only` si hace falta. No audites el resto del repo.
 
 ## Paso 3: Revision con severidad
 
