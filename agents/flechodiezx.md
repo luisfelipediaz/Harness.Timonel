@@ -100,6 +100,8 @@ Marca `- [x] Implementación` (o `Backend`) solo en el caso normal, y salta a Fa
 
 **Modo rama del usuario — perfil consumidor (Fase 3)**: igual que el perfil plugin, sin `isolation`, con la `ruta` del usuario como directorio de trabajo, sin `RAMA_HISTORIA`, sin delta de `worktree-agent-*` ni merge-base. Los sub-agentes de backend y de frontend (cada uno con su skill de implementacion de la fase) comparten un solo arbol: lanzalos **en secuencia**, no en el mismo mensaje. Verifica cada capa con `git -C <ruta> rev-list --count <base>..<rama>` con las mismas tres respuestas (mas de 0 sigue, `0` detiene, comando que falla es "no se" y detiene).
 
+**Aceptacion del reporte (Fase 3, perfil plugin, perfil consumidor y modo rama del usuario)**: antes de dar por terminado a un sub-agente de implementacion, valida que su Output traiga el bloque `### Tests verdes en su primera corrida` con exactamente una de tres formas: una linea por test con su mutacion y `fallos: N de M`; `Ninguno`; o `No medido: <motivo>`. Un reporte sin el bloque, o con una linea sin mutacion o sin conteo, no se acepta: registralo como pendiente y relanza al sub-agente **una vez** pidiendo el bloque. Si vuelve sin el, reportalo al usuario y no pases a consolidacion. Un test que nunca se vio fallar no entra a consolidacion como evidencia. Guarda el bloque tal cual como `tests_primera_corrida`: lo recibe `code-review` en la Fase 5.5.
+
 Cada prompt incluye: (1) el body completo del issue, (2) el contrato aprobado, (3) la lista de modelos compartidos ya commiteados, (4) la instruccion de usar el skill con ruta absoluta, (5) los valores del config que necesita.
 
 ### Backend
@@ -119,6 +121,7 @@ RESTRICCIONES DEL ORQUESTADOR:
 - NO modifiques {modelos.path} — ya esta implementado
 - NO modifiques {api.moduleFile} — documenta en tu output los providers a registrar
 - NO ejecutes nx test — el orquestador lo hara tras el merge
+- Tu Output cierra con el bloque `### Tests verdes en su primera corrida`, tal como lo pide tu skill
 - Commits con mensaje "feat(<modulo>): backend #N — <detalle>"
 ```
 
@@ -140,6 +143,7 @@ RESTRICCIONES DEL ORQUESTADOR:
 - NO modifiques {modelos.path}
 - NO modifiques {frontend.routesFile} — documenta en tu output las rutas a registrar
 - NO ejecutes nx test
+- Tu Output cierra con el bloque `### Tests verdes en su primera corrida`, tal como lo pide tu skill
 - Commits con mensaje "feat(<modulo>): frontend #N — <detalle>"
 ```
 
@@ -157,7 +161,7 @@ Con la consolidacion en verde (Fase B/lint+tests, ambos perfiles), verifica que 
 
 ## Fase 5.5: Code review (siempre)
 
-Sub-agente `model: "sonnet"`, sin worktree, skill `code-review`. Parametros: `issue`, `repo`, `modulo`, `alcance`, `archivos_modificados`, `plugin_root`. Devuelve `VEREDICTO`, `HALLAZGOS_CRITICOS`, `HALLAZGOS_WARNING`, `BLOQUEA_DOD`; publica `<!-- timonel:review -->` y label `review:*`. **No abortes** con `REQUIERE CAMBIOS`: la Fase 7 lo reporta y el humano decide. Si falla en ejecucion, **reintenta una vez** antes de marcar `VEREDICTO: NO_GENERADO` y continuar; `NO_GENERADO` produce `FALLAS_CRITICAS` en la Fase 7 (el issue no se cierra: el code review es obligatorio en `tipo:hu`).
+Sub-agente `model: "sonnet"`, sin worktree, skill `code-review`. Parametros: `issue`, `repo`, `modulo`, `alcance`, `archivos_modificados`, `plugin_root` y `tests_primera_corrida` (el bloque de la Fase 3 tal cual, incluido `No medido`). Devuelve `VEREDICTO`, `HALLAZGOS_CRITICOS`, `HALLAZGOS_WARNING`, `BLOQUEA_DOD`; publica `<!-- timonel:review -->` y label `review:*`. **No abortes** con `REQUIERE CAMBIOS`: la Fase 7 lo reporta y el humano decide. Si falla en ejecucion, **reintenta una vez** antes de marcar `VEREDICTO: NO_GENERADO` y continuar; `NO_GENERADO` produce `FALLAS_CRITICAS` en la Fase 7 (el issue no se cierra: el code review es obligatorio en `tipo:hu`).
 
 **Ronda de correccion**: si decidis relanzar un sub-agente de implementacion (mismo skill que uso la Fase 3, mismo perfil) para cerrar hallazgos `CRITICO` del review antes de seguir, el orden es estricto -- push, verificar, recien entonces pasar la variable: `git push -u origin hu/N-slug`, despues `git rev-list --left-right --count hu/N-slug...origin/hu/N-slug`, y **solo si el resultado es `0 0`** agregas `RAMA_HISTORIA: hu/N-slug` al prompt del sub-agente y lo lanzas. Si el conteo no es `0 0`, no pasas la variable y no lo lanzas: reportalo (el push fallo o no llego al remoto) antes de reintentar. Pushear y pasar la variable sin medir el conteo reproduce el defecto que esta HU cierra, una vuelta mas abajo -- un `Already up to date` que el sub-agente no puede distinguir de un no-op legitimo (#194).
 

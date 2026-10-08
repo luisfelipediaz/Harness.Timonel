@@ -48,3 +48,8 @@ No modifiques archivos fuera de tu tarea: solo los que la historia, el contrato 
 - Dependencias de API pendientes (mocks a reemplazar)
 - Branch/worktree con los commits
 - Si lint fallo: error exacto y lo intentado
+- `### Tests verdes en su primera corrida` — exactamente una de tres formas (nunca vacio ni en prosa libre):
+  - una linea por test que paso en su primera corrida: `` - `<test>` — mutación: <qué se cambió> — fallos: N de M `` (N≥1; si N=0 el test es vacuo: reportalo como tal, no lo cuentes como evidencia);
+  - `Ninguno`: corriste tests y ninguno nacio verde;
+  - `No medido: <motivo>`: distinto de `Ninguno`. Lo esperado aca es `No medido: no se ejecuta nx test (lo hace el orquestador)`, salvo que hayas corrido tests.
+

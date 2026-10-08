@@ -1,9 +1,10 @@
 # Changelog
 
-## 0.10.0 — en desarrollo
+## 0.10.0 — 2026-10-08
 
 - `test_labels_script_incluye_labels_documentados` (`tests/test_consistencia.py`) deriva los labels de la primera celda de las tablas de `skills/github-issues/references/labels.md` en vez de una lista a mano: celda literal `x` cuenta, plantillas con `<` o `…` se excluyen, una celda con backticks no clasificable falla, una extraccion vacia falla, y hay un `subTest` por label (#225)
 - Modo "rama del usuario" en `agents/flechodiezx.md`: cuando el usuario pide una rama concreta, el orquestador trabaja en esa rama y su ruta (sin worktree propio, sin nombrar skills `implement-*`), `consolidate-story` acepta `modo_rama`/`ruta_trabajo` (linea `Merge: n-a — rama pedida por el usuario (<rama>, <ruta>)`), `verify-dod` acepta `directorio_trabajo` y `scripts/integracion.py` suma `--draft` (`gh --draft`, `az --draft true`). Tests: 4 casos en `IntegracionTests` y `ModoRamaDelUsuarioTests` (11 casos); 322 en verde (#221)
+- Los sub-agentes `implement-*` reportan el bloque "Tests verdes en su primera corrida" (que test, que mutacion, cuantos fallos); `flechodiezx` y `flechodiezx-hotfix` lo aceptan o relanzan una sola vez, y `code-review` recibe `tests_primera_corrida` y marca "No medido" como WARNING de evidencia faltante. `TestsVerdesPrimeraCorridaTests` en `tests/test_consistencia.py`; 323 en verde (#230)
 - `tests/test_consistencia.py` detecta los flags de `argparse` declarados y nunca leidos (`ArgumentosDeArgparseLeidosTests`): para cada `scripts/*.py` compara los `add_argument` con los atributos que el script lee del namespace de `parse_args`, y responde "no se" (no "esta bien") cuando el script usa `vars`/`getattr` o no llama a `parse_args` (#227)
 
 ## 0.9.0 — 2026-10-08
