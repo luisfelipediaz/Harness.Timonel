@@ -16,7 +16,7 @@ import re
 import sys
 from pathlib import Path
 
-from timonel_gh import find_marker_comment, gh_json, load_config, repo_from_config
+from timonel_gh import find_marker_comment, gh_json, load_config, numero_issue, repo_from_config
 
 ENDPOINT = re.compile(r"Metodo:\s*(?P<metodo>GET|POST|PUT|PATCH|DELETE)\s*\n\s*Ruta:\s*(?P<ruta>\S+)", re.IGNORECASE)
 DECORADOR = {"GET": "Get", "POST": "Post", "PUT": "Put", "PATCH": "Patch", "DELETE": "Delete"}
@@ -78,7 +78,7 @@ def tabla(resultados) -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Contrasta contrato API vs controllers.")
-    parser.add_argument("issue", type=int)
+    parser.add_argument("issue", type=numero_issue)
     parser.add_argument("--repo")
     parser.add_argument("--api-path")
     args = parser.parse_args()

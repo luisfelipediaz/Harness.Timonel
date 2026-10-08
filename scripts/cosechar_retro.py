@@ -25,6 +25,7 @@ from timonel_gh import (
     gh_json,
     label_value,
     load_config,
+    numero_issue,
     parse_secciones,
     repo_from_config,
 )
@@ -147,7 +148,7 @@ def cosechar(repo: str, issue_num: int, plugin_repo: str, apply: bool) -> list[s
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Convierte las mejoras de una retro en issues.")
-    parser.add_argument("issue", type=int)
+    parser.add_argument("issue", type=numero_issue)
     parser.add_argument("--repo")
     parser.add_argument("--plugin-repo", default=None)
     parser.add_argument("--apply", action="store_true")

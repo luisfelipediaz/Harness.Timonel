@@ -25,7 +25,7 @@ import sys
 from pathlib import Path
 from typing import Callable
 
-from timonel_gh import find_marker_comment, gh_json, repo_from_config
+from timonel_gh import find_marker_comment, gh_json, numero_issue, repo_from_config
 
 REMOTE_GITHUB = re.compile(r"github\.com[:/](?P<owner>[^/]+)/(?P<repo>.+?)(?:\.git)?/?$")
 REMOTE_AZURE_DEV = re.compile(r"dev\.azure\.com/(?P<org>[^/]+)/(?P<project>[^/]+)/_git/(?P<repo>[^/]+)/?$")
@@ -158,7 +158,7 @@ def _remote_actual() -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Arma (imprime) el comando de PR segun el remote del repo.")
-    parser.add_argument("issue", type=int, nargs="?")
+    parser.add_argument("issue", type=numero_issue, nargs="?")
     parser.add_argument("--rama")
     parser.add_argument("--base", default="main")
     parser.add_argument("--remote-url")

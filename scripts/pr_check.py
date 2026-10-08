@@ -2,16 +2,33 @@
 """Sensor del estado del PR para el item 1 del DoD (issue #81, epica #79).
 
 Uso:
-    python3 pr_check.py <issue> [--repo owner/repo] [--base main] [--espera 60]
+    python3 pr_check.py <issue> [--repo owner/repo] [--base main] [--espera 60] [--rama <rama>]
     python3 pr_check.py <issue> --json '<array de `gh pr list` --json ...>'   # tests
 
 El sensor descubre el PR solo: toma la rama actual (`git rev-parse --abbrev-ref
-HEAD`) y verifica que referencie el issue (`hu/<N>-*` / `fix/<N>-*`, mismos
-prefijos que `estado_historia.PREFIJOS_RAMA`). No recibe `pr_url` -- un dato que
-el orquestador *afirma* es falsificable con un copy-paste de otro PR; `gh pr
-list --head <rama>` es evidencia de GitHub ligada a la rama (decision D1 del
-contrato de #81). `--pr`/`--rama` existen solo para depurar a mano; el skill
-`verify-dod` nunca los usa.
+HEAD`) y verifica que referencie el issue. No recibe `pr_url` -- un dato que el
+orquestador *afirma* es falsificable con un copy-paste de otro PR; `gh pr list
+--head <rama>` es evidencia de GitHub ligada a la rama (decision D1 del contrato
+de #81). `--rama` existe solo para depurar a mano; el skill `verify-dod` nunca
+lo usa.
+
+Reglas de rama (#223), en este orden:
+  a. Rama con prefijo del harness (`hu/<N>-*` / `fix/<N>-*`, mismos prefijos que
+     `estado_historia.PREFIJOS_RAMA`) y OTRO numero: critico, sin mirar PRs.
+  b. Prefijo del harness y el mismo numero: la rama alcanza, como siempre.
+  c. Rama SIN prefijo del harness (una PoC o una rama pedida por el usuario): se
+     vincula al issue solo si el cuerpo del unico PR abierto de esa rama dice
+     `Closes|Fixes|Resolves|Refs #N`; si no, critico. El PR sigue saliendo de la
+     rama actual (D1). `Refs` vincula pero no cierra: la regla "el PR no cierra
+     #N" lo reporta aparte, como no critico.
+
+Draft (#223): el sensor recibe `draft_intencional` (tres estados, no dos). `False`:
+el PR en draft es critico, como siempre. `None` ("no se pudo leer el label del
+issue"): critico con motivo propio, distinto de "draft sin declarar". `True`
+(label `draft-intencional` en el ISSUE): el draft no corta; se evaluan las reglas
+siguientes y una falla critica manda sola. Si nada critico aparece, el veredicto
+es `FAILED` no critico (`PENDIENTES` en el DoD) con el motivo del draft primero,
+unido con `; ` a cualquier otro motivo no critico (p. ej. "no cierra #N").
 
 Imprime `ESTADO: PASSED|FAILED`, `CRITICIDAD: critico|no-critico|n-a`,
 `MOTIVO: <texto>`, `PR: <url o n-a>`. Sale 0 si `ESTADO` empieza por `PASSED`,
@@ -57,12 +74,22 @@ from pathlib import Path
 
 from estado_historia import PREFIJOS_RAMA
 from integracion import tipo_remote
-from timonel_gh import repo_from_config
+from timonel_gh import numero_issue, repo_from_config
 
 CAMPOS_PR = "number,url,state,isDraft,baseRefName,headRefName,body,mergeable,mergeStateStatus,statusCheckRollup"
 
 _RAMA_RE = re.compile(rf"^(?:{'|'.join(re.escape(p) for p in PREFIJOS_RAMA)})/(\d+)-")
-_CIERRA_ISSUE_RE = re.compile(r"\b(?:Closes|Fixes|Resolves)\s+#(\d+)\b", re.IGNORECASE)
+# Una sola fuente de las palabras de cierre: `_VINCULA_ISSUE_RE` suma `Refs`
+# sobre la misma lista, no la copia.
+_PALABRAS_CIERRE = ("Closes", "Fixes", "Resolves")
+
+
+def _regex_issue(palabras: tuple[str, ...]) -> re.Pattern[str]:
+    return re.compile(rf"\b(?:{'|'.join(palabras)})\s+#(\d+)\b", re.IGNORECASE)
+
+
+_CIERRA_ISSUE_RE = _regex_issue(_PALABRAS_CIERRE)
+_VINCULA_ISSUE_RE = _regex_issue(_PALABRAS_CIERRE + ("Refs",))
 
 # R5: dos `__typename` de `statusCheckRollup` se normalizan al mismo eje. Todo
 # valor fuera del mapa cae en "desconocido", que nunca es verde y siempre se
@@ -90,13 +117,34 @@ class Veredicto:
     pr: str              # url del PR, o "n-a" si no se identifico ninguno
 
 
-def _rama_corresponde(rama: str, issue: int) -> bool:
+def _rama_ajena(rama: str, issue: int) -> bool:
+    """True si la rama sigue la convencion del harness pero es de OTRO issue
+    (reglas a y b). Una rama sin prefijo no es ajena: la decide el cuerpo del PR."""
     m = _RAMA_RE.match(rama or "")
-    return bool(m) and int(m.group(1)) == issue
+    return bool(m) and int(m.group(1)) != issue
+
+
+def _menciona_issue(regex: re.Pattern[str], body: str, issue: int) -> bool:
+    return any(int(n) == issue for n in regex.findall(body or ""))
 
 
 def _cierra_issue(body: str, issue: int) -> bool:
-    return any(int(n) == issue for n in _CIERRA_ISSUE_RE.findall(body or ""))
+    return _menciona_issue(_CIERRA_ISSUE_RE, body, issue)
+
+
+def _vincula_issue(body: str, issue: int) -> bool:
+    return _menciona_issue(_VINCULA_ISSUE_RE, body, issue)
+
+
+_MOTIVO_DRAFT_INTENCIONAL = "draft intencional declarado (label draft-intencional)"
+
+# Los tres estados de `draft_intencional` (sensor-declara-su-evidencia): `True`
+# no es critico; `False` y `None` si, con motivos distintos.
+_MOTIVO_DRAFT_CRITICO: dict[bool | None, str | None] = {
+    True: None,
+    False: "el PR #{numero} está en draft; un humano no puede mergearlo",
+    None: "no se pudo saber si el draft es intencional (PR #{numero}: no se leyeron los labels del issue)",
+}
 
 
 def _unir(items: list[str]) -> str:
@@ -190,6 +238,7 @@ def evaluar(
     hay_workflows: bool,
     gh_error: str | None = None,
     espera: int = 60,
+    draft_intencional: bool | None = None,
 ) -> Veredicto:
     """Traduce el estado de GitHub (PR + checks) a un veredicto del item 1 del DoD.
 
@@ -217,7 +266,7 @@ def evaluar(
     if gh_error:
         return Veredicto("FAILED", "critico", f"no se pudo verificar el PR: {gh_error}", "n-a")
 
-    if not _rama_corresponde(rama, issue):
+    if _rama_ajena(rama, issue):
         return Veredicto("FAILED", "critico", f"la rama actual {rama} no corresponde al issue #{issue}", "n-a")
 
     if not prs:
@@ -261,6 +310,13 @@ def evaluar(
     pr = abiertos[0]
     url = pr.get("url", "n-a")
 
+    if not _RAMA_RE.match(rama or "") and not _vincula_issue(pr.get("body", ""), issue):
+        return Veredicto(
+            "FAILED", "critico",
+            f"la rama actual {rama} no sigue la convención del harness y ni la rama ni su PR referencian el issue #{issue}",
+            url,
+        )
+
     # `gh pr list` siempre devuelve estos campos para un PR real; si faltan,
     # el dato esta corrupto o incompleto y el motivo debe decirlo -- no debe
     # caer en la rama de "checks aun no registrados", que manda a esperar por
@@ -273,12 +329,21 @@ def evaluar(
             url,
         )
 
+    motivo_draft = ""
     if pr.get("isDraft"):
-        return Veredicto("FAILED", "critico", f"el PR #{pr.get('number')} está en draft; un humano no puede mergearlo", url)
+        plantilla = _MOTIVO_DRAFT_CRITICO[draft_intencional]
+        if plantilla:
+            return Veredicto("FAILED", "critico", plantilla.format(numero=pr.get("number")), url)
+        motivo_draft = _MOTIVO_DRAFT_INTENCIONAL
+
+    def pendiente(motivo: str) -> Veredicto:
+        # El motivo del draft va primero; ningun motivo no critico tapa al otro.
+        return Veredicto("FAILED", "no-critico", "; ".join(m for m in (motivo_draft, motivo) if m), url)
+
     if pr.get("baseRefName") != base:
         return Veredicto("FAILED", "critico", f"el PR apunta a {pr.get('baseRefName')}, no a {base}", url)
     if not _cierra_issue(pr.get("body", ""), issue):
-        return Veredicto("FAILED", "no-critico", f"el PR no cierra #{issue}: el issue quedará abierto al mergear", url)
+        return pendiente(f"el PR no cierra #{issue}: el issue quedará abierto al mergear")
 
     mergeable = pr.get("mergeable")
     merge_state = pr.get("mergeStateStatus")
@@ -289,20 +354,24 @@ def evaluar(
     if mergeable == "UNKNOWN":
         return Veredicto("FAILED", "critico", f"GitHub no pudo calcular el estado de merge tras {espera}s", url)
     if merge_state == "BEHIND":
-        return Veredicto("FAILED", "no-critico", f"la rama está detrás de {base}; actualizala antes del merge", url)
+        return pendiente(f"la rama está detrás de {base}; actualizala antes del merge")
     # CLEAN, BLOCKED, UNSTABLE, HAS_HOOKS, UNKNOWN, DRAFT: no alteran el veredicto (D2).
 
     checks = pr.get("statusCheckRollup") or []
     if not checks:
         if hay_workflows:
-            return Veredicto("FAILED", "no-critico", "checks aún no registrados; reevaluá en unos segundos", url)
+            return pendiente("checks aún no registrados; reevaluá en unos segundos")
+        if motivo_draft:
+            return pendiente("")
         return Veredicto("PASSED", "n-a", "PR mergeable; el repo no tiene checks configurados", url)
 
     eje, motivo = _estado_checks(checks)
     if eje == "rojo":
         return Veredicto("FAILED", "critico", motivo, url)
     if eje in ("desconocido", "en_curso"):
-        return Veredicto("FAILED", "no-critico", motivo, url)
+        return pendiente(motivo)
+    if motivo_draft:
+        return pendiente("")
     return Veredicto("PASSED", "n-a", f"PR #{pr.get('number')} abierto contra {base}, mergeable, checks en verde", url)
 
 
@@ -331,6 +400,26 @@ def _pr_list(rama: str, repo: str) -> list[dict]:
     return json.loads(proc.stdout) if proc.stdout.strip() else []
 
 
+def _draft_intencional(issue: int, repo: str) -> bool | None:
+    """True si el ISSUE lleva el label `draft-intencional`; None ("no se")
+    si `gh` no pudo leerlo -- nunca False por un fallo de consulta."""
+    proc = subprocess.run(
+        ["gh", "issue", "view", str(issue), "-R", repo, "--json", "labels"],
+        capture_output=True, text=True,
+    )
+    if proc.returncode != 0:
+        return None
+    try:
+        labels = json.loads(proc.stdout)["labels"]
+        return "draft-intencional" in [label["name"] for label in labels]
+    except (ValueError, KeyError, TypeError):
+        return None
+
+
+def _hay_draft_abierto(prs: list[dict]) -> bool:
+    return any(p.get("state") == "OPEN" and p.get("isDraft") for p in prs)
+
+
 def _esperar_mergeable(rama: str, repo: str, prs: list[dict], espera: int) -> list[dict]:
     """Reintenta `gh pr list` mientras el unico PR OPEN tenga `mergeable: UNKNOWN`
     (asincronia de GitHub que se resuelve en segundos). No espera por checks."""
@@ -347,12 +436,11 @@ def _esperar_mergeable(rama: str, repo: str, prs: list[dict], espera: int) -> li
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Sensor del estado del PR (item 1 del DoD, issue #81).")
-    parser.add_argument("issue", type=int)
+    parser.add_argument("issue", type=numero_issue)
     parser.add_argument("--repo")
     parser.add_argument("--base", default="main")
     parser.add_argument("--espera", type=int, default=60, help="segundos maximos de espera mientras mergeable=UNKNOWN")
     parser.add_argument("--rama", help="override de depuracion; verify-dod no lo usa (D1)")
-    parser.add_argument("--pr", type=int, help="override de depuracion; verify-dod no lo usa (D1)")
     parser.add_argument("--remote-url", help="override de depuracion")
     parser.add_argument("--json", help="array de `gh pr list --json %s` (tests)" % CAMPOS_PR)
     args = parser.parse_args()
@@ -361,20 +449,28 @@ def main() -> None:
 
     if args.json:
         prs = json.loads(args.json)
-        veredicto = evaluar(prs, args.issue, rama, args.base, "github", True, espera=args.espera)
+        # Este modo no consulta GitHub: con un PR en draft la respuesta honesta es "no se".
+        draft = None if _hay_draft_abierto(prs) else False
+        veredicto = evaluar(prs, args.issue, rama, args.base, "github", True, espera=args.espera, draft_intencional=draft)
     else:
         url_remote = args.remote_url or _remote_actual()
         remote = tipo_remote(url_remote)
         prs: list[dict] = []
         gh_error: str | None = None
+        draft: bool | None = False
         if remote == "github":
             repo = args.repo or repo_from_config()
             try:
                 prs = _pr_list(rama, repo)
                 prs = _esperar_mergeable(rama, repo, prs, args.espera)
+                if _hay_draft_abierto(prs):
+                    draft = _draft_intencional(args.issue, repo)
             except RuntimeError as exc:
                 gh_error = str(exc)
-        veredicto = evaluar(prs, args.issue, rama, args.base, remote, _hay_workflows(), gh_error=gh_error, espera=args.espera)
+        veredicto = evaluar(
+            prs, args.issue, rama, args.base, remote, _hay_workflows(),
+            gh_error=gh_error, espera=args.espera, draft_intencional=draft,
+        )
 
     print(f"ESTADO: {veredicto.estado}")
     print(f"CRITICIDAD: {veredicto.criticidad}")
