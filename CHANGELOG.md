@@ -1,5 +1,7 @@
 # Changelog
 
+## 0.10.0 — en desarrollo
+
 ## 0.9.0 — 2026-10-08
 
 - `guard_integracion.py` juzga la rama por segmento del comando, no la del cwd: resuelve el directorio de cada segmento (`cd <ruta> &&`, `git -C <ruta>`) y consulta su rama real (`git -C dir branch --show-current`, con cache y timeout de 5s); si no la puede resolver, falla abierto con la razon `rama-no-resuelta`. `tests/test_hooks_integracion.py` suma `GuardRamaPorSegmentoPuroTests` y `GuardRamaPorSegmentoCajaNegraTests` (#229)
