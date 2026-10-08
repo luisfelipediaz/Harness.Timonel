@@ -54,7 +54,21 @@ Cualquier otro flag -- booleano, conocido o no (`--no-pager`, `--paginate`,
 `-P`, `--bare`, `--literal-pathspecs`, ...) -- consume solo su propio token:
 la regla los cubre a todos sin necesidad de enumerarlos.
 
-Uso (stdin = payload de un hook PreToolUse de Claude Code):
+Rama por segmento (#229): `-C <dir>` y `cd <dir> &&` NO son solo ruido que se
+salta -- dicen DONDE corre el segmento. `decidir()` acepta un `rama_de(dir) ->
+rama | None` inyectable y juzga cada segmento contra la rama del repo donde
+corre (`_dir_de_segmento` resuelve el directorio efectivo), no contra la del
+cwd de la sesion: un `git -C <worktree> push origin hu/N-slug` desde una
+sesion parada en `main` ya no se bloquea como push de `main`. La rama
+simulada (`git checkout` entre segmentos) se lleva POR directorio. Sin
+`rama_de` el comportamiento es el de siempre (todo corre en la rama de la
+sesion). NO se resuelven -- caen a la rama de la sesion y dejan fail-open
+`rama-no-resuelta` -- `cd` sin argumento, `cd -`, `~`, `$VAR`/`$(...)`,
+`--git-dir`/`--work-tree`, un `rama_de` que devuelve None (dir inexistente,
+`git` falla) y cualquier `cd` en un comando con subshell `(`/`)` (decision
+aprobada: no se modela el alcance del subshell).
+
+Uso(stdin = payload de un hook PreToolUse de Claude Code):
     echo '{"tool_input": {"command": "git push origin main"}}' | python3 guard_integracion.py
 
 Sale 2 con el mensaje en stderr si bloquea, 0 si lo permite. Ante cualquier
@@ -65,7 +79,9 @@ es `git push --force`, y esa vive inline en `hooks/hooks.json`, no aqui.
 Todo fail-open deja rastro auditable en `.timonel/events.log` (linea `<hora>
 guard-integracion-fail-open <motivo>`): nunca es silencioso.
 
-Limitacion conocida y aceptada (revision #2 de #82): el guard cubre TODAS las
+Limitacion conocida y aceptada (revision #2 de #82; #229 retiro de ella el
+cwd-de-la-sesion como unica rama: ahora `-C`/`cd` se resuelven, ver "Rama por
+segmento"): el guard cubre TODAS las
 formas naturales de escribir el comando -- `;`, `&&`, `||`, salto de linea
 (`\n`/`\r\n`, la forma en que Bash entrega comandos multilinea todo el
 tiempo), `&` de fondo, `|` (pipe simple) y agrupacion `(...)` -- pero NO
@@ -83,7 +99,12 @@ que acumular parsers).
 
 Criterio de alcance de la tabla (ronda final de #82, cierre de la lista): un
 vector nuevo entra a este guard si se arregla agregando FILAS a
-`MANEJADORES`/la tabla de lookup -- datos, no codigo nuevo de parseo. Si
+`MANEJADORES`/la tabla de lookup -- datos, no codigo nuevo de parseo.
+Reinterpretacion aprobada por el usuario en #229: esa regla nacio para no
+perseguir evasiones. La resolucion de rama por segmento corrige un FALSO
+POSITIVO (bloquear un push legitimo desde un worktree) y lo hace con una
+funcion nueva y aparte (`_dir_de_segmento`), sin tocar `_normalizar_separadores`,
+`_indice_subcomando_git` ni `_clave_y_resto`; no persigue ninguna evasion. Si
 arreglarlo pide tocar el parser (`_normalizar_separadores`,
 `_indice_subcomando_git`, `_clave_y_resto`), NO entra: cada capa nueva de
 parser es superficie nueva de bug, no una mejora gratis -- ya paso en esta
@@ -120,10 +141,12 @@ from __future__ import annotations
 
 import datetime
 import json
+import posixpath
 import re
 import shlex
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 PREFIJO = "[timonel] Bloqueado: "
@@ -651,23 +674,129 @@ def clave_de_segmento(segmento: list[str]) -> tuple[str, ...] | None:
     return clave
 
 
-def decidir(cmd: str, rama: str, bases: list[str]) -> str | None:
-    """Punto de entrada puro. `rama` es la rama actual real; se simula su avance
-    entre segmentos (`git checkout <base> && ...`) para que el compuesto no evada
-    el guard. Devuelve el mensaje de bloqueo, o None si el comando se permite."""
+SESION = "."  # clave del directorio de la sesion (cwd del hook)
+
+_FLAGS_DE_CD_SIN_VALOR = {"-P", "-L", "-e", "-@"}
+_MARCAS_NO_RESOLUBLES = ("$", "`", "~")
+
+
+def _unir_dir(base: str | None, destino: str) -> str | None:
+    """`destino` relativo a `base` (normalizado); None si algo no es resoluble:
+    `base` ya desconocido y `destino` relativo, o `destino` con `~`/`$`/backtick."""
+    if not destino or any(marca in destino for marca in _MARCAS_NO_RESOLUBLES):
+        return None
+    if posixpath.isabs(destino):
+        return posixpath.normpath(destino)
+    if base is None:
+        return None
+    return posixpath.normpath(posixpath.join(base, destino))
+
+
+def _dirs_de_flags_git(segmento: list[str], idx: int) -> list[str] | None:
+    """Valores de los `-C` que preceden al subcomando (en orden); None si hay
+    `--git-dir`/`--work-tree`, que cambian el repo de forma no resoluble aqui."""
+    dirs: list[str] = []
+    i = 1
+    while i < idx:
+        token = segmento[i]
+        if token == "-C":
+            dirs.append(segmento[i + 1])
+            i += 2
+        elif token.startswith("-C"):
+            dirs.append(token[2:])
+            i += 1
+        elif token.split("=", 1)[0] in ("--git-dir", "--work-tree"):
+            return None
+        elif token in _FLAGS_GLOBALES_GIT_CON_VALOR_SEPARADO:
+            i += 2
+        else:
+            i += 1
+    return dirs
+
+
+def _dir_de_cd(segmento: list[str], dir_actual: str | None) -> str | None:
+    args = [t for t in segmento[1:] if t not in _FLAGS_DE_CD_SIN_VALOR]
+    if len(args) != 1 or args[0] == "-":
+        return None
+    return _unir_dir(dir_actual, args[0])
+
+
+def _dir_de_git(segmento: list[str], dir_actual: str | None) -> str | None:
+    idx = _indice_subcomando_git(segmento)
+    if idx is None:
+        return dir_actual
+    dirs = _dirs_de_flags_git(segmento, idx)
+    if dirs is None:
+        return None
+    efectivo = dir_actual
+    for d in dirs:
+        efectivo = _unir_dir(efectivo, d)
+    return efectivo
+
+
+def _dir_de_segmento(segmento: list[str], dir_actual: str | None) -> tuple[str | None, str | None]:
+    """Funcion pura (#229). Devuelve `(dir_efectivo, dir_siguiente)`: el directorio
+    donde corre ESTE segmento y el vigente para los siguientes. `None` = no
+    resoluble. `cd <dir>` no corre nada pero mueve el dir de los siguientes
+    (relativo al vigente); `git -C <a> -C <b>` acumula sobre el vigente y no
+    mueve el de los siguientes."""
+    segmento = _descartar_asignaciones_env(segmento)
+    if not segmento:
+        return dir_actual, dir_actual
+    programa = segmento[0]
+    if programa == "cd":
+        return dir_actual, _dir_de_cd(segmento, dir_actual)
+    if programa == "git":
+        return _dir_de_git(segmento, dir_actual), dir_actual
+    return dir_actual, dir_actual
+
+
+def _clave_de_rama(
+    dir_efectivo: str | None, ramas: dict[str, str], rama_de: Callable[[str], str | None]
+) -> str:
+    """Clave de `ramas` con la rama del dir efectivo, leyendola (una vez) con
+    `rama_de`. Si no se puede (dir no resoluble o `rama_de` -> None) usa la
+    rama de la sesion y deja fail-open `rama-no-resuelta`."""
+    if dir_efectivo == SESION or dir_efectivo in ramas:
+        return dir_efectivo
+    leida = None if dir_efectivo is None else rama_de(dir_efectivo)
+    if leida is None:
+        _registrar_fail_open("rama-no-resuelta")
+        return SESION
+    ramas[dir_efectivo] = leida
+    return dir_efectivo
+
+
+def decidir(
+    cmd: str,
+    rama: str,
+    bases: list[str],
+    rama_de: Callable[[str], str | None] | None = None,
+) -> str | None:
+    """Punto de entrada puro. `rama` es la rama actual real de la sesion; se simula
+    su avance entre segmentos (`git checkout <base> && ...`) para que el compuesto
+    no evada el guard. `rama_de(dir) -> rama | None` (inyectable, #229) da la rama
+    del repo de otro directorio; sin ella todo corre en `rama`. Devuelve el
+    mensaje de bloqueo, o None si el comando se permite."""
     try:
         tokens = shlex.split(_normalizar_separadores(cmd), posix=True)
     except ValueError:
         _registrar_fail_open("shlex-invalido")
         return None  # shlex invalido (comillas sin cerrar, etc.): fail-open
     try:
-        rama_actual = rama
+        ramas = {SESION: rama}
+        dir_actual: str | None = SESION
+        con_subshell = "(" in tokens or ")" in tokens
         for segmento in _partir_en_segmentos(tokens):
+            dir_efectivo, dir_siguiente = _dir_de_segmento(segmento, dir_actual)
+            if not con_subshell:
+                dir_actual = dir_siguiente
             clave, resto = _clave_y_resto(segmento)
             manejador = MANEJADORES.get(clave)
             if manejador is None:
                 continue
-            mensaje, rama_actual = manejador(resto, rama_actual, bases)
+            clave_rama = SESION if rama_de is None else _clave_de_rama(dir_efectivo, ramas, rama_de)
+            mensaje, ramas[clave_rama] = manejador(resto, ramas[clave_rama], bases)
             if mensaje:
                 return mensaje
         return None
@@ -681,6 +810,27 @@ def _rama_git_actual() -> str:
         ["git", "branch", "--show-current"], capture_output=True, text=True, check=False
     )
     return resultado.stdout.strip()
+
+
+def _rama_de_dir_real() -> Callable[[str], str | None]:
+    """`rama_de` real para `main()`: `git -C <dir> branch --show-current`, cacheado
+    por directorio, con timeout corto. `returncode != 0` (dir inexistente, no es
+    repo) o fallo al ejecutar -> None; HEAD desacoplado -> "" (no es base)."""
+    cache: dict[str, str | None] = {}
+
+    def rama_de(directorio: str) -> str | None:
+        if directorio not in cache:
+            try:
+                r = subprocess.run(
+                    ["git", "-C", directorio, "branch", "--show-current"],
+                    capture_output=True, text=True, check=False, timeout=5,
+                )
+                cache[directorio] = r.stdout.strip() if r.returncode == 0 else None
+            except (OSError, subprocess.SubprocessError):
+                cache[directorio] = None
+        return cache[directorio]
+
+    return rama_de
 
 
 def _bases_configuradas() -> list[str]:
@@ -699,7 +849,7 @@ def main() -> int:
     try:
         payload = json.load(sys.stdin)
         cmd = payload.get("tool_input", {}).get("command", "")
-        mensaje = decidir(cmd, _rama_git_actual(), _bases_configuradas())
+        mensaje = decidir(cmd, _rama_git_actual(), _bases_configuradas(), _rama_de_dir_real())
     except Exception:
         _registrar_fail_open("payload-o-entorno-invalido")
         return 0  # payload roto o entorno inesperado: fail-open
