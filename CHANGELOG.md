@@ -2,6 +2,8 @@
 
 ## 0.10.0 — en desarrollo
 
+- Modo "rama del usuario" en `agents/flechodiezx.md`: cuando el usuario pide una rama concreta, el orquestador trabaja en esa rama y su ruta (sin worktree propio, sin nombrar skills `implement-*`), `consolidate-story` acepta `modo_rama`/`ruta_trabajo` (linea `Merge: n-a — rama pedida por el usuario (<rama>, <ruta>)`), `verify-dod` acepta `directorio_trabajo` y `scripts/integracion.py` suma `--draft` (`gh --draft`, `az --draft true`). Tests: 4 casos en `IntegracionTests` y `ModoRamaDelUsuarioTests` (11 casos); 322 en verde (#221)
+
 ## 0.9.0 — 2026-10-08
 
 - `guard_integracion.py` juzga la rama por segmento del comando, no la del cwd: resuelve el directorio de cada segmento (`cd <ruta> &&`, `git -C <ruta>`) y consulta su rama real (`git -C dir branch --show-current`, con cache y timeout de 5s); si no la puede resolver, falla abierto con la razon `rama-no-resuelta`. `tests/test_hooks_integracion.py` suma `GuardRamaPorSegmentoPuroTests` y `GuardRamaPorSegmentoCajaNegraTests` (#229)
