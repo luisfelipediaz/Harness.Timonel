@@ -22,8 +22,19 @@ Integra los branches de implementacion a la rama actual (`hu/N-slug`), registra 
 | `branch_worktree` (perfil plugin) | Rama que dejo el sub-agente de `implement-plugin-change` en su worktree (delta de `git branch --list 'worktree-agent-*'` capturado por el orquestador en su Fase 3), o el motivo por el que no hay una para mergear |
 | `output_sub_agente` (perfil plugin) | Resumen del output del sub-agente unico de `implement-plugin-change` (archivos, tests, pendientes) |
 | `version_en_desarrollo` (perfil plugin) | Version `X.Y.0` de la epica en curso, para la seccion `## X.Y.0 — en desarrollo` del CHANGELOG |
+| `modo_rama` | `harness` (default) \| `usuario`. `usuario`: el usuario pidio trabajar en una rama y un worktree propios (ver "Modo rama del usuario") |
+| `ruta_trabajo` (con `modo_rama: usuario`) | Ruta del worktree del usuario, donde esta checkouteada su rama; la Fase B, el CHANGELOG y el push corren ahi |
 
-Si falta alguno, detente y reporta cual. En `perfil: plugin` solo se requieren `issue`, `repo`, `branch_worktree`, `output_sub_agente` y `version_en_desarrollo`.
+Si falta alguno, detente y reporta cual. En `perfil: plugin` solo se requieren `issue`, `repo`, `branch_worktree`, `output_sub_agente` y `version_en_desarrollo`. Con `modo_rama: usuario` no se requiere `branch_worktree` (ni `branch_worktree_backend|frontend`) pero si `ruta_trabajo`; sin `ruta_trabajo`, detente y reporta que falta.
+
+## Modo rama del usuario (`modo_rama: usuario`)
+
+Aplica a la Fase A de ambos perfiles. No hay rama de worktree del harness que mergear: el trabajo ya esta commiteado en la rama del usuario, dentro de `ruta_trabajo`. Es un caso **distinto** de "`branch_worktree` trae un motivo" del perfil plugin: ese motivo significa que la Fase 3 se detuvo sin producto y la Fase A **se detiene sin Fase B**; aca hay producto y la consolidacion **sigue**.
+
+- **Fase A**: sin merge, sin `git worktree remove` y sin `git branch -d` — ni el worktree ni la rama son del harness, nunca los borres.
+- **Fase B**: corre en `ruta_trabajo` (`git -C <ruta_trabajo> ...`, o con ese directorio como CWD), sobre la rama del usuario.
+- **CHANGELOG** (perfil plugin), commit y push: tambien en la rama del usuario, desde `ruta_trabajo`; el push es `git -C <ruta_trabajo> push -u origin <rama del usuario>`.
+- **Comentario `timonel:consolidacion`**: en `Pendientes y notas` agrega la linea literal `Merge: n-a — rama pedida por el usuario (<rama>, <ruta>)`, sin campo YAML nuevo.
 
 ## Perfil plugin
 
