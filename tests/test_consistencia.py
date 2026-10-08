@@ -1128,10 +1128,20 @@ class VersionTests(unittest.TestCase):
     def test_labels_script_incluye_labels_documentados(self):
         doc = (ROOT / "skills/github-issues/references/labels.md").read_text(encoding="utf-8")
         script = (ROOT / "scripts/setup-github-labels.sh").read_text(encoding="utf-8")
-        for label in re.findall(r"^\| `([a-z-]+:[a-z-]+|bloqueado|bug|duplicada|obsoleta|insights|harness-audit|draft-intencional)` \|", doc, re.MULTILINE):
-            if label.startswith("mod:") or label.startswith("sp:"):
+        labels = []
+        for celda in re.findall(r"^\|([^|]*)\|", doc, re.MULTILINE):
+            celda = celda.strip()
+            if "`" not in celda or "<" in celda or "…" in celda:
                 continue
-            self.assertIn(f"\n{label}|", script, f"labels.md documenta `{label}` pero setup-github-labels.sh no lo crea")
+            self.assertTrue(
+                celda.startswith("`") and celda.endswith("`") and celda.count("`") == 2,
+                f"labels.md: la celda {celda} tiene backticks y no es un label literal ni una plantilla",
+            )
+            labels.append(celda[1:-1])
+        self.assertTrue(labels, "no se extrajo ningún label de labels.md")
+        for label in labels:
+            with self.subTest(label=label):
+                self.assertIn(f"\n{label}|", script, f"labels.md documenta `{label}` pero setup-github-labels.sh no lo crea")
 
 
 class EvalsTests(unittest.TestCase):
