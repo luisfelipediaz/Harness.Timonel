@@ -25,7 +25,7 @@ Ejecuta la checklist de DoD con los resultados acumulados de fases anteriores ma
 
 | # | Item | Criticidad | Verificacion |
 | --- | --- | --- | --- |
-| 1 | PR abierto y mergeable | CRITICO o NO critico segun motivo (D1-D7, #81) | `python3 PLUGIN_ROOT/scripts/pr_check.py <issue> --repo <repo> --base <rama-base>` — el sensor descubre el PR por la rama actual (nunca recibe una URL): PASSED si `ESTADO` empieza por PASSED; si no, FAILED con la `CRITICIDAD` y el `MOTIVO` que imprime (conflictos, check en rojo, draft, PR sin `Closes #N`, remote no soportado, etc.) |
+| 1 | PR abierto y mergeable | CRITICO o NO critico segun motivo (D1-D7, #81) | `python3 PLUGIN_ROOT/scripts/pr_check.py <issue> --repo <repo> --base <rama-base>` — el sensor descubre el PR por la rama actual (nunca recibe una URL): PASSED si `ESTADO` empieza por PASSED; si no, FAILED con la `CRITICIDAD` y el `MOTIVO` que imprime (conflictos, check en rojo, draft, PR sin `Closes #N`, remote no soportado, etc.). Una rama fuera de `hu/` y `fix/` (PoC, rama pedida por el usuario) se vincula al issue si el cuerpo de su PR dice `Closes\|Fixes\|Resolves\|Refs #N`; el PR sigue saliendo de la rama actual, nunca de un dato afirmado (D1 de #81). Un PR en draft con el label `draft-intencional` en el issue y todo lo demas sano da FAILED **no critico** (decision `PENDIENTES`, no `FALLAS_CRITICAS`); sin el label, o si no se pudo leerlo, el draft es critico |
 | 2 | Lint pasa | CRITICO | `lint_resultado` |
 | 3 | Tests unitarios creados | NO critico | `git diff --name-only --diff-filter=A <rama-base>...HEAD -- '*.spec.ts' \| grep <modulo>` → PASSED si hay; SKIPPED si `NO_SPECS` |
 | 4 | Tests pasan | CRITICO | `tests_resultado` (SKIPPED si `NO_SPECS`) |

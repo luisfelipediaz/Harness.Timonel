@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.0 — en desarrollo
+
+- `scripts/pr_check.py` (item 1 del DoD) reconoce ramas fuera de la convencion `hu/N-`/`fix/N-` (una PoC o una rama pedida por el usuario) y distingue un PR draft declarado intencional de uno olvidado, sin perder D1 (#81: el PR sigue saliendo de la rama actual, nunca de un `pr_url` afirmado). Rama con prefijo del harness y otro numero: critico sin mirar PRs (como hoy); rama sin prefijo: se vincula al issue solo si el cuerpo de su unico PR abierto dice `Closes|Fixes|Resolves|Refs #N` (`Refs` vincula pero no cierra: lo reporta la regla "no cierra #N", no critica), si no, critico. `evaluar()` recibe `draft_intencional` de tres estados (`True` = label `draft-intencional` en el ISSUE; `False` = draft critico como hoy; `None` = no se pudo leer el label, critico con motivo propio): con `True` el draft no corta, una falla critica posterior manda sola y, si no hay otra, el veredicto es `FAILED` no critico con el motivo del draft primero (`PENDIENTES` en `verify-dod`). El label `draft-intencional` se provisiona en `scripts/setup-github-labels.sh` y `skills/github-issues/references/labels.md`, y el test de consistencia de labels cubre la nueva entrada. `skills/verify-dod/SKILL.md` documenta el caso. Tests: 275 en verde (escenarios nuevos en `PrCheckTests`, los previos intactos); mutaciones verificadas (el escenario 9 y la consistencia de labels fallan al revertir el cambio) (#223)
+
 ## 0.8.0 — 2026-10-07
 
 - Skill nuevo `disenar`: guia el diseño de una interfaz desde la investigacion de tendencias y el sistema de diseño del proyecto hasta un prototipo interactivo con escenarios reproducibles, y lo entrega como canvas de Claude Design (un artboard por estado de cada pantalla). Sus scripts node (`capture.js`, `build.js`, `verify.js`) congelan cada estado, arman los `.dc.html` con un solo `<helmet>` y los empaquetan en el editor del canvas publicado; se resuelven desde `PLUGIN_ROOT` (#205)

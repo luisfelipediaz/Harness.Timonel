@@ -36,5 +36,6 @@ Provisionados por `scripts/setup-github-labels.sh` (idempotente). Los ejes `tipo
 | `obsoleta` | `CFD3D7` | Reemplazada o ya no aplica (cerrada not_planned) |
 | `insights` | `5319E7` | Issue de insights destilados (retro/review) |
 | `harness-audit` | `0E8A16` | Auditoría de madurez del harness (una por corrida) |
+| `draft-intencional` | `CFD3D7` | PR en draft a propósito: PoC o rama que no se mergea |
 
 Los 9 labels default de GitHub (`enhancement`, `documentation`, `good first issue`, …) se eliminan en repos nuevos dedicados a backlog; en repos con historia se conservan.
