@@ -2,7 +2,7 @@
 
 ## 0.11.0 — en desarrollo
 
-- `tests/test_consistencia.py` suma `CableadoDeMainTests` (3 tests): `agents/flechodiezx.md` y `skills/implement-plugin-change/SKILL.md` deben nombrar los cinco literales del cableado de `main()` y en el orden correcto; verificado por mutacion (borrar y mover cada literal, 10 de 10 fallan) (#224)
+- El contrato de cambio del perfil plugin (`agents/flechodiezx.md`, Fase 2) exige una fila por cada decisión de `main()` de un sensor `scripts/*.py`, con la fila del "no sé" cuando el sensor tiene tres respuestas; `implement-plugin-change` pide un test por fila del cableado de `main()` (no solo la función pura) y lo reporta en la línea `Tests del cableado de main()`. `CableadoDeMainTests` (`tests/test_consistencia.py`) asevera los cinco literales en su sección, verificado por mutación (borrar y mover cada literal: 10 de 10 fallan) (#224)
 
 ## 0.10.0 — 2026-10-08
 
