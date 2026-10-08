@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.11.0 — en desarrollo
+
+- `cosechar_retro.py` omite las respuestas "Ninguno (motivo)", "Ninguna — motivo", "N/A: motivo" y "No aplica (motivo)" (el regex exige limite de palabra, no el fin de linea; "Ningunos de…" sigue cosechandose) y `_titulo` conserva el `_` de los identificadores (`test_consistencia.py`) quitando solo el de enfasis (`_x_`); tests en `CosecharRetroTests` (#237)
+
 ## 0.10.0 — 2026-10-08
 
 - `test_labels_script_incluye_labels_documentados` (`tests/test_consistencia.py`) deriva los labels de la primera celda de las tablas de `skills/github-issues/references/labels.md` en vez de una lista a mano: celda literal `x` cuenta, plantillas con `<` o `…` se excluyen, una celda con backticks no clasificable falla, una extraccion vacia falla, y hay un `subTest` por label (#225)

@@ -34,7 +34,7 @@ PLUGIN_REPO_DEFAULT = "luisfelipediaz/Harness.Timonel"
 PALABRAS_PLUGIN = ("timonel", "plugin", "skill", "agente", "sub-agente", "orquestador", "plantilla", "marcador",
                    "flechodiezx", "dora", "code-review", "generate-retro", "verify-dod", "consolidate-story", "retro-tools")
 PALABRAS_CONSUMIDOR = ("claude.md", "heur", "convenci", "lint", "eslint", "ci", "pipeline", "test", "modulo", "módulo", "componente", "servicio")
-NINGUNO = re.compile(r"^(ninguno|ninguna|n/a|no aplica)\.?$", re.IGNORECASE)
+NINGUNO = re.compile(r"^(ninguno|ninguna|n/a|no aplica)\b", re.IGNORECASE)
 RESPUESTA_HE = re.compile(r"^¿[^?]+\?\s*→\s*(.+)$")  # "¿Surgió...? → propuesta"
 
 
@@ -62,7 +62,7 @@ def destino(texto: str) -> str:
 
 
 def _titulo(texto: str) -> str:
-    limpio = re.sub(r"[`*_]", "", texto).strip().rstrip(".")
+    limpio = re.sub(r"[`*]|(?<!\w)_|_(?!\w)", "", texto).strip().rstrip(".")
     limpio = re.sub(r"^(documentar|agregar|añadir|re-evaluar|reevaluar|explicitar|mover|crear)\b", lambda m: m.group(1).capitalize(), limpio, flags=re.IGNORECASE)
     return limpio[:70].rstrip(" ,;:")
 
