@@ -29,7 +29,7 @@ Recibes del orquestador: `issue`, el body del issue, el **contrato de cambio** (
    - **El merge trae conflictos**: detente y reportalo.
    - **No te indico ninguna `RAMA_HISTORIA`**: no hay nada que sincronizar — segui normalmente.
 1. Lee `CLAUDE.md` del plugin, el contrato de cambio y los "Archivos de referencia" de la investigacion. No explores fuera de ellos.
-2. **TDD**: si el cambio toca `scripts/*.py`, escribe primero el test en `tests/` (unittest, sin `gh` real: funciones puras sobre dicts) y velo fallar; si toca agentes/skills/commands/hooks, `tests/test_consistencia.py` es tu red: agrega ahi la regla nueva si el cambio introduce una invariante (p. ej. "todo agente X invoca Y").
+2. **TDD**: si el cambio toca `scripts/*.py`, escribe primero el test en `tests/` (unittest, sin `gh` real: funciones puras sobre dicts, y ademas un test por fila del cableado de `main()` que ejercite `main()` o la funcion que lo cablea, con `--json` o con `subprocess.run` parcheado: la funcion pura sola deja sin evidencia el tramo que decide el "no sé") y velo fallar; si toca agentes/skills/commands/hooks, `tests/test_consistencia.py` es tu red: agrega ahi la regla nueva si el cambio introduce una invariante (p. ej. "todo agente X invoca Y").
 3. Implementa. Para `hooks/hooks.json`, prueba el hook con entradas simuladas (`echo '{"tool_input":{...}}' | bash -c "$(jq -r '.hooks...command' hooks/hooks.json)"`) y deja el caso en el output.
 4. Verifica localmente:
    ```bash
@@ -45,6 +45,7 @@ Recibes del orquestador: `issue`, el body del issue, el **contrato de cambio** (
 - Archivos creados/modificados (incluidos tests)
 - Casos de prueba de hooks ejecutados (si aplica)
 - Invariantes nuevas agregadas a `test_consistencia.py` (si aplica)
+- Tests del cableado de main(): lista de los tests que ejercitan `main()` (uno por fila de decision), o `Ninguno: el cambio no toca main()`
 - Pendientes fuera del contrato (o "Ninguno")
 - **Rama exacta y ruta de tu worktree** (`git branch --show-current` y `pwd`): el orquestador los necesita para consolidar
 - Hash del commit

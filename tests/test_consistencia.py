@@ -1230,6 +1230,73 @@ class TestsVerdesPrimeraCorridaTests(unittest.TestCase):
                 )
 
 
+class CableadoDeMainTests(unittest.TestCase):
+    """El contrato de cambio exige un test por decision de `main()` (#224). Caso real:
+    #223 muto `draft = None if _hay_draft_abierto(prs) else False` a `draft = False` y
+    132 tests de sensores siguieron en verde, porque todos ejercitaban la funcion pura.
+
+    Tres literales, cada uno en SU seccion (un literal en otra seccion no cubre la
+    obligacion donde se ejerce): la regla de contrato en el parrafo `**Perfil plugin**`
+    de la Fase 2 de flechodiezx, el test por fila en el item `2. **TDD**` de `## Pasos` del skill y la linea del
+    reporte en su `## Output (obligatorio)`. Los literales viven en constantes, no en
+    esta prosa.
+
+    Verificado a mano por mutacion (#224): borrar cada literal de cada archivo hace
+    fallar el caso de ese archivo nombrandolo; moverlo fuera de su seccion tambien."""
+
+    FLECHODIEZX = "agents/flechodiezx.md"
+    SKILL = "skills/implement-plugin-change/SKILL.md"
+    MARCADOR = "**Perfil plugin**"
+    SECCION_FASE_2 = "## Fase 2: Contrato API y modelos compartidos"
+    LITERALES_FASE_2 = ("una fila por cada decisión de `main()`", 'fila del "no sé"')
+    SECCION_PASOS = "## Pasos"
+    PASO_TDD = "2. **TDD**"
+    LITERALES_PASOS = ("un test por fila del cableado de `main()`",)
+    SECCION_OUTPUT = "## Output (obligatorio)"
+    LITERALES_OUTPUT = ("Tests del cableado de main()", "Ninguno: el cambio no toca main()")
+
+    def _seccion(self, ruta: str, titulo: str) -> str:
+        texto = (ROOT / ruta).read_text(encoding="utf-8")
+        recorte = SincronizacionDelWorktreeTests._seccion(texto, titulo)
+        self.assertTrue(recorte, f"{ruta}: no tiene la seccion `{titulo}`")
+        return recorte
+
+    def _exige(self, ruta: str, ambito: str, literales: tuple[str, ...], donde: str) -> None:
+        self.assertGreaterEqual(len(literales), 1, "invariante vacua: sin literales")
+        for literal in literales:
+            with self.subTest(archivo=ruta, literal=literal):
+                self.assertIn(
+                    literal, ambito,
+                    f"{ruta}: {donde} perdio `{literal}`. Sin el, el contrato de cambio no exige un "
+                    "test por decision de main() y el tramo del \"no se\" queda sin evidencia",
+                )
+
+    def test_fase_2_perfil_plugin_exige_fila_por_decision_de_main(self):
+        seccion = self._seccion(self.FLECHODIEZX, self.SECCION_FASE_2)
+        parrafos = [p for p in SincronizacionDelWorktreeTests._parrafos(seccion) if p.lstrip().startswith(self.MARCADOR)]
+        self.assertEqual(
+            len(parrafos), 1,
+            f"{self.FLECHODIEZX}: `{self.SECCION_FASE_2}` debe tener exactamente un parrafo `{self.MARCADOR}`",
+        )
+        self._exige(self.FLECHODIEZX, parrafos[0], self.LITERALES_FASE_2, f"el parrafo `{self.MARCADOR}` de la Fase 2")
+
+    def test_skill_paso_2_exige_test_por_fila_del_cableado(self):
+        # El ambito es el item `2.` (TDD), no `## Pasos` entera: el literal en el paso 0,
+        # 3 o 4 no obliga a nada en el TDD (WARNING del review de #224).
+        seccion = self._seccion(self.SKILL, self.SECCION_PASOS)
+        # `_parrafos` de PoliticaDeIntegracion corta por item de lista; el de Sincronizacion solo por linea en blanco.
+        pasos = [p for p in PoliticaDeIntegracionDocumentadaTests._parrafos(seccion) if p.lstrip().startswith(self.PASO_TDD)]
+        self.assertEqual(
+            len(pasos), 1, f"{self.SKILL}: `{self.SECCION_PASOS}` debe tener exactamente un item `{self.PASO_TDD}`",
+        )
+        self._exige(self.SKILL, pasos[0], self.LITERALES_PASOS, f"el item `{self.PASO_TDD}` de `## Pasos`")
+
+    def test_skill_output_lista_los_tests_del_cableado(self):
+        self._exige(
+            self.SKILL, self._seccion(self.SKILL, self.SECCION_OUTPUT), self.LITERALES_OUTPUT, "`## Output (obligatorio)`",
+        )
+
+
 class HeuristicasDescubriblesTests(unittest.TestCase):
     """Una heuristica escrita que ningun skill puede descubrir no cambia ninguna decision (#134).
 
