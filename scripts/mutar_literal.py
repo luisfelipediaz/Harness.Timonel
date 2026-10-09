@@ -136,7 +136,12 @@ def mutar(texto: str, literal: str, modo: str, destino: str | None) -> tuple[str
     afectadas = len(contadores[modo]())
     if afectadas == 0:
         raise NoSe("mutacion_no_aplicada")
-    return "".join(MODOS[modo](lineas, literal, destino)), afectadas
+    nuevo = "".join(MODOS[modo](lineas, literal, destino))
+    # Alcanzable: si el literal es el encabezado que sigue al destino y esta al
+    # final del archivo, se quita y se reinserta en el mismo sitio (texto igual).
+    if nuevo == texto:
+        raise NoSe("mutacion_no_aplicada")
+    return nuevo, afectadas
 
 
 def parsear_unittest(salida: str, con_objetivo: bool) -> tuple[int, int]:

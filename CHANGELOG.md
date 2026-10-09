@@ -2,7 +2,7 @@
 
 ## 0.13.0 — en desarrollo
 
-- `scripts/mutar_literal.py` ancla `--a` por igualdad de línea completa (`## N` ya no toma `## Nueva`, el pase falso de #263) y exige un encabezado `#+ ` (`destino_no_es_encabezado`); `OSError`, `shutil.Error` y `UnicodeDecodeError` al copiar o leer salen 2 con `no sé: <motivo>` (`copia_o_lectura_imposible`), nunca exit 1 con traceback; se elimina el guard inalcanzable `if nuevo == texto`; `IgnorarCopiaTests` ve fallar cada exclusión de `_ignorar` (una mutación por exclusión, 1 fallo cada una); 7 tests nuevos en `tests/test_mutar_literal.py` (38); 386 en verde (#272)
+- `scripts/mutar_literal.py` ancla `--a` por igualdad de línea completa (`## N` ya no toma `## Nueva`, el pase falso de #263) y exige un encabezado `#+ ` (`destino_no_es_encabezado`); `OSError`, `shutil.Error` y `UnicodeDecodeError` al copiar o leer salen 2 con `no sé: <motivo>` (`copia_o_lectura_imposible`), nunca exit 1 con traceback; se conserva el guard `if nuevo == texto` (alcanzable cuando el literal es el encabezado final que sigue al destino) con un test puro y uno de subproceso que solo él hace pasar; `IgnorarCopiaTests` ve fallar cada exclusión de `_ignorar` (una mutación por exclusión, 1 fallo cada una); 9 tests nuevos en `tests/test_mutar_literal.py` (40); 388 en verde (#272)
 
 ## 0.12.0 — 2026-10-08
 

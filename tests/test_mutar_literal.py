@@ -113,6 +113,13 @@ class SeccionYMutacionTests(unittest.TestCase):
             ml.mutar("## N\nLIT\n", "LIT", "mover", "## N")
         self.assertEqual(c.exception.clave, "mutacion_no_aplicada")
 
+    def test_mover_que_reinserta_en_el_mismo_sitio_es_no_se(self):
+        # `Z` solo esta en el ultimo encabezado, que sigue al destino: se quita y
+        # vuelve al fin de la seccion `## N`, que ahora llega al fin de archivo.
+        with self.assertRaises(ml.NoSe) as c:
+            ml.mutar("## N\nfoo\n## Z\n", "Z", "mover", "## N")
+        self.assertEqual(c.exception.clave, "mutacion_no_aplicada")
+
     def test_mover_a_seccion_inexistente_es_no_se(self):
         with self.assertRaises(ml.NoSe) as c:
             ml.mutar("LIT\n", "LIT", "mover", "## N")
@@ -213,6 +220,13 @@ class MainSubprocessTests(unittest.TestCase):
     def test_copia_identica_sale_2(self):
         # `fin` ya vive en `## Notas`: mover no cambia nada.
         r = _correr(self.repo, "--ruta", "doc.md", "--literal", "fin", "--modo", "mover", "--a", "## Notas")
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("la mutación no se aplicó", r.stderr)
+        self.assertNotIn("fallos:", r.stdout)
+
+    def test_mover_que_reinserta_en_el_mismo_sitio_sale_2_sin_fallos(self):
+        (self.repo / "doc.md").write_text("## N\nfoo\n## Z\n", encoding="utf-8")
+        r = _correr(self.repo, "--ruta", "doc.md", "--literal", "Z", "--modo", "mover", "--a", "## N")
         self.assertEqual(r.returncode, 2)
         self.assertIn("la mutación no se aplicó", r.stderr)
         self.assertNotIn("fallos:", r.stdout)
