@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.13.0 — en desarrollo
+
+- `scripts/mutar_literal.py` ancla `--a` por igualdad de línea completa (`## N` ya no toma `## Nueva`, el pase falso de #263) y exige un encabezado `#+ ` (`destino_no_es_encabezado`); `OSError`, `shutil.Error` y `UnicodeDecodeError` al copiar o leer salen 2 con `no sé: <motivo>` (`copia_o_lectura_imposible`), nunca exit 1 con traceback; se elimina el guard inalcanzable `if nuevo == texto`; `IgnorarCopiaTests` ve fallar cada exclusión de `_ignorar` (una mutación por exclusión, 1 fallo cada una); 7 tests nuevos en `tests/test_mutar_literal.py` (38); 386 en verde (#272)
+
 ## 0.12.0 — 2026-10-08
 
 - `scripts/mutar_literal.py` mide por mutación si un test cubre un literal: copia el repo a un directorio temporal, borra el literal de las líneas que lo contienen o mueve esas líneas al final de la sección `--a`, corre `unittest` en la copia y reporta `lineas mutadas: K` y `fallos: N de M`; todo "no sé" (literal ausente, copia idéntica, destino inexistente, 0 tests, salida no parseable, ruta inválida) sale con código 2; 31 tests en `tests/test_mutar_literal.py`; 375 en verde (#263)
