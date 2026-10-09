@@ -1,7 +1,8 @@
 # Changelog
 
-## 0.12.0 — en desarrollo
+## 0.12.0 — 2026-10-08
 
+- `scripts/mutar_literal.py` mide por mutación si un test cubre un literal: copia el repo a un directorio temporal, borra el literal de las líneas que lo contienen o mueve esas líneas al final de la sección `--a`, corre `unittest` en la copia y reporta `lineas mutadas: K` y `fallos: N de M`; todo "no sé" (literal ausente, copia idéntica, destino inexistente, 0 tests, salida no parseable, ruta inválida) sale con código 2; 31 tests en `tests/test_mutar_literal.py`; 375 en verde (#263)
 - El modo "rama del usuario" de `agents/flechodiezx.md` queda completo: Fase 0.5, review de la Fase 5.5, ronda de corrección y Fase 7 pasan el directorio de trabajo, y `code-review` acepta `directorio_trabajo` y usa `git -C` en su Paso 2. Tests: 4 casos nuevos en `ModoRamaDelUsuarioTests`, `test_3b` y `test_6` endurecidos; 348 en verde (#245)
 
 ## 0.11.0 — 2026-10-08
