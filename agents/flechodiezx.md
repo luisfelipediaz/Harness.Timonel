@@ -37,6 +37,8 @@ Ademas, antes de lanzar cualquier sub-agente revisa si ya hay worktrees bajo `.c
 
 Antes de relanzar cualquier sub-agente en esta reanudacion (Fase 3, Fase 5.5 o cualquier otra), la misma precondicion que la ronda de correccion de la Fase 5.5: push, verificar, recien entonces pasar la variable. `git push -u origin hu/N-slug`, despues `git rev-list --left-right --count hu/N-slug...origin/hu/N-slug`, y **solo si el resultado es `0 0`** agregas `RAMA_HISTORIA: hu/N-slug` al prompt y lanzas el sub-agente. Si el conteo no da `0 0`, no lo lances: reportalo (#194).
 
+**Modo rama del usuario (Fase 0.5)**: la reanudacion reutiliza la `<rama>` del usuario en su `<ruta>` y no busca `hu/N-*`; cualquier sub-agente que relances va sin `RAMA_HISTORIA`, y la sincronizacion previa se mide con `git -C <ruta> rev-list --left-right --count <rama>...origin/<rama>`: si no da `0 0` o el comando falla, es un "no se", **detente** y reportalo.
+
 ## Fase 1: Analisis del issue
 
 1. Si no recibiste numero: `gh issue list -R "$REPO" --label tipo:hu --label estado:listo --state open --json number,title,labels` y pide elegir uno. No leas otros issues.
@@ -165,6 +167,10 @@ Sub-agente `model: "sonnet"`, sin worktree, skill `code-review`. Parametros: `is
 
 **Ronda de correccion**: si decidis relanzar un sub-agente de implementacion (mismo skill que uso la Fase 3, mismo perfil) para cerrar hallazgos `CRITICO` del review antes de seguir, el orden es estricto -- push, verificar, recien entonces pasar la variable: `git push -u origin hu/N-slug`, despues `git rev-list --left-right --count hu/N-slug...origin/hu/N-slug`, y **solo si el resultado es `0 0`** agregas `RAMA_HISTORIA: hu/N-slug` al prompt del sub-agente y lo lanzas. Si el conteo no es `0 0`, no pasas la variable y no lo lanzas: reportalo (el push fallo o no llego al remoto) antes de reintentar. Pushear y pasar la variable sin medir el conteo reproduce el defecto que esta HU cierra, una vuelta mas abajo -- un `Already up to date` que el sub-agente no puede distinguir de un no-op legitimo (#194).
 
+**Modo rama del usuario (Fase 5.5, review)**: lanza `code-review` con `directorio_trabajo: <ruta>` para que el reviewer lea el diff de la rama del usuario, `<base>...<rama>`, y no el `HEAD` de tu propio arbol.
+
+**Modo rama del usuario (Fase 5.5, ronda de correccion)**: el sub-agente de implementacion (el mismo skill de implementacion de la Fase 3) va sin `isolation` y sin `RAMA_HISTORIA`, con la `ruta` del usuario como directorio de trabajo; antes de lanzarlo corre `git -C <ruta> push -u origin <rama>` y mide `git -C <ruta> rev-list --left-right --count <rama>...origin/<rama>`: solo si da `0 0` lo lanzas, y si no lo da o el comando falla, no lo lances y reportalo.
+
 ## Fase 6: Retrospectiva (no bloqueante)
 
 Sub-agente `model: "opus"`, sin worktree, skill `generate-retro`. Parametros: `issue`, `repo`, `archivos_modificados`, `resultado_verificacion`, `estimado_sp` (label `sp:`), `modulo`, `alcance`, `veredicto_review`. Publica `<!-- timonel:retro -->` (validado con `validar_marcador.py`) y label `retro:*`, y **cosecha** las mejoras en issues (`cosechar_retro.py --apply`, ratchet). Muestra al usuario los issues derivados. **Perfil consumidor**: si falla, `retro_generada: no` y sigue (no bloqueante). **Perfil plugin**: la retro **si bloquea** el DoD (item 9 es CRITICO); si falla, **reintenta una vez** antes de marcar `retro_generada: no`.
@@ -190,7 +196,7 @@ El merge a la rama base lo hace siempre un humano al aprobar el PR: esta fase te
 
 Sub-agente `model: "sonnet"`, sin worktree, skill `verify-dod`. Parametros: `issue`, `repo`, `modulo`, `alcance`, `lint_resultado`, `tests_resultado`, `providers_registrados`, `rutas_registradas`, `tareas_completas` (si/no segun `## Tareas`), `retro_generada`, `veredicto_code_review`, `perfil` (`consumidor` o `plugin`, segun corresponda). Publica `<!-- timonel:dod -->`. Si la decision es `DONE`: marca `- [x] Definition of Done`, presenta al usuario la tabla del DoD y el link al PR abierto en la Fase 6.5, reporta "PR abierto, pendiente de merge humano" y **termina** — el cierre del issue no ocurre en ninguna fase de flechodiezx: lo hace el humano al mergear el PR. Si es `FALLAS_CRITICAS` por el item 11 (review) o el item 9 (retro, perfil plugin), relanza la fase correspondiente (Fase 5.5 o Fase 6) una vez antes de reportar al humano. Si no, revierte el label a `estado:en-progreso` (la Fase 6.5 ya lo habia dejado en `estado:en-revision`: con el DoD fallido la pelota vuelve al equipo, no al humano que revisa) y muestras las fallas.
 
-**Modo rama del usuario (Fase 7)**: lanza `verify-dod` con `directorio_trabajo: <ruta>`, para que `pr_check.py` y los `git diff` corran en la rama del usuario y no en la de tu arbol. Con `pr_draft_intencional: si` y todo lo demas sano, la decision esperada es `PENDIENTES` (el draft es un pendiente no critico, #223): el issue **no** vuelve a `estado:en-progreso` y queda en `estado:en-revision`. Con `FALLAS_CRITICAS`, la regla de arriba no cambia.
+**Modo rama del usuario (Fase 7)**: lanza `verify-dod` con `directorio_trabajo: <ruta>`, para que `pr_check.py` y los `git diff` corran en la rama del usuario y no en la de tu arbol. Con `pr_draft_intencional: si` y todo lo demas sano, la decision esperada es `PENDIENTES` (el draft es un pendiente no critico, #223): el issue **no** vuelve a `estado:en-progreso` y queda en `estado:en-revision`; con `PENDIENTES` por ese draft intencional sano, presenta al usuario la tabla del DoD y el link al PR y **termina**, como con `DONE`. Con `FALLAS_CRITICAS`, la regla de arriba no cambia.
 
 ## Manejo de fallos
 
