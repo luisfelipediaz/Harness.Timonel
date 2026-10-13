@@ -1735,5 +1735,94 @@ class GuardRamaPorSegmentoCajaNegraTests(unittest.TestCase):
                     self.assertIn("guard-integracion-fail-open rama-no-resuelta", log)
 
 
+class CompuertaPushForzadoPorSegmentoTests(unittest.TestCase):
+    """#316: la compuerta de push forzado decide por SEGMENTO con
+    `scripts/detectar_push_forzado.py` (el glob `*'push'*'--force'*` solo queda de
+    respaldo). Caja negra contra el `command` real de hooks.json, perfiles plugin y
+    consumidor."""
+
+    PERFILES = ("plugin", "consumidor")
+
+    def _correr(self, perfil, rama, cmd, plugin_root=None):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            _preparar_repo(tmp_path, rama, perfil=perfil)
+            raiz = str(ROOT) if plugin_root is None else str(plugin_root(tmp_path))
+            return _correr_hook(_comando_push_force(), cmd, tmp_path, plugin_root=raiz)
+
+    def _sin_sensor(self, tmp_path):
+        root = tmp_path / "instalada-sin-sensor"
+        (root / "scripts").mkdir(parents=True, exist_ok=True)
+        return root
+
+    def test_escenario_1_force_en_otro_segmento_no_bloquea(self):
+        for perfil in self.PERFILES:
+            for cmd in (
+                "git push origin tag && git worktree remove --force x",
+                "git push origin hu/82-x; git branch -D --force y",
+            ):
+                with self.subTest(perfil=perfil, cmd=cmd):
+                    r = self._correr(perfil, "hu/82-x", cmd)
+                    self.assertEqual(r.returncode, 0, r.stderr)
+                    self.assertEqual(r.stderr, "")
+
+    def test_escenario_2_push_forzado_real_bloquea(self):
+        for perfil in self.PERFILES:
+            for cmd in (
+                "git push --force origin hu/82-x",
+                "git push -f origin hu/82-x",
+                "git status && git push --force origin hu/82-x",
+            ):
+                with self.subTest(perfil=perfil, cmd=cmd):
+                    r = self._correr(perfil, "hu/82-x", cmd)
+                    self.assertEqual(r.returncode, 2, r.stderr)
+                    self.assertIn("[timonel] Bloqueado: ", r.stderr)
+
+    def test_escenario_3_banderas_cortas_agrupadas_y_dashC_bloquean(self):
+        for perfil in self.PERFILES:
+            for cmd in (
+                "git push -u -f origin hu/82-x",
+                "git -C . push -uf origin hu/82-x",
+            ):
+                with self.subTest(perfil=perfil, cmd=cmd):
+                    r = self._correr(perfil, "hu/82-x", cmd)
+                    self.assertEqual(r.returncode, 2, r.stderr)
+                    self.assertIn("[timonel] Bloqueado: ", r.stderr)
+
+    def test_push_forzado_envuelto_bloquea_por_el_respaldo(self):
+        """El sensor dice 'no se' (rc 3) ante envoltorios y el glob de respaldo bloquea."""
+        fuerza = "--" + "force"
+        for perfil in self.PERFILES:
+            for cmd in (
+                f"sudo git push {fuerza} origin hu/82-x",
+                f'bash -c "git push {fuerza} origin hu/82-x"',
+            ):
+                with self.subTest(perfil=perfil, cmd=cmd):
+                    r = self._correr(perfil, "hu/82-x", cmd)
+                    self.assertEqual(r.returncode, 2, r.stderr)
+                    self.assertIn("[timonel] Bloqueado: ", r.stderr)
+
+    def test_fila_mixta_rc1_no_salta_el_guard_de_commits(self):
+        """El sensor dice 'no' (rc 1) para el push; la compuerta NO termina con
+        `exit 0`: continua al bloque de commits, que bloquea el commit en la base."""
+        cmd = "git push origin x && git commit -m sin-issue"
+        r = self._correr("consumidor", "main", cmd)
+        self.assertEqual(r.returncode, 2, r.stderr)
+        self.assertIn("[timonel] Bloqueado: commit directo en la rama base", r.stderr)
+
+    def test_respaldo_sin_sensor_rige_el_glob(self):
+        for perfil in self.PERFILES:
+            with self.subTest(perfil=perfil, fila="push forzado sigue bloqueado"):
+                r = self._correr(perfil, "hu/82-x", "git push --force origin hu/82-x", self._sin_sensor)
+                self.assertEqual(r.returncode, 2, r.stderr)
+                self.assertIn("[timonel] Bloqueado: ", r.stderr)
+            with self.subTest(perfil=perfil, fila="escenario 1 vuelve a bloquear (glob)"):
+                r = self._correr(
+                    perfil, "hu/82-x", "git push origin tag && git worktree remove --force x", self._sin_sensor
+                )
+                self.assertEqual(r.returncode, 2, r.stderr)
+                self.assertIn("[timonel] Bloqueado: ", r.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()

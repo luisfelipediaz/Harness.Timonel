@@ -136,9 +136,10 @@ Segundo seam publico (#176, hallazgo 1 del code review): `clave_de_segmento(segm
 `_clave_y_resto` -- que sigue siendo zona interna de este modulo, con el mismo
 derecho a cambiar sin aviso que ya declaraba el parser -- para no duplicar el
 salto de flags globales de `git` (`-C`/`-c`/`--git-dir`/etc.). Junto con
-`segmentar()`, son los DOS unicos seams publicos que `scripts/detectar_commit.py`
-consume; ninguno de los dos cambia `MANEJADORES`, `decidir()`, sus mensajes ni
-la politica de fail-open.
+`segmentar()`, son los seams publicos que `scripts/detectar_commit.py`
+consume; ninguno cambia `MANEJADORES`, `decidir()`, sus mensajes ni
+la politica de fail-open. Un tercer seam publico, `argumentos_de_segmento` (#316),
+lo consume `scripts/detectar_push_forzado.py`.
 """
 
 from __future__ import annotations
@@ -677,6 +678,20 @@ def clave_de_segmento(segmento: list[str]) -> tuple[str, ...] | None:
     `_clave_y_resto` (`heuristics/general/sensor-importa-no-reimplementa.md`)."""
     clave, _resto = _clave_y_resto(segmento)
     return clave
+
+
+def argumentos_de_segmento(segmento: list[str]) -> list[str]:
+    """Tercer seam publico (#316): dado UN segmento ya tokenizado (uno de los
+    que devuelve `segmentar()`), devuelve los argumentos posteriores al
+    subcomando (p. ej. `["-uf", "origin", "x"]` para `git -C . push -uf origin
+    x`), ya descartados `-C`/`-c`/`--git-dir`/etc. y las asignaciones `VAR=`
+    iniciales. Es la contraparte de `clave_de_segmento()`: delega en
+    `_clave_y_resto` y descarta la clave. Lista vacia si el segmento no
+    matchea ninguna clave conocida. No reimplementa nada del parser
+    (`heuristics/general/sensor-importa-no-reimplementa.md`); no cambia
+    `decidir()` ni los otros dos seams."""
+    _clave, resto = _clave_y_resto(segmento)
+    return resto
 
 
 SESION = "."  # clave del directorio de la sesion (cwd del hook)
