@@ -1203,7 +1203,8 @@ class ChangelogEnHotfixPluginTests(unittest.TestCase):
 
     SECCION = staticmethod(SincronizacionDelWorktreeTests._seccion)
     INICIO = "**Perfil plugin (Fase 2, CHANGELOG)**"
-    LITERALES = ("consolidate-story", "CHANGELOG.md", "plugin.json", "mismo commit", "sed -i", "jq")
+    LITERALES = ("consolidate-story", "CHANGELOG.md", "plugin.json", "mismo commit", "jq",
+                "Nunca edites la version con `sed -i`")
 
     def _parrafo(self):
         texto = (ROOT / "agents/flechodiezx-hotfix.md").read_text(encoding="utf-8")
@@ -1221,10 +1222,10 @@ class ChangelogEnHotfixPluginTests(unittest.TestCase):
     def test_verificar_plugin_va_despues_del_commit_del_changelog(self):
         parrafo = self._parrafo()
         self.assertIn("verificar_plugin.py", parrafo, "el parrafo debe mandar correr `verificar_plugin.py`")
-        commit = parrafo.find("chore: changelog #N")
-        self.assertGreaterEqual(commit, 0, "el parrafo debe nombrar el commit `chore: changelog #N`")
-        self.assertLess(commit, parrafo.find("verificar_plugin.py"),
-                        "`chore: changelog #N` debe aparecer antes que `verificar_plugin.py`")
+        orden = "despues del commit `chore: changelog #N` y no antes"
+        self.assertIn(orden, parrafo, f"el parrafo debe exigir el orden literal `{orden}`")
+        frase = next(f for f in parrafo.split(". ") if "verificar_plugin.py" in f)
+        self.assertIn(orden, frase, "el orden debe estar en la misma frase que manda correr `verificar_plugin.py`")
 
 
 class Item3PerfilPluginTests(unittest.TestCase):
