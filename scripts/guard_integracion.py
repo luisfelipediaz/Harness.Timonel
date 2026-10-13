@@ -679,6 +679,20 @@ def clave_de_segmento(segmento: list[str]) -> tuple[str, ...] | None:
     return clave
 
 
+def argumentos_de_segmento(segmento: list[str]) -> list[str]:
+    """Tercer seam publico (#316): dado UN segmento ya tokenizado (uno de los
+    que devuelve `segmentar()`), devuelve los argumentos posteriores al
+    subcomando (p. ej. `["-uf", "origin", "x"]` para `git -C . push -uf origin
+    x`), ya descartados `-C`/`-c`/`--git-dir`/etc. y las asignaciones `VAR=`
+    iniciales. Es la contraparte de `clave_de_segmento()`: delega en
+    `_clave_y_resto` y descarta la clave. Lista vacia si el segmento no
+    matchea ninguna clave conocida. No reimplementa nada del parser
+    (`heuristics/general/sensor-importa-no-reimplementa.md`); no cambia
+    `decidir()` ni los otros dos seams."""
+    _clave, resto = _clave_y_resto(segmento)
+    return resto
+
+
 SESION = "."  # clave del directorio de la sesion (cwd del hook)
 
 _FLAGS_DE_CD_SIN_VALOR = {"-P", "-L", "-e", "-@"}
