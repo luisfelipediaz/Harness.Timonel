@@ -18,6 +18,8 @@ probado.
         --modo borrar [--test tests.modulo.Clase]
     python3 scripts/mutar_literal.py --ruta x.md --literal "texto" \\
         --modo mover --a "## Notas"
+    python3 scripts/mutar_literal.py --ruta x.sh --literal "continue" \\
+        --modo sustituir --por "break" [--linea 93]
 
 Modos (la unidad es la linea; se mutan TODAS las que contienen el literal):
     borrar  quita el literal de cada linea que lo contiene
@@ -26,6 +28,14 @@ Modos (la unidad es la linea; se mutan TODAS las que contienen el literal):
             encabezado (`## Notas`, no un prefijo ni un titulo sin `#`).
             Seccion = desde el encabezado
             hasta el siguiente de nivel <= al suyo, o fin de archivo.
+    sustituir  reemplaza el literal por `--por B` (texto literal, sin regex) en
+            cada linea que lo contiene. Es la mutacion para cambios de
+            comportamiento (`*/.git)` -> `*)`, `continue` -> `break`) donde
+            borrar dejaria un error de sintaxis.
+
+`--linea N` (entero, 1-based como `grep -n`) acota `borrar` y `sustituir` a esa
+linea cuando el literal se repite; una linea sin el literal es
+`mutacion_no_aplicada`. Con `mover` no aplica. `--por` solo aplica a `sustituir`.
 
 Borrar una llamada completa con sus paréntesis (`f(x)` entero) deja la copia
 con un error de sintaxis: los tests no importan, el objetivo "no se encuentra"
@@ -47,7 +57,9 @@ Codigos de salida:
         no UTF-8), objetivo sin tests o inexistente, salida no parseable,
         timeout, una corrida base cuyo `Ran M tests` no coincide con el de la
         mutada (`base_inconsistente`), o argumentos invalidos (coincide con el exit de uso de
-        argparse). No hay exit 1: ningun "no pude medir" termina en traceback.
+        argparse): `sustituir` sin `--por`, `--por` vacio, igual a `--literal` o
+        con salto de linea, `--por` fuera de `sustituir`, `--linea` con `mover`
+        o fuera de rango. Todos salen antes de correr tests. No hay exit 1: ningun "no pude medir" termina en traceback.
 """
 
 from __future__ import annotations
@@ -69,6 +81,11 @@ MOTIVOS = {
     "literal_invalido": "--literal debe ser no vacío y de una sola línea",
     "ruta_invalida": "--ruta debe ser un archivo existente, relativo al repo y sin `..`",
     "mover_sin_destino": "--modo mover exige --a",
+    "sustituir_sin_por": "--modo sustituir exige --por",
+    "por_invalido": "--por debe ser no vacío, distinto de --literal y de una sola línea",
+    "por_no_aplica_al_modo": "--por solo aplica a --modo sustituir",
+    "linea_no_aplica_al_modo": "--linea solo aplica a --modo borrar o sustituir",
+    "linea_invalida": "--linea debe estar entre 1 y el número de líneas de la ruta",
     "mutacion_no_aplicada": "la mutación no se aplicó (el literal no está fuera del destino o la copia quedó idéntica)",
     "destino_no_es_encabezado": "--a debe ser un encabezado markdown completo (`#+ ` seguido del título)",
     "seccion_destino_inexistente": "sección destino no existe en la ruta",
@@ -115,11 +132,22 @@ def _fuera_del_destino(lineas: list[str], literal: str, destino: str) -> list[in
     return [i for i, l in enumerate(lineas) if literal in l and not rango[0] <= i < rango[1]]
 
 
-def _borrar(lineas: list[str], literal: str, destino: str | None) -> list[str]:
-    return [linea.replace(literal, "") for linea in lineas]
+def _con_literal(lineas: list[str], literal: str, linea: int | None) -> list[int]:
+    """Indices de las lineas con el literal; `linea` (1-based) acota a una sola."""
+    return [i for i, l in enumerate(lineas) if literal in l and linea in (None, i + 1)]
 
 
-def _mover(lineas: list[str], literal: str, destino: str | None) -> list[str]:
+def _borrar(lineas: list[str], literal: str, destino: str | None, por: str | None, linea: int | None) -> list[str]:
+    afectadas = set(_con_literal(lineas, literal, linea))
+    return [l.replace(literal, "") if i in afectadas else l for i, l in enumerate(lineas)]
+
+
+def _sustituir(lineas: list[str], literal: str, destino: str | None, por: str | None, linea: int | None) -> list[str]:
+    afectadas = set(_con_literal(lineas, literal, linea))
+    return [l.replace(literal, por or "") if i in afectadas else l for i, l in enumerate(lineas)]
+
+
+def _mover(lineas: list[str], literal: str, destino: str | None, por: str | None, linea: int | None) -> list[str]:
     indices = set(_fuera_del_destino(lineas, literal, destino or ""))
     movidas = [lineas[i] if lineas[i].endswith("\n") else lineas[i] + "\n" for i in sorted(indices)]
     resto = [l for i, l in enumerate(lineas) if i not in indices]
@@ -132,21 +160,44 @@ def _mover(lineas: list[str], literal: str, destino: str | None) -> list[str]:
     return resto[:corte] + movidas + resto[corte:]
 
 
-MODOS = {"borrar": _borrar, "mover": _mover}
+MODOS = {"borrar": _borrar, "mover": _mover, "sustituir": _sustituir}
+
+# (condicion sobre modo, literal, por, linea) -> clave de MOTIVOS. Gana la primera.
+REGLAS_DE_OPCIONES = [
+    (lambda m, lit, p, n: m == "sustituir" and p is None, "sustituir_sin_por"),
+    (lambda m, lit, p, n: m != "sustituir" and p is not None, "por_no_aplica_al_modo"),
+    (lambda m, lit, p, n: m == "sustituir" and (not p or p == lit or "\n" in p or "\r" in p), "por_invalido"),
+    (lambda m, lit, p, n: m == "mover" and n is not None, "linea_no_aplica_al_modo"),
+    (lambda m, lit, p, n: n is not None and n < 1, "linea_invalida"),
+]
 
 
-def mutar(texto: str, literal: str, modo: str, destino: str | None) -> tuple[str, int]:
+def validar_opciones(literal: str, modo: str, por: str | None, linea: int | None) -> None:
+    for condicion, clave in REGLAS_DE_OPCIONES:
+        if condicion(modo, literal, por, linea):
+            raise NoSe(clave)
+
+
+def mutar(
+    texto: str, literal: str, modo: str, destino: str | None,
+    por: str | None = None, linea: int | None = None,
+) -> tuple[str, int]:
     """Aplica la mutacion y la verifica. Devuelve (texto_mutado, lineas_mutadas).
-    Lanza NoSe si el literal no esta, la seccion no existe o la copia no cambio."""
+    Lanza NoSe si el literal no esta, la seccion no existe, las opciones no
+    aplican al modo, `linea` cae fuera del archivo o la copia no cambio."""
+    validar_opciones(literal, modo, por, linea)
     lineas = texto.splitlines(keepends=True)
+    if linea is not None and linea > len(lineas):
+        raise NoSe("linea_invalida")
     contadores = {
-        "borrar": lambda: [i for i, l in enumerate(lineas) if literal in l],
+        "borrar": lambda: _con_literal(lineas, literal, linea),
+        "sustituir": lambda: _con_literal(lineas, literal, linea),
         "mover": lambda: _fuera_del_destino(lineas, literal, destino or ""),
     }
     afectadas = len(contadores[modo]())
     if afectadas == 0:
         raise NoSe("mutacion_no_aplicada")
-    nuevo = "".join(MODOS[modo](lineas, literal, destino))
+    nuevo = "".join(MODOS[modo](lineas, literal, destino, por, linea))
     # Alcanzable: si el literal es el encabezado que sigue al destino y esta al
     # final del archivo, se quita y se reinserta en el mismo sitio (texto igual).
     if nuevo == texto:
@@ -205,6 +256,7 @@ def _validar(args: argparse.Namespace) -> None:
     ruta = Path(args.ruta)
     if ruta.is_absolute() or ".." in ruta.parts or not (Path.cwd() / ruta).is_file():
         raise NoSe("ruta_invalida")
+    validar_opciones(args.literal, args.modo, args.por, args.linea)
     if args.modo == "mover" and not args.a:
         raise NoSe("mover_sin_destino")
     if args.modo == "mover" and not re.match(r"#+ \S", args.a):
@@ -223,7 +275,7 @@ def medir(args: argparse.Namespace) -> tuple[int, int, int, int]:
             original = archivo.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
             raise NoSe("copia_o_lectura_imposible")
-        nuevo, k = mutar(original, args.literal, args.modo, args.a)
+        nuevo, k = mutar(original, args.literal, args.modo, args.a, args.por, args.linea)
         base, total_base = parsear_unittest(correr_unittest(copia, args.test), args.test is not None)
         try:
             archivo.write_text(nuevo, encoding="utf-8")
@@ -242,6 +294,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--literal", required=True)
     parser.add_argument("--modo", required=True, choices=sorted(MODOS))
     parser.add_argument("--a")
+    parser.add_argument("--por")
+    parser.add_argument("--linea", type=int)
     parser.add_argument("--test")
     args = parser.parse_args(argv)
     try:

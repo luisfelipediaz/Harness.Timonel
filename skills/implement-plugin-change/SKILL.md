@@ -52,7 +52,7 @@ Recibes del orquestador: `issue`, el body del issue, el **contrato de cambio** (
 - Si la verificacion fallo: error exacto y lo intentado
 - `Verificación: PASSED \| FAILED: <paso> \| no sé: <motivo>` — la linea final de `scripts/verificar_plugin.py` (un "no sé" es un pendiente obligatorio de la consolidacion, nunca un pasado)
 - `### Tests verdes en su primera corrida` — exactamente una de tres formas (nunca vacio ni en prosa libre):
-  - una linea por test que paso en su primera corrida: `` - `<test>` — mutación: <qué se cambió> — fallos: N de M `` (N≥1; si N=0 el test es vacuo: reportalo como tal, no lo cuentes como evidencia). Si `mutar_literal.py` reporta `base: B de M` con B > 0 (la suite ya falla sin mutar), la evidencia de cobertura es `N > B`, no `N > 0`: con `N <= B` el test es vacuo;
+  - una linea por test que paso en su primera corrida: `` - `<test>` — mutación: <qué se cambió> — fallos: N de M `` (N≥1; si N=0 el test es vacuo: reportalo como tal, no lo cuentes como evidencia). Si `mutar_literal.py` reporta `base: B de M` con B > 0 (la suite ya falla sin mutar), la evidencia de cobertura es `N > B`, no `N > 0`: con `N <= B` el test es vacuo. Para mutaciones de reemplazo usa `python3 scripts/mutar_literal.py --ruta <archivo> --literal <A> --modo sustituir --por <B>` (`*/.git)` -> `*)`, `continue` -> `break`): `--modo borrar` dejaria un error de sintaxis, que es "no sé", no evidencia. Si el literal se repite en el archivo, acota con `--linea N` (1-based, como `grep -n`) para mutar solo esa linea;
   - `Ninguno`: corriste tests y ninguno nacio verde;
   - `No medido: <motivo>`: distinto de `Ninguno`, para cuando no corriste tests.
 
