@@ -2,6 +2,7 @@
 
 ## 0.19.0 — en desarrollo
 
+- `EscenarioRealContraElRepoTests` (`tests/test_mutar_literal.py`) se salta con `skipUnless((ROOT / ".git").exists(), ...)` cuando el árbol no tiene `.git` (la copia de `mutar_literal.py` o una exportación `git archive`), donde `git status --porcelain` salía 128 y toda medición sobre la suite completa arrancaba con `base: 1 de 467`; ahora `base: 0 de 467`, y con `.git` como directorio o archivo de worktree el test sigue corriendo. Verificado: `git archive` termina en `OK (skipped=1)`, la copia sin la condición vuelve a `base: 1 de 467`, suite en verde con 467 tests (`verificar_plugin.py` PASSED). (#313)
 - `ResolverConfigWorktreeTests.test_perfil_plugin_sin_config_devuelve_config_minimo` parchea ahora también `tg.subprocess.run` con `AssertionError("git")`, de modo que el perfil plugin de `load_config` no pueda consultar git: mover el bloque del perfil plugin debajo de la llamada a `resolver_config_path` dejaba la clase en verde (`Ran 10 tests ... OK`, base B=0 fallos) y con el test endurecido falla (`FAILED (failures=1)`, N=1 de 10 > B=0); contra el código real pasa (`OK`). Sin tests nuevos ni cambios en `scripts/timonel_gh.py`; verificación del plugin en verde con 467 tests (`verificar_plugin.py` PASSED). (#284)
 
 ## 0.18.0 — 2026-10-13
