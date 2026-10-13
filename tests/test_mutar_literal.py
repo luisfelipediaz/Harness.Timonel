@@ -436,6 +436,14 @@ class MutacionQueNoCompilaTests(unittest.TestCase):
             self.assertEqual(ml.main(args), 2)
         corrida.assert_not_called()
 
+    def test_sin_bash_o_con_timeout_sale_2_verificador_no_disponible(self):
+        fallas = {"sin_bash": OSError("bash"), "timeout": subprocess.TimeoutExpired("bash", 30)}
+        for nombre, falla in fallas.items():
+            with self.subTest(nombre), mock.patch.object(ml.subprocess, "run", side_effect=falla):
+                with self.assertRaises(ml.NoSe) as ctx:
+                    ml.verificar_que_compila("m.sh", "echo a\n", "echo b\n")
+                self.assertEqual(ctx.exception.clave, "verificador_no_disponible")
+
     def test_original_que_no_compila_conserva_el_comportamiento_actual(self):
         r = self._medir("roto.py", "MARCA")
         self.assertEqual(r.returncode, 0, r.stderr)

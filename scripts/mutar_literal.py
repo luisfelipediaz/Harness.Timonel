@@ -65,7 +65,8 @@ Codigos de salida:
         argparse): `sustituir` sin `--por`, `--por` vacio, igual a `--literal` o
         con salto de linea, `--por` fuera de `sustituir`, `--linea` con `mover`
         o fuera de rango; `mutacion_no_compila` (la copia mutada no compila o
-        no parsea y el original si). Todos salen antes de correr tests. No hay exit 1: ningun "no pude medir" termina en traceback.
+        no parsea y el original si) y `verificador_no_disponible` (no se pudo
+        correr el verificador, p. ej. sin `bash` para un `.sh`). Todos salen antes de correr tests. No hay exit 1: ningun "no pude medir" termina en traceback.
 """
 
 from __future__ import annotations
@@ -95,6 +96,7 @@ MOTIVOS = {
     "linea_invalida": "--linea debe estar entre 1 y el número de líneas de la ruta",
     "mutacion_no_aplicada": "la mutación no se aplicó (el literal no está fuera del destino o la copia quedó idéntica)",
     "mutacion_no_compila": "la mutación deja la copia sin compilar o parsear (el original sí): sus fallos serían de sintaxis, no de la invariante",
+    "verificador_no_disponible": "no se pudo verificar si la copia mutada compila (sin `bash` o con timeout en `bash -n`)",
     "destino_no_es_encabezado": "--a debe ser un encabezado markdown completo (`#+ ` seguido del título)",
     "seccion_destino_inexistente": "sección destino no existe en la ruta",
     "objetivo_no_encontrado": "objetivo de test no encontrado",
@@ -243,22 +245,28 @@ def _parsea_json(texto: str) -> bool:
     return True
 
 
-def _pasa_bash_n(texto: str) -> bool:
+def _pasa_bash_n(texto: str) -> bool | None:
+    """None = no se: sin bash (o con timeout) no hay evidencia en ningun sentido."""
     try:
         r = subprocess.run(["bash", "-n"], input=texto, capture_output=True, text=True, timeout=30)
     except (OSError, subprocess.TimeoutExpired):
-        return True  # sin bash no se puede afirmar que no compila: no se rechaza
+        return None
     return r.returncode == 0
 
 
-# sufijo -> verificador (texto -> compila). Sin entrada: no se verifica.
+# sufijo -> verificador (texto -> compila: True | False | None = no se).
+# Sin entrada: no se verifica.
 VERIFICADORES = {".py": _compila_py, ".json": _parsea_json, ".sh": _pasa_bash_n}
 
 
 def verificar_que_compila(ruta: str, original: str, nuevo: str) -> None:
-    """NoSe si la mutacion rompe un archivo que antes compilaba."""
+    """NoSe si la mutacion rompe un archivo que antes compilaba, o si no se puede saber."""
     verificador = VERIFICADORES.get(Path(ruta).suffix, lambda texto: True)
-    if verificador(original) and not verificador(nuevo):
+    antes = verificador(original)
+    despues = verificador(nuevo)
+    if None in (antes, despues):
+        raise NoSe("verificador_no_disponible")
+    if antes and not despues:
         raise NoSe("mutacion_no_compila")
 
 
