@@ -1871,5 +1871,129 @@ class CompuertaPushForzadoPorSegmentoTests(unittest.TestCase):
                 self.assertIn("[timonel] Bloqueado: ", r.stderr)
 
 
+class RutaDeMensajeUnitarioTests(unittest.TestCase):
+    """#326: `ruta_de_mensaje()` puro. Tres respuestas (SI + ruta / NO sin -F / NOSE);
+    cada causa de NOSE es una fila propia (`enumerar-la-clase-no-el-representante.md`)."""
+
+    SI, NO, NOSE = "SI", "NO", "NOSE"
+
+    CASOS = [
+        ("-F valor separado", "git commit -F msg.txt", SI, "msg.txt"),
+        ("-F valor pegado", "git commit -Fmsg.txt", SI, "msg.txt"),
+        ("--file valor separado", "git commit --file msg.txt", SI, "msg.txt"),
+        ("--file=valor", "git commit --file=msg.txt", SI, "msg.txt"),
+        ("-F mezclado con -m", "git commit -m x -F msg.txt", SI, "msg.txt"),
+        ("--file= antes de -m", "git commit --file=msg.txt -m x", SI, "msg.txt"),
+        ("git add && git commit -F", "git add x && git commit -F m.txt", SI, "m.txt"),
+        ("git -C sub commit -F", "git -C sub commit -F m.txt", SI, "m.txt"),
+        ("ruta con comillas y espacio", "git commit -F 'a b.txt'", SI, "a b.txt"),
+        ("ruta absoluta", "git commit -F /tmp/m.txt", SI, "/tmp/m.txt"),
+        ("commit sin -F", 'git commit -m "x"', NO, None),
+        ("sin commit", "git status", NO, None),
+        ("-F de otro programa, no de git commit", "grep -F x archivo", NO, None),
+        ("-F de un git que no es commit", "git log -F x", NO, None),
+        ("comando vacio", "", NO, None),
+        ("NOSE: comilla sin cerrar", 'git commit -F "m.txt', NOSE, None),
+        ("NOSE: -F - (stdin)", "git commit -F -", NOSE, None),
+        ("NOSE: -F- (stdin pegado)", "git commit -F-", NOSE, None),
+        ("NOSE: --file=- (stdin)", "git commit --file=-", NOSE, None),
+        ("NOSE: --file - (stdin)", "git commit --file -", NOSE, None),
+        ("NOSE: -F sin valor", "git commit -F", NOSE, None),
+        ("NOSE: --file sin valor", "git commit --file", NOSE, None),
+        ("NOSE: --file= con valor vacio", "git commit --file=", NOSE, None),
+        ("NOSE: dos -F en el mismo commit", "git commit -F a.txt -F b.txt", NOSE, None),
+        ("NOSE: -F y --file en el mismo commit", "git commit -F a.txt --file=b.txt", NOSE, None),
+        ("NOSE: dos segmentos git commit con -F", "git commit -F a.txt && git commit -F b.txt", NOSE, None),
+        ("NOSE: banderas cortas agrupadas con F", "git commit -aF msg.txt", NOSE, None),
+    ]
+
+    def test_tabla_de_casos(self):
+        for descripcion, cmd, esperado, ruta in self.CASOS:
+            with self.subTest(caso=descripcion, cmd=cmd):
+                resultado = dc.ruta_de_mensaje(cmd)
+                esperada = {self.SI: ruta, self.NO: "", self.NOSE: None}[esperado]
+                self.assertEqual(resultado, esperada)
+
+    def _cli(self, cmd: str, *args: str) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            [sys.executable, str(ROOT / "scripts/detectar_commit.py"), *args],
+            input=cmd, capture_output=True, text=True,
+        )
+
+    def test_cli_ruta_mensaje_imprime_la_ruta_y_sale_0(self):
+        r = self._cli("git commit -F msg.txt", "--ruta-mensaje")
+        self.assertEqual((r.returncode, r.stdout.strip()), (0, "msg.txt"))
+
+    def test_cli_ruta_mensaje_sin_F_no_imprime_y_sale_1(self):
+        r = self._cli('git commit -m "x"', "--ruta-mensaje")
+        self.assertEqual((r.returncode, r.stdout), (1, ""))
+
+    def test_cli_ruta_mensaje_nose_no_imprime_y_sale_3(self):
+        r = self._cli("git commit -F -", "--ruta-mensaje")
+        self.assertEqual((r.returncode, r.stdout), (3, ""))
+
+    def test_cli_sin_la_opcion_sigue_respondiendo_invoca_commit(self):
+        r = self._cli("git commit -F msg.txt")
+        self.assertEqual((r.returncode, r.stdout), (0, ""))
+
+
+class GuardCommitsLeeArchivoMensajeTests(unittest.TestCase):
+    """#326: ambos guards de commit juzgan tambien el mensaje de `-F`/`--file`, contra el
+    hook REAL y en los DOS perfiles. Cada test aserta exit Y stderr."""
+
+    PERFILES = {
+        "plugin": (_comando_guard_commits_plugin, "todo commit en Harness.Timonel debe referenciar un issue (#N)"),
+        "consumidor": (_comando_guard_commits_consumidor, "en la rama hu/1-x el commit debe referenciar #1"),
+    }
+
+    def _correr(self, perfil, cmd, archivos=None, dirs=()):
+        comando = self.PERFILES[perfil][0]()
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            _preparar_repo(tmp_path, "hu/1-x", perfil=perfil)
+            for d in dirs:
+                _preparar_repo_destino(tmp_path, "hu/1-x", d)
+            for nombre, texto in (archivos or {}).items():
+                (tmp_path / nombre).write_text(texto, encoding="utf-8")
+            return _correr_hook(comando, cmd, tmp_path, plugin_root=str(ROOT))
+
+    def _assert_permitido(self, r):
+        self.assertEqual((r.returncode, r.stderr), (0, ""))
+
+    def _assert_bloqueado(self, perfil, r):
+        self.assertEqual(r.returncode, 2, r.stderr)
+        self.assertIn("[timonel] Bloqueado: " + self.PERFILES[perfil][1], r.stderr)
+
+    def test_e1_el_numero_en_el_archivo_cuenta_en_las_tres_formas(self):
+        for perfil in self.PERFILES:
+            for cmd in ("git commit -F msg.txt", "git commit --file=msg.txt", "git commit --file msg.txt"):
+                with self.subTest(perfil=perfil, cmd=cmd):
+                    self._assert_permitido(self._correr(perfil, cmd, {"msg.txt": "fix: algo #1"}))
+
+    def test_e2_archivo_sin_numero_bloquea_con_el_mensaje_de_hoy(self):
+        for perfil in self.PERFILES:
+            with self.subTest(perfil=perfil):
+                r = self._correr(perfil, "git commit -F sin.txt", {"sin.txt": "fix: algo"})
+                self._assert_bloqueado(perfil, r)
+
+    def test_e3_archivo_inexistente_o_stdin_bloquea_sin_fail_open(self):
+        for perfil in self.PERFILES:
+            for cmd in ("git commit -F no-existe.txt", "git commit -F -"):
+                with self.subTest(perfil=perfil, cmd=cmd):
+                    self._assert_bloqueado(perfil, self._correr(perfil, cmd))
+
+    def test_e4_git_C_resuelve_la_ruta_contra_el_mismo_dir_del_guard(self):
+        for perfil in self.PERFILES:
+            with self.subTest(perfil=perfil):
+                r = self._correr(perfil, "git -C sub commit -F msg.txt", dirs=("sub",),
+                                 archivos={"sub/msg.txt": "fix: algo #1"})
+                self._assert_permitido(r)
+
+    def test_control_con_m_sigue_permitido(self):
+        for perfil in self.PERFILES:
+            with self.subTest(perfil=perfil):
+                self._assert_permitido(self._correr(perfil, "git commit -m 'fix: algo #1'"))
+
+
 if __name__ == "__main__":
     unittest.main()

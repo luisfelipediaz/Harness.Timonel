@@ -31,6 +31,18 @@ DISTINTO para cada una de las tres respuestas, y `main()` atrapa cualquier
 excepcion no prevista para que nunca escape como un traceback con exit code
 1 (que el guard leeria, erroneamente, como "no invoca commit").
 
+Segunda pregunta (#326): `ruta_de_mensaje(cmd)` extrae la ruta del archivo de
+mensaje de `git commit -F <ruta>` / `--file <ruta>` para que los dos guards
+juzguen la regla `#N` sobre el mensaje REAL y no solo sobre el texto del
+comando. Tambien tiene tres respuestas, y NOSE no se colapsa con NO: NO ("el
+commit no trae -F") deja al guard juzgar solo el comando, que es correcto;
+NOSE ("trae un -F que no pude resolver a una ruta unica": stdin `-F -`, flag
+sin valor, mas de un -F, banderas cortas agrupadas como `-aF`, tokenizacion
+invalida) tambien lo deja juzgar solo el comando, pero porque el guard es
+fail-closed y NO debe fingir que leyo un archivo; colapsarlo con NO esconderia
+que el sensor no sabe de donde sale el mensaje
+(`heuristics/general/sensor-declara-su-evidencia.md`).
+
 CLI: lee el comando CRUDO por stdin (no el payload JSON de un hook de Claude
 Code: los entries de `hooks.json` ya consumieron stdin con `jq` para armar
 `$cmd` antes de invocar este sensor).
@@ -45,6 +57,10 @@ Codigos de salida:
         cualquier codigo que no sea 0 o 1 (sensor ausente, `python3`
         ausente, `shlex` invalido, version instalada vieja que no entiende
         esta CLI): ver el protocolo de invocacion en `hooks/hooks.json`.
+
+Con la opcion `--ruta-mensaje` la CLI responde la segunda pregunta: imprime la
+ruta y sale 0 (SI), no imprime y sale 1 (NO), no imprime y sale 3 (NOSE). Sin
+la opcion, la CLI es la de arriba, sin cambios.
 
 Limite declarado (no es un olvido, ver contrato de cambio de #176): este
 sensor tokeniza el comando, no lo ejecuta. Un heredoc cuyo CONTENIDO tenga
@@ -72,6 +88,11 @@ CLAVE_COMMIT = ("git", "commit")
 # salida de la CLI. Lookup map en vez de una cadena de `if` (evitar-ifs.md).
 _CODIGOS_DE_SALIDA = {True: 0, False: 1, None: 3}
 
+# Formas de `git commit` con el valor pegado (`--file=m`, `-Fm`) y valores que
+# significan "lee de stdin" (no hay archivo que leer).
+_PREFIJOS_CON_VALOR_PEGADO = ("--file=", "-F")
+_VALORES_DE_STDIN = frozenset({"-"})
+
 
 def invoca_commit(cmd: str) -> bool | None:
     """Punto de entrada puro. Tres respuestas (ver docstring del modulo):
@@ -94,9 +115,72 @@ def invoca_commit(cmd: str) -> bool | None:
         return None
 
 
+def _ruta_en(args: list[str], i: int) -> tuple[str | None, int]:
+    """Lee la forma de `-F`/`--file` que empieza en `args[i]`. Devuelve
+    (ruta | "" si no es forma de archivo | None si no se pudo resolver, tokens
+    consumidos). Las formas se resuelven por lookup, no por cadena de `if`."""
+    arg = args[i]
+    siguiente = args[i + 1] if i + 1 < len(args) else None
+    formas = {
+        "-F": (siguiente, 2),
+        "--file": (siguiente, 2),
+    }
+    if arg in formas:
+        return formas[arg]
+    for prefijo in _PREFIJOS_CON_VALOR_PEGADO:
+        if arg.startswith(prefijo):
+            return (arg[len(prefijo):] or None), 1
+    es_corta_agrupada = arg.startswith("-") and not arg.startswith("--") and "F" in arg[1:]
+    return ({True: None, False: ""}[es_corta_agrupada]), 1
+
+
+def _rutas_de_segmento(segmento: list[str]) -> list[str | None]:
+    args = gi.argumentos_de_segmento(segmento)
+    rutas: list[str | None] = []
+    i = 0
+    while i < len(args):
+        ruta, consumidos = _ruta_en(args, i)
+        if ruta != "":
+            rutas.append(ruta)
+        i += consumidos
+    return rutas
+
+
+def ruta_de_mensaje(cmd: str) -> str | None:
+    """Punto de entrada puro de la segunda pregunta (#326). Tres respuestas (ver
+    docstring del modulo): la ruta (str no vacio) si el `git commit` trae un
+    unico `-F`/`--file` resoluble; `""` si ningun `git commit` trae `-F`/`--file`
+    (NO); `None` ("no se") ante tokenizacion invalida, stdin (`-`), flag sin
+    valor, mas de un -F, banderas cortas agrupadas con F o error inesperado."""
+    try:
+        segmentos = gi.segmentar(cmd)
+        if segmentos is None:
+            return None
+        rutas: list[str | None] = []
+        for segmento in segmentos:
+            if gi.clave_de_segmento(segmento) == CLAVE_COMMIT:
+                rutas.extend(_rutas_de_segmento(segmento))
+    except Exception:
+        return None
+    if not rutas:
+        return ""
+    ruta = rutas[0]
+    sin_resolver = len(rutas) > 1 or not ruta or ruta in _VALORES_DE_STDIN
+    return {True: None, False: ruta}[sin_resolver]
+
+
+def _responder_ruta_mensaje(cmd: str) -> int:
+    ruta = ruta_de_mensaje(cmd)
+    imprimir = {True: lambda: print(ruta), False: lambda: None}
+    imprimir[bool(ruta)]()
+    return {True: 3, False: {True: 0, False: 1}[bool(ruta)]}[ruta is None]
+
+
 def main() -> int:
     try:
         cmd = sys.stdin.read()
+        if "--ruta-mensaje" in sys.argv[1:]:
+            return _responder_ruta_mensaje(cmd)
         resultado = invoca_commit(cmd)
     except Exception:
         resultado = None
