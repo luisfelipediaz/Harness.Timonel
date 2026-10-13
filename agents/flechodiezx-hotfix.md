@@ -93,13 +93,13 @@ Sub-agente `model: "sonnet"`, dentro de la rama `fix/N-<slug>` (ya consolidada t
 
 **Modo rama del usuario (Fase 3, ronda de correccion)**: el sub-agente de implementacion (el mismo skill de implementacion de la Fase 2) va sin `isolation` y sin `RAMA_HISTORIA`, con la `ruta` del usuario como directorio de trabajo; antes de lanzarlo corre `git -C <ruta> push -u origin <rama>` y mide `git -C <ruta> rev-list --left-right --count <rama>...origin/<rama>`: solo si da `0 0` lo lanzas, y si no lo da o el comando falla, no lo lances y reportalo.
 
-## Fase 4: Retro opcional
+## Fase 4: Retro (obligatoria en perfil plugin)
 
-Solo si el SP real difiere del estimado, el fix revelo un problema sistemico, o el review marco warnings repetidos. Usa `generate-retro` con los mismos parametros que `flechodiezx`. Si la saltas, dilo en el resumen final.
+Usa `generate-retro` con los mismos parametros que `flechodiezx`. **Perfil plugin**: la retro es obligatoria y **si bloquea** el DoD (el item 9 es CRITICO); si falla, **reintenta una vez** antes de marcar `retro_generada: no`. **Perfil consumidor**: solo si el SP real difiere del estimado, el fix revelo un problema sistemico, o el review marco warnings repetidos; si la saltas, dilo en el resumen final.
 
 ## Fase 5: PR/Integracion — abrir el PR
 
-Con el code review publicado (Fase 3) y la retro decidida (Fase 4), la rama `fix/N-<slug>` debe llegar a la rama base por PR. Esta fase corre **siempre** y **antes** del DoD: ningun cambio llega a la rama base sin pasar primero por esta fase, ni siquiera un hotfix de 1 SP.
+Con el code review publicado (Fase 3) y la retro generada o decidida (Fase 4), la rama `fix/N-<slug>` debe llegar a la rama base por PR. Esta fase corre **siempre** y **antes** del DoD: ningun cambio llega a la rama base sin pasar primero por esta fase, ni siquiera un hotfix de 1 SP.
 
 1. `git push -u origin fix/N-<slug>`.
 2. Arma el cuerpo del PR:
@@ -115,6 +115,8 @@ El merge a la rama base lo hace siempre un humano al aprobar el PR: esta fase te
 **Modo rama del usuario (Fase 5)**: los pasos 1 y 2 usan la rama del usuario, no `fix/N-<slug>`: `git -C <ruta> push -u origin <rama>` e `integracion.py N --rama <rama del usuario> --base <base declarada> --repo "$REPO" --body-out /tmp/pr-N.md`, agregando `--draft` solo si `pr_draft_intencional: si` (el comando impreso es `gh pr create --draft ...`); sin draft intencional, el PR es normal. El comentario del paso 4 dice `(rama <rama> → <base declarada>)`.
 
 ## Fase 6: DoD reducido
+
+**Perfil plugin, antes de lanzar `verify-dod`**: comprueba que el issue tiene el comentario `<!-- timonel:retro -->` (`gh api repos/$REPO/issues/N/comments --paginate -q '[.[]|select(.body|startswith("<!-- timonel:retro -->"))]|length'`). Si el conteo es 0 (o la consulta falla: es un "no se", no un "no existe"), **no lances el DoD**: detente y reporta que falta la retro.
 
 Sub-agente `"$PLUGIN_ROOT/skills/verify-dod/SKILL.md"` con `providers_registrados: n-a`, `rutas_registradas: n-a`, `retro_generada: {si|no}`, `tareas_completas`, `veredicto_code_review`, `perfil` (`consumidor` por defecto; `plugin` si el hotfix es sobre el propio plugin). Items tipicamente `SKIPPED`: 3, 5, 6, 7. Criticos: 1, 2, 4, 8, 11 (y 9 en perfil plugin). `NO_GENERADO`/`SKIPPED` en la fila 11 = `FALLAS_CRITICAS` (no se cierra el issue: el code review es obligatorio). Publica `<!-- timonel:dod -->`.
 
@@ -134,4 +136,4 @@ Si la decision no es `DONE`, revierte el label a `estado:en-progreso` (la Fase 5
 
 ## Notas
 
-- Relacionado con #67: tras esta fase de integracion, `flechodiezx-hotfix` comparte con `flechodiezx` rama propia, worktree, merge, lint+tests, review obligatorio, PR antes del DoD y `estado:en-revision`. El tamaño ya no cambia la forma de integrar — solo la ceremonia previa (sin contrato aprobado, Dora opcional, un solo sub-agente, retro opcional, DoD con mas `SKIPPED`).
+- Relacionado con #67: tras esta fase de integracion, `flechodiezx-hotfix` comparte con `flechodiezx` rama propia, worktree, merge, lint+tests, review obligatorio, PR antes del DoD y `estado:en-revision`. El tamaño ya no cambia la forma de integrar — solo la ceremonia previa (sin contrato aprobado, Dora opcional, un solo sub-agente, retro opcional solo en perfil consumidor, DoD con mas `SKIPPED`).

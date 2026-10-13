@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.20.0 — en desarrollo
+
+- `agents/flechodiezx-hotfix.md` exige la retro en perfil plugin: la Fase 4 pasa de "Retro opcional" a "Retro (obligatoria en perfil plugin)" (item 9 CRITICO; si falla, `reintenta una vez` antes de marcar `retro_generada: no`; el perfil consumidor conserva los criterios de antes) y la Fase 6 no lanza `verify-dod` en perfil plugin si el issue no tiene el comentario `<!-- timonel:retro -->` (se detiene y reporta). Tests nuevos: `RetroHotfixPerfilPluginTests` (1 test, un subTest por fase, anclado en la sección de cada fase); los literales del párrafo (`**Perfil plugin**`, `**Perfil consumidor**`, `si bloquea`, `reintenta una vez` en la Fase 4; `timonel:retro`, `no lances el DoD` en la Fase 6) dan cada uno 1 fallo de 106 contra 0 de base, y falla el subTest de su fase; verificación del plugin en verde con 481 tests (`verificar_plugin.py` PASSED). (#303)
+
 ## 0.19.0 — 2026-10-14
 
 - La compuerta de push forzado de `hooks/hooks.json` deja de bloquear por coincidencia de texto sobre todo el comando y decide por segmento: el sensor nuevo `scripts/detectar_push_forzado.py` (0 sí / 1 no / 3 no sé) reutiliza `segmentar` y el seam público nuevo `argumentos_de_segmento` de `scripts/guard_integracion.py` para reconocer solo un `git push` real con bandera de forzado; con rc 1 la compuerta continúa y con cualquier otro código cae al glob de respaldo. Tests nuevos: `tests/test_detectar_push_forzado.py` (7) y `CompuertaPushForzadoPorSegmentoTests` (5); mutación del literal `detectar_push_forzado.py` en `hooks/hooks.json`: 8 fallos de 95 contra 0 de base; verificación del plugin en verde con 479 tests (`verificar_plugin.py` PASSED). (#316)
