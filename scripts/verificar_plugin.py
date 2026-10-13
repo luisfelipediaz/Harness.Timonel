@@ -89,11 +89,11 @@ def _correr_por_archivo(
                 [*comando, str(archivo)], cwd=raiz, capture_output=True, text=True, timeout=TIMEOUT_S,
             )
         except subprocess.TimeoutExpired:
-            sin_evidencia = f"timeout_{herramienta}"
-            break
+            sin_evidencia = sin_evidencia or f"timeout_{herramienta}"
+            continue
         except OSError:
-            sin_evidencia = f"{herramienta}_no_ejecutable"
-            break
+            sin_evidencia = sin_evidencia or f"{herramienta}_no_ejecutable"
+            continue
         if r.returncode != 0:
             rojos.append(str(archivo.relative_to(raiz)))
     if rojos:

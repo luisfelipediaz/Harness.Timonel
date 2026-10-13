@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.20.0 — en desarrollo
+
+- `scripts/verificar_plugin.py`: `_correr_por_archivo` ya no corta con `break` ante el primer `TimeoutExpired` u `OSError`, sino que sigue con `continue`, conserva el primer motivo sin evidencia y deja que un rojo posterior gane (FAILED sobre "no sé"; con la herramienta ausente en todos los archivos nada cambia), y el filtro `if p.is_file()` de `_archivos_bash` queda cubierto por un test. Tests nuevos en `MainEnProcesoTests` (5, los dos con subTest por herramienta): 25 en `tests.test_verificar_plugin` y 485 en la suite; `verificar_plugin.py` PASSED. Mutación con `mutar_literal.py`: quitar ` if p.is_file()` da 1 fallo de 25 contra base 0, borrar los dos `continue` 9 de 25 contra base 0, y revertir a `break` (timeout, `OSError` o ambas) 4 de 25 contra base 0. (#299)
+
 ## 0.19.0 — 2026-10-14
 
 - La compuerta de push forzado de `hooks/hooks.json` deja de bloquear por coincidencia de texto sobre todo el comando y decide por segmento: el sensor nuevo `scripts/detectar_push_forzado.py` (0 sí / 1 no / 3 no sé) reutiliza `segmentar` y el seam público nuevo `argumentos_de_segmento` de `scripts/guard_integracion.py` para reconocer solo un `git push` real con bandera de forzado; con rc 1 la compuerta continúa y con cualquier otro código cae al glob de respaldo. Tests nuevos: `tests/test_detectar_push_forzado.py` (7) y `CompuertaPushForzadoPorSegmentoTests` (5); mutación del literal `detectar_push_forzado.py` en `hooks/hooks.json`: 8 fallos de 95 contra 0 de base; verificación del plugin en verde con 479 tests (`verificar_plugin.py` PASSED). (#316)

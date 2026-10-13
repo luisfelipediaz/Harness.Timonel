@@ -220,6 +220,85 @@ class MainEnProcesoTests(unittest.TestCase):
         self.assertEqual((codigo, lineas[-1]), (1, "FAILED: bash -n"))
         self.assertIn(f"jq: no sé ({vp.MOTIVOS['jq_no_ejecutable']})", lineas)
 
+    def test_subdirectorio_en_githooks_no_se_pasa_a_bash_n(self):
+        (self.repo / ".githooks" / "subdir").mkdir()
+        codigo, _, sr, _ = self._main(self.OK, _ok)
+        bash = [c.args[0] for c in sr.call_args_list if c.args[0][0] == "bash"]
+        self.assertEqual(codigo, 0)
+        self.assertNotIn(["bash", "-n", str(self.repo / ".githooks" / "subdir")], bash)
+        self.assertEqual(len(bash), 2)
+
+    # (primer archivo que no da evidencia, segundo archivo que se revisa despues)
+    ARCHIVOS_POR_HERRAMIENTA = {
+        "bash": ("a.sh", "b.sh"),
+        "jq": ("plugin.json", "marketplace.json"),
+    }
+    PASO_POR_HERRAMIENTA = {"bash": "bash -n", "jq": "jq"}
+
+    def _agregar_b_sh(self):
+        (self.repo / "scripts" / "b.sh").write_text("#!/bin/bash\necho b\n", encoding="utf-8")
+
+    def test_timeout_en_el_primer_archivo_no_oculta_un_rojo_posterior(self):
+        self._agregar_b_sh()
+        for herramienta, (primero, segundo) in self.ARCHIVOS_POR_HERRAMIENTA.items():
+            with self.subTest(herramienta=herramienta):
+                def run(cmd, **_k):
+                    if cmd[0] == herramienta and cmd[-1].endswith("/" + primero):
+                        raise subprocess.TimeoutExpired(cmd, 1)
+                    rc = 1 if cmd[0] == herramienta and cmd[-1].endswith("/" + segundo) else 0
+                    return subprocess.CompletedProcess(cmd, rc, "", "")
+                codigo, lineas, sr, _ = self._main(self.OK, run)
+                invocados = [Path(c.args[0][-1]).name for c in sr.call_args_list if c.args[0][0] == herramienta]
+                self.assertEqual(codigo, 1)
+                self.assertIn(primero, invocados)
+                self.assertIn(segundo, invocados)
+                paso = self.PASO_POR_HERRAMIENTA[herramienta]
+                self.assertEqual(
+                    [l for l in lineas if l.startswith(f"{paso}: ")],
+                    [f"{paso}: FAILED ({'scripts/' if herramienta == 'bash' else '.claude-plugin/'}{segundo})"],
+                )
+
+    def test_timeout_en_el_primer_archivo_con_el_resto_verde_sigue_siendo_no_se(self):
+        self._agregar_b_sh()
+        for herramienta, (primero, segundo) in self.ARCHIVOS_POR_HERRAMIENTA.items():
+            with self.subTest(herramienta=herramienta):
+                def run(cmd, **_k):
+                    if cmd[0] == herramienta and cmd[-1].endswith("/" + primero):
+                        raise subprocess.TimeoutExpired(cmd, 1)
+                    return subprocess.CompletedProcess(cmd, 0, "", "")
+                codigo, lineas, sr, _ = self._main(self.OK, run)
+                invocados = [Path(c.args[0][-1]).name for c in sr.call_args_list if c.args[0][0] == herramienta]
+                self.assertEqual(codigo, 2)
+                self.assertIn(segundo, invocados)
+                self.assertIn(vp.MOTIVOS[f"timeout_{herramienta}"], lineas[-1])
+                self.assertNotIn("PASSED", lineas[-1])
+
+    def test_primer_motivo_sin_evidencia_no_se_sobrescribe_con_uno_posterior(self):
+        self._agregar_b_sh()
+
+        def run(cmd, **_k):
+            if cmd[0] == "bash" and cmd[-1].endswith("/a.sh"):
+                raise subprocess.TimeoutExpired(cmd, 1)
+            if cmd[0] == "bash" and cmd[-1].endswith("/b.sh"):
+                raise FileNotFoundError("bash")
+            return subprocess.CompletedProcess(cmd, 0, "", "")
+        codigo, lineas, _, _ = self._main(self.OK, run)
+        self.assertEqual(codigo, 2)
+        self.assertIn(vp.MOTIVOS["timeout_bash"], lineas[-1])
+        self.assertNotIn(vp.MOTIVOS["bash_no_ejecutable"], lineas[-1])
+
+    def test_herramienta_ausente_en_todos_los_archivos_no_cambia(self):
+        self._agregar_b_sh()
+        for herramienta in ("bash", "jq"):
+            with self.subTest(herramienta=herramienta):
+                def run(cmd, **_k):
+                    if cmd[0] == herramienta:
+                        raise FileNotFoundError(herramienta)
+                    return subprocess.CompletedProcess(cmd, 0, "", "")
+                codigo, lineas, _, _ = self._main(self.OK, run)
+                self.assertEqual(codigo, 2)
+                self.assertEqual(lineas[-1].count(vp.MOTIVOS[f"{herramienta}_no_ejecutable"]), 1)
+
     def test_siempre_imprime_los_tres_pasos_mas_la_final(self):
         _, lineas, _, _ = self._main("basura", _rc(1))
         self.assertEqual(len(lineas), 4)
