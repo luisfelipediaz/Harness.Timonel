@@ -614,11 +614,14 @@ class SincronizacionDelWorktreeTests(unittest.TestCase):
         (`\\n## `), o el fin del archivo. Ancla real de #194: un parrafo que
         menciona el literal correcto pero vive en otra seccion (o en `## Notas`)
         no debe satisfacer un caso acotado a una fase concreta -- de lo
-        contrario el ancla no hace ningun trabajo (M8 del contrato)."""
+        contrario el ancla no hace ningun trabajo (M8 del contrato). Excluye
+        tambien el resto de la linea del encabezado: un literal que solo esta en
+        el titulo no debe satisfacer un `assertIn` acotado a la seccion (#332/#303)."""
         inicio = texto.find(titulo)
         if inicio == -1:
             return ""
         resto = texto[inicio + len(titulo):]
+        resto = resto.partition("\n")[2]
         fin = resto.find("\n## ")
         return resto if fin == -1 else resto[:fin]
 
@@ -1540,6 +1543,36 @@ class CableadoDeMainTests(unittest.TestCase):
         )
 
 
+class SeccionSinEncabezadoTests(unittest.TestCase):
+    """Los helpers que recortan una seccion de markdown no incluyen la linea del
+    encabezado (#332/#303): un literal que solo vive en el titulo no debe satisfacer
+    un `assertIn` acotado a la seccion."""
+
+    def test_recorte_excluye_el_titulo(self):
+        texto = "## Fase 4: Retro (obligatoria en perfil plugin)\ncuerpo\n## Fase 5\notro"
+        seccion = SincronizacionDelWorktreeTests._seccion(texto, "## Fase 4")
+        self.assertNotIn("perfil plugin", seccion)
+        self.assertIn("cuerpo", seccion)
+        self.assertNotIn("otro", seccion)
+
+    def test_cuerpo_de_seccion_excluye_el_titulo(self):
+        texto = "# H\n\n## Regla (solo en titulo)\ncuerpo\n\n## Otra\nresto\n"
+        cuerpo = HeuristicasDescubriblesTests._cuerpo_de_seccion(texto, "Regla (solo en titulo)")
+        self.assertNotIn("solo en titulo", cuerpo)
+        self.assertIn("cuerpo", cuerpo)
+        self.assertNotIn("resto", cuerpo)
+
+    def test_cuerpo_de_seccion_conserva_none_si_no_existe(self):
+        self.assertIsNone(HeuristicasDescubriblesTests._cuerpo_de_seccion("## A\nx\n", "B"))
+
+    def test_seccion_3_5_excluye_el_titulo(self):
+        texto = "### 3.5 Vacuo (N=0 solo en titulo)\nbase: B\n### 3.6 Otra\nresto"
+        seccion = VacuoConLineaBaseTests._recortar_3_5(texto)
+        self.assertNotIn("N=0", seccion)
+        self.assertIn("base: B", seccion)
+        self.assertNotIn("resto", seccion)
+
+
 class HeuristicasDescubriblesTests(unittest.TestCase):
     """Una heuristica escrita que ningun skill puede descubrir no cambia ninguna decision (#134).
 
@@ -1619,7 +1652,7 @@ class HeuristicasDescubriblesTests(unittest.TestCase):
     def _cuerpo_de_seccion(cls, texto: str, titulo: str) -> str | None:
         for bloque in re.split(r"^## ", cls._sin_bloques_de_codigo(texto), flags=re.M)[1:]:
             if bloque.splitlines()[0].strip() == titulo:
-                return bloque
+                return bloque.partition("\n")[2]
         return None
 
     @staticmethod
@@ -1913,11 +1946,14 @@ class VacuoConLineaBaseTests(unittest.TestCase):
     CODE_REVIEW = ROOT / "skills" / "code-review" / "SKILL.md"
     IMPLEMENTADOR = ROOT / "skills" / "implement-plugin-change" / "SKILL.md"
 
-    def _seccion_3_5(self):
-        texto = self.CODE_REVIEW.read_text(encoding="utf-8")
+    @staticmethod
+    def _recortar_3_5(texto: str) -> str:
         inicio = texto.index("### 3.5")
         fin = texto.index("\n### ", inicio + 1)
-        return texto[inicio:fin]
+        return texto[inicio:fin].partition("\n")[2]
+
+    def _seccion_3_5(self):
+        return self._recortar_3_5(self.CODE_REVIEW.read_text(encoding="utf-8"))
 
     def test_code_review(self):
         seccion = self._seccion_3_5()
