@@ -1190,6 +1190,51 @@ class RetroHotfixPerfilPluginTests(unittest.TestCase):
                     self.assertIn(literal, seccion, f"`{titulo}` de flechodiezx-hotfix.md debe contener `{literal}`")
 
 
+class Item3PerfilPluginTests(unittest.TestCase):
+    """#304: en perfil plugin el item 3 del DoD tiene criterio propio (PASSED si el diff de
+    `tests/` lista algo; `SKIPPED solo si` el diff esta vacio y no se tocan `scripts/*.py` ni
+    `hooks/hooks.json`; FAILED no critico en otro caso) y `flechodiezx-hotfix` ya no lo da por
+    SKIPPED. Cada subTest se ancla a su parrafo/seccion, nunca al archivo entero."""
+
+    SECCION = staticmethod(SincronizacionDelWorktreeTests._seccion)
+
+    @staticmethod
+    def _parrafo(texto, inicio):
+        bloques = texto.split("\n\n")
+        return next((b for b in bloques if b.startswith(inicio)), "")
+
+    def _verify_dod(self, texto):
+        return self._parrafo(texto, "**Perfil plugin**")
+
+    def _hotfix(self, texto):
+        return self.SECCION(texto, "## Fase 6")
+
+    DOCUMENTOS = {
+        "skills/verify-dod/SKILL.md": (
+            _verify_dod,
+            ("PASSED si", "SKIPPED solo si", "scripts/*.py", "hooks/hooks.json", "FAILED no critico"),
+        ),
+        "agents/flechodiezx-hotfix.md": (
+            _hotfix,
+            ("`SKIPPED` en perfil plugin: 5, 6, 7", "criterio de verify-dod", "en perfil consumidor: 3, 5, 6, 7"),
+        ),
+    }
+
+    def test_fila_3_remite_al_parrafo_perfil_plugin(self):
+        texto = (ROOT / "skills/verify-dod/SKILL.md").read_text(encoding="utf-8")
+        fila = next((l for l in texto.splitlines() if l.startswith("| 3 |")), "")
+        self.assertIn("ver el parrafo **Perfil plugin**", fila, "la fila 3 de la checklist debe remitir al parrafo **Perfil plugin**")
+
+    def test_cada_documento_declara_el_criterio_del_item_3(self):
+        for ruta, (extraer, literales) in self.DOCUMENTOS.items():
+            with self.subTest(documento=ruta):
+                texto = (ROOT / ruta).read_text(encoding="utf-8")
+                ancla = extraer(self, texto)
+                self.assertTrue(ancla, f"{ruta} no tiene la seccion/parrafo anclado")
+                for literal in literales:
+                    self.assertIn(literal, ancla, f"{ruta}: debe contener `{literal}` en su seccion/parrafo")
+
+
 class DodEstrictoTests(unittest.TestCase):
     """DoD estricto (gap 3 de la auditoria #24, issue #28): sin autoevaluacion sin evaluador."""
 
