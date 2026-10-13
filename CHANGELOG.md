@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.19.0 — en desarrollo
+## 0.19.0 — 2026-10-14
 
 - La compuerta de push forzado de `hooks/hooks.json` deja de bloquear por coincidencia de texto sobre todo el comando y decide por segmento: el sensor nuevo `scripts/detectar_push_forzado.py` (0 sí / 1 no / 3 no sé) reutiliza `segmentar` y el seam público nuevo `argumentos_de_segmento` de `scripts/guard_integracion.py` para reconocer solo un `git push` real con bandera de forzado; con rc 1 la compuerta continúa y con cualquier otro código cae al glob de respaldo. Tests nuevos: `tests/test_detectar_push_forzado.py` (7) y `CompuertaPushForzadoPorSegmentoTests` (5); mutación del literal `detectar_push_forzado.py` en `hooks/hooks.json`: 8 fallos de 95 contra 0 de base; verificación del plugin en verde con 479 tests (`verificar_plugin.py` PASSED). (#316)
 - `EscenarioRealContraElRepoTests` (`tests/test_mutar_literal.py`) se salta con `skipUnless((ROOT / ".git").exists(), ...)` cuando el árbol no tiene `.git` (la copia de `mutar_literal.py` o una exportación `git archive`), donde `git status --porcelain` salía 128 y toda medición sobre la suite completa arrancaba con `base: 1 de 467`; ahora `base: 0 de 467`, y con `.git` como directorio o archivo de worktree el test sigue corriendo. Verificado: `git archive` termina en `OK (skipped=1)`, la copia sin la condición vuelve a `base: 1 de 467`, suite en verde con 467 tests (`verificar_plugin.py` PASSED). (#313)
