@@ -1216,9 +1216,14 @@ class Item3PerfilPluginTests(unittest.TestCase):
         ),
         "agents/flechodiezx-hotfix.md": (
             _hotfix,
-            ("`SKIPPED` en perfil plugin: 5, 6, 7", "criterio de verify-dod"),
+            ("`SKIPPED` en perfil plugin: 5, 6, 7", "criterio de verify-dod", "en perfil consumidor: 3, 5, 6, 7"),
         ),
     }
+
+    def test_fila_3_remite_al_parrafo_perfil_plugin(self):
+        texto = (ROOT / "skills/verify-dod/SKILL.md").read_text(encoding="utf-8")
+        fila = next((l for l in texto.splitlines() if l.startswith("| 3 |")), "")
+        self.assertIn("ver el parrafo **Perfil plugin**", fila, "la fila 3 de la checklist debe remitir al parrafo **Perfil plugin**")
 
     def test_cada_documento_declara_el_criterio_del_item_3(self):
         for ruta, (extraer, literales) in self.DOCUMENTOS.items():
