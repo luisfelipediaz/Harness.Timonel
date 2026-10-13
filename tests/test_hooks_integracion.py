@@ -1802,6 +1802,28 @@ class CompuertaPushForzadoPorSegmentoTests(unittest.TestCase):
                     self.assertEqual(r.returncode, 2, r.stderr)
                     self.assertIn("[timonel] Bloqueado: ", r.stderr)
 
+    def test_banderas_cortas_agrupadas_tras_envoltorio_bloquean(self):
+        """#327: el glob de respaldo no ve `-uf`; el sensor decide "si" ante un envoltorio."""
+        for perfil in self.PERFILES:
+            for cmd in (
+                "sudo git push -uf x",
+                "env FOO=1 git push -uf x",
+                "time git push -uf origin x",
+                "bash -c 'git push -uf x'",
+                "sudo git push -f x",
+            ):
+                with self.subTest(perfil=perfil, cmd=cmd):
+                    r = self._correr(perfil, "hu/1-x", cmd)
+                    self.assertEqual(r.returncode, 2, r.stderr)
+                    self.assertIn("[timonel] Bloqueado: ", r.stderr)
+
+    def test_envoltorio_sin_bandera_de_fuerza_no_bloquea(self):
+        for perfil in self.PERFILES:
+            with self.subTest(perfil=perfil):
+                r = self._correr(perfil, "hu/1-x", "sudo git push -u origin x")
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertEqual(r.stderr, "")
+
     def test_push_sin_mas_o_con_mas_en_otro_segmento_no_bloquea(self):
         for perfil in self.PERFILES:
             for cmd in (
