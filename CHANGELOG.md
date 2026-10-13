@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.19.0 — en desarrollo
+
+- `ResolverConfigWorktreeTests.test_perfil_plugin_sin_config_devuelve_config_minimo` parchea ahora también `tg.subprocess.run` con `AssertionError("git")`, de modo que el perfil plugin de `load_config` no pueda consultar git: mover el bloque del perfil plugin debajo de la llamada a `resolver_config_path` dejaba la clase en verde (`Ran 10 tests ... OK`, base B=0 fallos) y con el test endurecido falla (`FAILED (failures=1)`, N=1 de 10 > B=0); contra el código real pasa (`OK`). Sin tests nuevos ni cambios en `scripts/timonel_gh.py`; verificación del plugin en verde con 467 tests (`verificar_plugin.py` PASSED). (#284)
+
 ## 0.18.0 — 2026-10-13
 
 - Las 5 compuertas de `hooks/hooks.json` (onboard, versión, aviso de archivo raíz, push forzado + commits en base y guard de integración) resuelven el config del consumidor con `resolver_config_consumidor` de `scripts/_common.sh`, de modo que un worktree sin `.claude/timonel.config.json` propio decide con el config del checkout principal; si la función no existe usan un fallback local con la misma regla. Tests nuevos: `CompuertasResuelvenConfigDesdeWorktreeTests` (8) y `ParidadCompuertaResolverTests` parametrizada por compuerta; verificación del plugin en verde con 467 tests (`verificar_plugin.py` PASSED). El falso positivo del push forzado queda en #316. (#281)
