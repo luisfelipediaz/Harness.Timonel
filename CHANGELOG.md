@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.23.0 — en desarrollo
+## 0.23.0 — 2026-10-13
 
 - `scripts/mutar_literal.py` gana el modo `sustituir` (`--modo sustituir --por <texto>`, reemplaza el literal por otro en vez de borrarlo o moverlo) y la opción `--linea N` (limita la mutación a esa línea): los motivos nuevos de salida 2 `sustituir_sin_por`, `por_invalido`, `por_no_aplica_al_modo`, `linea_no_aplica_al_modo` y `linea_invalida` salen de la tabla `REGLAS_DE_OPCIONES` y se emiten sin correr tests, y `--linea` sobre una línea sin el literal sale 2 con `mutacion_no_aplicada`. `skills/implement-plugin-change/SKILL.md` documenta el modo. Tests nuevos en `SeccionYMutacionTests` y `MainSubprocessTests` (sustituir con conteo sin tocar el original, `--linea` cambia solo esa línea, línea sin el literal, opciones inválidas) y `ModoSustituirEnSkillTests`: 524 en la suite; `verificar_plugin.py` PASSED. Evidencia con `mutar_literal.py` (base 0 en todas): `--ruta scripts/_common.sh --literal '*/.git)' --modo sustituir --por '*)' --test tests.test_common_sh` da líneas mutadas 1 y 2 fallos de 9; `--ruta scripts/verificar_plugin.py --literal continue --modo sustituir --por break --linea 93 --test tests.test_verificar_plugin` da líneas mutadas 1 y 4 fallos de 27; quitar el filtro de `--linea` da 5 fallos de 63, `por or ""` por `""` 3 de 63, el rango de `linea_invalida` a `False` 2 de 63 y borrar `--modo sustituir --por` del SKILL 1 de 1. (#310)
 
