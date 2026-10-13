@@ -1386,7 +1386,8 @@ class ResolverConfigWorktreeTests(unittest.TestCase):
     def test_perfil_plugin_sin_config_devuelve_config_minimo(self):
         (self.worktree / ".claude-plugin").mkdir()
         (self.worktree / ".claude-plugin/plugin.json").write_text('{"name": "timonel"}', encoding="utf-8")
-        with _en(self.worktree), mock.patch.object(tg, "gh", return_value="o/timonel\n") as gh_mock:
+        with _en(self.worktree), mock.patch.object(tg, "gh", return_value="o/timonel\n") as gh_mock, \
+                mock.patch.object(tg.subprocess, "run", side_effect=AssertionError("git")):
             cfg = tg.load_config()
         self.assertEqual(cfg["modulos"], ["plugin"])
         self.assertEqual(cfg["github"]["repo"], "o/timonel")
