@@ -20,9 +20,9 @@ Ejecuta la checklist de DoD con los resultados acumulados de fases anteriores ma
 | `perfil` | `consumidor` (default) \| `plugin` |
 | `directorio_trabajo` | Ruta del worktree donde esta checkouteada la rama de la historia (default: el directorio actual). En el modo "rama del usuario" del orquestador es la ruta del usuario |
 
-**`directorio_trabajo`**: `pr_check.py` (item 1) y los `git diff <rama-base>...HEAD` de los items 3, 5 y 10 corren **ahi** (`cd <directorio_trabajo>` o `git -C <directorio_trabajo>`), porque `pr_check.py` descubre el PR por la rama actual y `HEAD` es la de ese directorio, no la del arbol del orquestador. Sin el parametro, todo corre en el directorio actual, como antes.
+**`directorio_trabajo`**: `pr_check.py` (item 1) y los `git diff origin/<rama-base>...HEAD` de los items 3, 5 y 10 corren **ahi** (`cd <directorio_trabajo>` o `git -C <directorio_trabajo>`), porque `pr_check.py` descubre el PR por la rama actual y `HEAD` es la de ese directorio, no la del arbol del orquestador. Sin el parametro, todo corre en el directorio actual, como antes.
 
-**Perfil plugin**: items 5, 6 y 7 son `SKIPPED`; en el item 8 las tareas `Contrato API aprobado`, `Modelos compartidos` y `Frontend` cuentan como SKIPPED si no estan marcadas; item 3 usa `git diff --name-only --diff-filter=AM <rama-base>...HEAD -- tests/`: PASSED si lista algun archivo; `SKIPPED solo si` el diff esta vacio y el cambio no toca `scripts/*.py` ni `hooks/hooks.json`; FAILED no critico en otro caso (los toca sin tests); `<rama-base>` es `main`. El item 11 **nunca** es SKIPPED: en el plugin tambien hay code review. El item 9 (retrospectiva) es **CRITICO** en este perfil: `retro_generada: no` → FAILED CRITICO (la retro no es opcional cuando el plugin se implementa a si mismo).
+**Perfil plugin**: items 5, 6 y 7 son `SKIPPED`; en el item 8 las tareas `Contrato API aprobado`, `Modelos compartidos` y `Frontend` cuentan como SKIPPED si no estan marcadas; item 3 usa `git diff --name-only --diff-filter=AM origin/<rama-base>...HEAD -- tests/`: PASSED si lista algun archivo; `SKIPPED solo si` el diff esta vacio y el cambio no toca `scripts/*.py` ni `hooks/hooks.json`; FAILED no critico en otro caso (los toca sin tests); `<rama-base>` es `main` (antes de los diffs: `git fetch origin <rama-base>`, ver la definicion de `<rama-base>`). El item 11 **nunca** es SKIPPED: en el plugin tambien hay code review. El item 9 (retrospectiva) es **CRITICO** en este perfil: `retro_generada: no` → FAILED CRITICO (la retro no es opcional cuando el plugin se implementa a si mismo).
 
 ## Checklist
 
@@ -30,17 +30,17 @@ Ejecuta la checklist de DoD con los resultados acumulados de fases anteriores ma
 | --- | --- | --- | --- |
 | 1 | PR abierto y mergeable | CRITICO o NO critico segun motivo (D1-D7, #81) | `python3 PLUGIN_ROOT/scripts/pr_check.py <issue> --repo <repo> --base <rama-base>` — el sensor descubre el PR por la rama actual (nunca recibe una URL): PASSED si `ESTADO` empieza por PASSED; si no, FAILED con la `CRITICIDAD` y el `MOTIVO` que imprime (conflictos, check en rojo, draft, PR sin `Closes #N`, remote no soportado, etc.). Una rama fuera de `hu/` y `fix/` (PoC, rama pedida por el usuario) se vincula al issue si el cuerpo de su PR dice `Closes\|Fixes\|Resolves\|Refs #N`; el PR sigue saliendo de la rama actual, nunca de un dato afirmado (D1 de #81). Un PR en draft con el label `draft-intencional` en el issue y todo lo demas sano da FAILED **no critico** (decision `PENDIENTES`, no `FALLAS_CRITICAS`); sin el label, o si no se pudo leerlo, el draft es critico |
 | 2 | Lint pasa | CRITICO | `lint_resultado` |
-| 3 | Tests unitarios creados | NO critico | `git diff --name-only --diff-filter=A <rama-base>...HEAD -- '*.spec.ts' \| grep <modulo>` → PASSED si hay; SKIPPED si `NO_SPECS`. En perfil plugin, criterio propio: ver el parrafo **Perfil plugin** |
+| 3 | Tests unitarios creados | NO critico | `git diff --name-only --diff-filter=A origin/<rama-base>...HEAD -- '*.spec.ts' \| grep <modulo>` → PASSED si hay; SKIPPED si `NO_SPECS`. En perfil plugin, criterio propio: ver el parrafo **Perfil plugin** |
 | 4 | Tests pasan | CRITICO | `tests_resultado` (SKIPPED si `NO_SPECS`) |
-| 5 | Modelos compartidos | NO critico | `git diff --name-only <rama-base>...HEAD -- <modelos.path>` → PASSED si hay; SKIPPED si el alcance no los implica |
+| 5 | Modelos compartidos | NO critico | `git diff --name-only origin/<rama-base>...HEAD -- <modelos.path>` → PASSED si hay; SKIPPED si el alcance no los implica |
 | 6 | Providers registrados | CRITICO si aplica | `providers_registrados` (`n-a` → SKIPPED) |
 | 7 | Rutas registradas | CRITICO si aplica | `rutas_registradas` (`n-a` → SKIPPED) |
 | 8 | Checklist de tareas completo | CRITICO | `tareas_completas`; verifica en el body: `gh issue view <issue> -R <repo> --json body -q .body \| awk '/^## Tareas/{f=1} f'` — las tareas no aplicables al alcance (ej. Frontend en `alcance:backend`) cuentan como SKIPPED; `PR abierto` debe estar **marcada** (el PR se abre en la Fase 6.5, antes del DoD, #80) — ya no cuenta como SKIPPED |
 | 9 | Retrospectiva publicada | NO critico (CRITICO en perfil plugin) | `retro_generada`: `si` → PASSED; `no` → FAILED CRITICO en perfil plugin, FAILED NO critico en perfil consumidor |
-| 10 | Sin TODOs criticos en archivos nuevos | NO critico | `git diff --name-only --diff-filter=A <rama-base>...HEAD \| xargs grep -l 'TODO'` → lista si hay (no bloquea) |
+| 10 | Sin TODOs criticos en archivos nuevos | NO critico | `git diff --name-only --diff-filter=A origin/<rama-base>...HEAD \| xargs grep -l 'TODO'` → lista si hay (no bloquea) |
 | 11 | Code review aprobado | CRITICO | `APROBADO`/`APROBADO CON OBSERVACIONES` → PASSED; `REQUIERE CAMBIOS`, `NO_GENERADO` o `SKIPPED` → FAILED CRITICO en `tipo:hu` y `tipo:hotfix` (sin autoevaluacion sin evaluador: nunca se degrada a NO critico) |
 
-`<rama-base>` es la rama desde la que se creo `hu/N-slug` (normalmente `main` o `develop`; usa `git merge-base`).
+`<rama-base>` es la rama desde la que se creo `hu/N-slug` (normalmente `main` o `develop`; usa `git merge-base`). Los diffs de los items 3, 5 y 10 se calculan contra la ref **remota** `origin/<rama-base>`, nunca contra la rama local (una local atrasada infla el diff): antes corre `git fetch origin <rama-base>` en `directorio_trabajo`. Si el `fetch` falla, el diff es "no se": el item afectado queda FAILED no critico con el motivo `fetch fallido`, nunca un conteo contra la ref local. El item 1 no cambia: `pr_check.py --base` recibe el nombre de la rama, sin `origin/`.
 
 ## Decision final
 
