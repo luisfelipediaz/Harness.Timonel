@@ -1228,6 +1228,39 @@ class ChangelogEnHotfixPluginTests(unittest.TestCase):
         self.assertIn(orden, frase, "el orden debe estar en la misma frase que manda correr `verificar_plugin.py`")
 
 
+class LintYTestsDelHotfixPorPerfilTests(unittest.TestCase):
+    """#356: en la `## Fase 2` de `flechodiezx-hotfix` el bloque `npx nx affected` es del
+    perfil consumidor; en perfil plugin (sin Nx) el lint y los tests los da
+    `python3 scripts/verificar_plugin.py`, con su mapeo a `LINT_RESULTADO`/`TESTS_RESULTADO`
+    (exit 0 PASSED, 1 FAILED, 2 "no sé", que no es PASSED). Se ancla a la seccion `## Fase 2`
+    (sin su encabezado) y, dentro, al parrafo que empieza con `INICIO`."""
+
+    SECCION = staticmethod(SincronizacionDelWorktreeTests._seccion)
+    INICIO = "**Perfil plugin (Fase 2, lint y tests)**"
+    LITERALES = ("perfil consumidor", "npx nx affected", "python3 scripts/verificar_plugin.py",
+                 "LINT_RESULTADO", "TESTS_RESULTADO", "exit 0", "PASSED", "exit 1", "FAILED",
+                 "exit 2", "no sé", "dos corridas")
+
+    def _parrafo(self):
+        texto = (ROOT / "agents/flechodiezx-hotfix.md").read_text(encoding="utf-8")
+        seccion = self.SECCION(texto, "## Fase 2")
+        self.assertTrue(seccion, "agents/flechodiezx-hotfix.md no tiene la seccion `## Fase 2`")
+        return next((b for b in seccion.split("\n\n") if b.startswith(self.INICIO)), "")
+
+    def test_parrafo_existe_con_sus_literales(self):
+        parrafo = self._parrafo()
+        self.assertTrue(parrafo, f"la `## Fase 2` debe tener un parrafo que empiece con `{self.INICIO}`")
+        for literal in self.LITERALES:
+            with self.subTest(literal=literal):
+                self.assertIn(literal, parrafo, f"el parrafo de lint y tests debe contener `{literal}`")
+
+    def test_exit_2_no_es_passed(self):
+        parrafo = self._parrafo()
+        frase = next((f for f in parrafo.split(". ") if "exit 2" in f), "")
+        self.assertRegex(frase, r"exit 2 `?no sé`?", "`exit 2` debe mapearse a `no sé`")
+        self.assertNotRegex(frase, r"exit 2 `?PASSED", "`exit 2` no puede mapearse a PASSED")
+
+
 class Item3PerfilPluginTests(unittest.TestCase):
     """#304: en perfil plugin el item 3 del DoD tiene criterio propio (PASSED si el diff de
     `tests/` lista algo; `SKIPPED solo si` el diff esta vacio y no se tocan `scripts/*.py` ni
