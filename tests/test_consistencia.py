@@ -2005,5 +2005,25 @@ class VacuoConLineaBaseTests(unittest.TestCase):
                 self.assertIn("N <= B", archivo.read_text(encoding="utf-8"))
 
 
+class ModoSustituirEnSkillTests(unittest.TestCase):
+    """El paso de evidencia por mutacion de implement-plugin-change nombra el modo de
+    reemplazo y el acotado por linea: sin ellos el implementador vuelve a `sed` (#310)."""
+
+    SKILL = ROOT / "skills" / "implement-plugin-change" / "SKILL.md"
+    ENCABEZADO = "### Tests verdes en su primera corrida"
+
+    def _seccion(self) -> str:
+        texto = self.SKILL.read_text(encoding="utf-8")
+        inicio = texto.index(self.ENCABEZADO)
+        fin = texto.find("\n## ", inicio)
+        return texto[inicio:] if fin == -1 else texto[inicio:fin]
+
+    def test_la_seccion_nombra_el_modo_y_el_acotado(self):
+        seccion = self._seccion()
+        for literal in ("--modo sustituir --por", "--linea"):
+            with self.subTest(literal=literal):
+                self.assertIn(literal, seccion)
+
+
 if __name__ == "__main__":
     unittest.main()
