@@ -307,6 +307,20 @@ class MainEnProcesoTests(unittest.TestCase):
         self.assertIn(vp.MOTIVOS["timeout_bash"], lineas[-1])
         self.assertNotIn(vp.MOTIVOS["bash_no_ejecutable"], lineas[-1])
 
+    def test_primer_motivo_oserror_no_se_sobrescribe_con_un_timeout_posterior(self):
+        self._agregar_b_sh()
+
+        def run(cmd, **_k):
+            if cmd[0] == "bash" and cmd[-1].endswith("/a.sh"):
+                raise FileNotFoundError("bash")
+            if cmd[0] == "bash" and cmd[-1].endswith("/b.sh"):
+                raise subprocess.TimeoutExpired(cmd, 1)
+            return subprocess.CompletedProcess(cmd, 0, "", "")
+        codigo, lineas, _, _ = self._main(self.OK, run)
+        self.assertEqual(codigo, 2)
+        self.assertIn(vp.MOTIVOS["bash_no_ejecutable"], lineas[-1])
+        self.assertNotIn(vp.MOTIVOS["timeout_bash"], lineas[-1])
+
     def test_herramienta_ausente_en_todos_los_archivos_no_cambia(self):
         self._agregar_b_sh()
         for herramienta in ("bash", "jq"):
