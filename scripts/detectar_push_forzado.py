@@ -15,8 +15,9 @@ de `scripts/guard_integracion.py`: `segmentar()`, `clave_de_segmento()` y
 Un segmento es push forzado si su clave es `("git", "push")` y algun argumento
 es `--force`, `--force-with-lease`, `--force-with-lease=<...>` o un grupo de
 banderas cortas (un solo `-` seguido de letras) que contiene `f` (`-f`, `-uf`,
-`-fu`). NO cuentan `--force-if-includes` solo, `--no-force`, `--forced` ni el
-refspec `+rama` (fuera de alcance).
+`-fu`), o un refspec forzado: un argumento que empieza con `+` y tiene mas de un
+caracter (`+rama`, `+HEAD:rama`; #325). NO cuentan `--force-if-includes` solo,
+`--no-force`, `--forced` ni un `+` en otro segmento o subcomando.
 
 Tres respuestas, nunca dos (`heuristics/general/sensor-declara-su-evidencia.md`):
 `invoca_push_forzado(cmd)` devuelve `True`, `False` o `None` ("no se": no se
@@ -31,16 +32,22 @@ aplica entonces su respaldo: el glob de siempre).
 
 Envoltorios (`bash -c`, `sudo`, `env`, `time`, `command`, `xargs`, `eval`,
 `$(...)`, `{ ...; }`, `if ...; then`): `clave_de_segmento` no los reconoce y
-devuelve `None`. Si el texto de un segmento sin reconocer (unido con espacios)
-casa con el glob de respaldo de hooks.json, el sensor responde "no se" (exit 3)
-y el hook cae a ese glob, que bloquea. Un segmento con clave conocida distinta
-de `git push` (p. ej. `git worktree`) nunca da "no se". Un `git push` forzado
-reconocido en otro segmento sigue ganando con "si".
+devuelve `None`. Para esos segmentos el texto unido se parte en tokens (asi un
+`bash -c 'git push -uf x'`, que llega como un token, tambien se parte): si
+contiene `push` y algun token es una bandera de fuerza (`-f`, `-uf`, `--force`,
+...), el sensor responde "si" (exit 0), porque el glob de respaldo de hooks.json
+no ve las banderas cortas agrupadas (#327). Si no, y el texto casa con el glob de
+respaldo, responde "no se" (exit 3) y el hook cae a ese glob, que bloquea. Un
+segmento con clave conocida distinta de `git push` (p. ej. `git worktree`) nunca
+da "no se". Un `git push` forzado reconocido en otro segmento sigue ganando con
+"si". Falso positivo aceptado (fail-closed): `echo git push -uf x` bloquea. El
+refspec `+` NO se busca en segmentos sin clave.
 
 Limites declarados (aceptados, fail-closed): un heredoc cuyo contenido tenga
 una linea que empiece con un push forzado real sigue dando "si", igual que el
 sensor de commits; y `git push -o -f x` da "si" por exceso, porque el sensor no
-distingue el valor de una opcion con argumento de una bandera.
+distingue el valor de una opcion con argumento de una bandera (igual con un
+valor que empiece con `+`, p. ej. `-o +x`).
 """
 
 from __future__ import annotations
@@ -76,9 +83,23 @@ def _es_bandera_de_fuerza(argumento: str) -> bool:
     return es_grupo_corto and argumento[1:].isalpha() and "f" in argumento[1:]
 
 
+def _es_refspec_forzado(argumento: str) -> bool:
+    # `+rama` / `+HEAD:rama` reescribe la historia remota igual que `--force`.
+    # No se distingue de una opcion con valor (`-o +x`): fail-closed (#325).
+    return argumento.startswith("+") and len(argumento) > 1
+
+
 def _casa_con_el_respaldo(segmento: list[str]) -> bool:
     texto = " ".join(segmento)
     return any(fnmatch.fnmatchcase(texto, patron) for patron in _PATRONES_DE_RESPALDO)
+
+
+def _es_push_forzado_envuelto(segmento: list[str]) -> bool:
+    # Segmento sin clave (`sudo`, `env`, `time`, `bash -c '...'`): se re-parte el
+    # texto unido (un `bash -c 'git push -uf x'` llega como UN token) y se busca
+    # `push` mas una bandera de fuerza, que el glob de respaldo no ve agrupada (#327).
+    tokens = " ".join(segmento).split()
+    return "push" in tokens and any(_es_bandera_de_fuerza(t) for t in tokens)
 
 
 def invoca_push_forzado(cmd: str) -> bool | None:
@@ -95,11 +116,13 @@ def invoca_push_forzado(cmd: str) -> bool | None:
         for segmento in segmentos:
             clave = gi.clave_de_segmento(segmento)
             if clave is None:
+                if _es_push_forzado_envuelto(segmento):
+                    return True
                 sin_reconocer = sin_reconocer or _casa_con_el_respaldo(segmento)
                 continue
             if clave != CLAVE_PUSH:
                 continue
-            if any(_es_bandera_de_fuerza(a) for a in gi.argumentos_de_segmento(segmento)):
+            if any(_es_bandera_de_fuerza(a) or _es_refspec_forzado(a) for a in gi.argumentos_de_segmento(segmento)):
                 return True
         return None if sin_reconocer else False
     except Exception:

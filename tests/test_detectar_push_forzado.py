@@ -35,18 +35,32 @@ class DetectarPushForzadoUnitarioTests(unittest.TestCase):
         ("--force-if-includes solo", "git push --force-if-includes origin x", NO),
         ("--no-force", "git push --no-force origin x", NO),
         ("--forced", "git push --forced origin x", NO),
-        ("refspec +rama (fuera de alcance)", "git push origin +rama", NO),
-        ("echo con la cadena: no se (segmento sin reconocer)", 'echo "git push -f"', NOSE),
-        ("bash -c envuelve el push", 'bash -c "git push --force x"', NOSE),
-        ("sudo envuelve el push", "sudo git push --force x", NOSE),
-        ("sudo con -f", "sudo git push -f x", NOSE),
+        ("refspec +rama", "git push origin +rama", SI),
+        ("refspec +HEAD:rama", "git push origin +HEAD:rama", SI),
+        ("refspec + con -C", "git -C . push origin +rama", SI),
+        ("limite: -o con valor + da si por exceso", "git push -o +x origin rama", SI),
+        ("un + solo no es refspec", "git push origin +", NO),
+        ("push sin + sigue en no", "git push origin rama", NO),
+        ("push HEAD:rama sin + sigue en no", "git push origin HEAD:rama", NO),
+        ("+ en otro segmento no cuenta", "git push origin tag && git add +x", NO),
+        ("echo con la cadena: si por exceso (#327)", 'echo "git push -f"', SI),
+        ("bash -c envuelve el push", 'bash -c "git push --force x"', SI),
+        ("sudo envuelve el push", "sudo git push --force x", SI),
+        ("sudo con -f", "sudo git push -f x", SI),
+        ("#327 sudo con -uf agrupado", "sudo git push -uf x", SI),
+        ("#327 env con -uf agrupado", "env FOO=1 git push -uf x", SI),
+        ("#327 time con -uf agrupado", "time git push -uf origin x", SI),
+        ("#327 bash -c con -uf agrupado (un solo token)", "bash -c 'git push -uf x'", SI),
+        ("#327 sudo con if-includes: sin bandera, el respaldo sigue en no se", "sudo git push --force-if-includes x", NOSE),
+        ("#327 sudo sin bandera de fuerza sigue en no", "sudo git push -u origin x", NO),
+        ("#327 limite: echo con -uf da si por exceso", "echo git push -uf x", SI),
         ("segmento sin reconocer que no casa con el respaldo", "sudo git status", NO),
         ("sin reconocer sin push forzado", "echo hola && ls --force", NO),
-        ("env envuelve el push", "env A=1 git push --force x", NOSE),
-        ("time envuelve el push", "time git push --force x", NOSE),
-        ("eval envuelve el push", 'eval "git push --force x"', NOSE),
-        ("sustitucion de comando", "echo $(git push --force x)", NOSE),
-        ("grupo de llaves", "{ git push --force x; }", NOSE),
+        ("env envuelve el push", "env A=1 git push --force x", SI),
+        ("time envuelve el push", "time git push --force x", SI),
+        ("eval envuelve el push", 'eval "git push --force x"', SI),
+        ("sustitucion de comando", "echo $(git push --force x)", SI),
+        ("grupo de llaves", "{ git push --force x; }", SI),
         ("limite: -o con valor -f da si por exceso", "git push -o -f x", SI),
         ("limite: heredoc con push forzado da si", "cat <<EOF\ngit push -f x\nEOF", SI),
         ("push sin banderas", "git push origin x", NO),
@@ -122,6 +136,19 @@ class DetectarPushForzadoCliTests(unittest.TestCase):
             ("git push --force origin x", 0),
             ("git push origin x", 1),
             ('git push -f "sin cerrar', 3),
+        ):
+            with self.subTest(entrada=entrada):
+                self.assertEqual(self._main_con(entrada), esperado)
+
+    def test_refspec_con_mas_por_stdin_sale_0_y_sin_mas_sale_1(self):
+        """#325, caja negra del sensor: stdin -> exit code."""
+        for entrada, esperado in (
+            ("git push origin +rama", 0),
+            ("git push origin +HEAD:rama", 0),
+            ("git -C . push origin +rama", 0),
+            ("git push origin rama", 1),
+            ("git push origin HEAD:rama", 1),
+            ("git push origin tag && git add +x", 1),
         ):
             with self.subTest(entrada=entrada):
                 self.assertEqual(self._main_con(entrada), esperado)
