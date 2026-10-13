@@ -94,6 +94,53 @@ class SeccionYMutacionTests(unittest.TestCase):
         nuevo, k = ml.mutar("a LIT\nb\nc LIT LIT\n", "LIT", "borrar", None)
         self.assertEqual((nuevo, k), ("a \nb\nc  \n", 2))
 
+    def test_sustituir_reemplaza_el_literal_en_todas_las_lineas_que_lo_tienen(self):
+        nuevo, k = ml.mutar("a LIT\nb\nc LIT LIT\n", "LIT", "sustituir", None, por="X")
+        self.assertEqual((nuevo, k), ("a X\nb\nc X X\n", 2))
+
+    def test_sustituir_con_linea_solo_cambia_esa_linea(self):
+        nuevo, k = ml.mutar("a LIT\nb LIT\nc LIT\n", "LIT", "sustituir", None, por="X", linea=2)
+        self.assertEqual((nuevo, k), ("a LIT\nb X\nc LIT\n", 1))
+
+    def test_borrar_con_linea_solo_cambia_esa_linea(self):
+        nuevo, k = ml.mutar("a LIT\nb LIT\n", "LIT", "borrar", None, linea=1)
+        self.assertEqual((nuevo, k), ("a \nb LIT\n", 1))
+
+    def test_sustituir_es_literal_no_regex(self):
+        nuevo, _ = ml.mutar("x */.git) y\n", "*/.git)", "sustituir", None, por="*)")
+        self.assertEqual(nuevo, "x *) y\n")
+
+    def test_linea_sin_el_literal_es_mutacion_no_aplicada(self):
+        with self.assertRaises(ml.NoSe) as c:
+            ml.mutar("a LIT\nb\n", "LIT", "sustituir", None, por="X", linea=2)
+        self.assertEqual(c.exception.clave, "mutacion_no_aplicada")
+
+    def test_opciones_que_no_aplican_son_no_se_con_su_motivo(self):
+        casos = {
+            "sustituir_sin_por": ("sustituir", None, None),
+            "por_invalido": ("sustituir", "", None),
+            "por_no_aplica_al_modo": ("borrar", "X", None),
+            "linea_no_aplica_al_modo": ("mover", None, 1),
+            "linea_invalida": ("borrar", None, 0),
+        }
+        for clave, (modo, por, linea) in casos.items():
+            with self.subTest(clave=clave):
+                with self.assertRaises(ml.NoSe) as c:
+                    ml.mutar("a LIT\n", "LIT", modo, "## N", por=por, linea=linea)
+                self.assertEqual(c.exception.clave, clave)
+
+    def test_por_igual_al_literal_o_con_salto_es_por_invalido(self):
+        for por in ("LIT", "a\nb", "a\rb"):
+            with self.subTest(por=por):
+                with self.assertRaises(ml.NoSe) as c:
+                    ml.mutar("a LIT\n", "LIT", "sustituir", None, por=por)
+                self.assertEqual(c.exception.clave, "por_invalido")
+
+    def test_linea_mayor_que_el_numero_de_lineas_es_linea_invalida_no_indexerror(self):
+        with self.assertRaises(ml.NoSe) as c:
+            ml.mutar("a LIT\n", "LIT", "borrar", None, linea=2)
+        self.assertEqual(c.exception.clave, "linea_invalida")
+
     def test_mover_reinserta_al_final_del_destino_antes_del_siguiente_encabezado(self):
         nuevo, k = ml.mutar("## A\nx LIT\n## N\nfin\n\n## Z\nz\n", "LIT", "mover", "## N")
         self.assertEqual((nuevo, k), ("## A\n## N\nfin\nx LIT\n\n## Z\nz\n", 1))
@@ -306,6 +353,57 @@ class MainSubprocessTests(unittest.TestCase):
                 r = _correr(self.repo, "--ruta", "doc.md", "--literal", literal, "--modo", "borrar")
                 self.assertEqual(r.returncode, 2)
                 self.assertIn("--literal debe ser", r.stderr)
+
+
+    def _sustituir(self, *extra: str) -> subprocess.CompletedProcess:
+        (self.repo / "doc.md").write_text("# Doc\n## A\nalfa MARCA\n## Notas\nfin MARCA\n", encoding="utf-8")
+        return _correr(
+            self.repo, "--ruta", "doc.md", "--literal", "MARCA", "--modo", "sustituir", "--por", "OTRA",
+            "--test", "tests.test_x.TestA", *extra,
+        )
+
+    def test_sustituir_sale_0_con_conteo_y_no_toca_el_original(self):
+        r = self._sustituir()
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("lineas mutadas: 2", r.stdout)
+        self.assertIn("fallos: 1 de 1", r.stdout)
+        self.assertIn("base: 0 de 1", r.stdout)
+
+    def test_sustituir_con_linea_cambia_solo_esa_linea(self):
+        # La linea 3 sostiene el test; la 5 tiene el mismo literal y no lo sostiene.
+        sobre_la_3 = self._sustituir("--linea", "3")
+        self.assertEqual(sobre_la_3.returncode, 0, sobre_la_3.stderr)
+        self.assertIn("lineas mutadas: 1", sobre_la_3.stdout)
+        self.assertIn("fallos: 1 de 1", sobre_la_3.stdout)
+        sobre_la_5 = self._sustituir("--linea", "5")
+        self.assertEqual(sobre_la_5.returncode, 0, sobre_la_5.stderr)
+        self.assertIn("lineas mutadas: 1", sobre_la_5.stdout)
+        self.assertIn("fallos: 0 de 1", sobre_la_5.stdout)
+
+    def test_linea_sobre_una_linea_sin_el_literal_sale_2_mutacion_no_aplicada(self):
+        r = self._sustituir("--linea", "4")
+        self.assertEqual(r.returncode, 2)
+        self.assertIn(ml.MOTIVOS["mutacion_no_aplicada"], r.stderr)
+        self.assertNotIn("fallos:", r.stdout)
+
+    def test_opciones_invalidas_salen_2_con_su_motivo_y_sin_correr_tests(self):
+        base = ("--ruta", "doc.md", "--literal", "MARCA")
+        filas = {
+            "sustituir_sin_por": (*base, "--modo", "sustituir"),
+            "por_invalido": (*base, "--modo", "sustituir", "--por", "MARCA"),
+            "por_invalido ": (*base, "--modo", "sustituir", "--por", ""),
+            "por_invalido  ": (*base, "--modo", "sustituir", "--por", "a\nb"),
+            "por_no_aplica_al_modo": (*base, "--modo", "borrar", "--por", "X"),
+            "linea_no_aplica_al_modo": (*base, "--modo", "mover", "--a", "## Notas", "--linea", "3"),
+            "linea_invalida": (*base, "--modo", "borrar", "--linea", "0"),
+            "linea_invalida ": (*base, "--modo", "borrar", "--linea", "99"),
+        }
+        for fila, flags in filas.items():
+            with self.subTest(fila=fila):
+                r = _correr(self.repo, *flags)
+                self.assertEqual(r.returncode, 2)
+                self.assertIn(ml.MOTIVOS[fila.strip()], r.stderr)
+                self.assertNotIn("fallos:", r.stdout)
 
 
 class MainEnProcesoTests(unittest.TestCase):
