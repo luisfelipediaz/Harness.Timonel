@@ -136,4 +136,4 @@ Si la decision no es `DONE`, revierte el label a `estado:en-progreso` (la Fase 5
 
 ## Notas
 
-- Relacionado con #67: tras esta fase de integracion, `flechodiezx-hotfix` comparte con `flechodiezx` rama propia, worktree, merge, lint+tests, review obligatorio, PR antes del DoD y `estado:en-revision`. El tamaño ya no cambia la forma de integrar — solo la ceremonia previa (sin contrato aprobado, Dora opcional, un solo sub-agente, retro opcional, DoD con mas `SKIPPED`).
+- Relacionado con #67: tras esta fase de integracion, `flechodiezx-hotfix` comparte con `flechodiezx` rama propia, worktree, merge, lint+tests, review obligatorio, PR antes del DoD y `estado:en-revision`. El tamaño ya no cambia la forma de integrar — solo la ceremonia previa (sin contrato aprobado, Dora opcional, un solo sub-agente, retro opcional solo en perfil consumidor, DoD con mas `SKIPPED`).
