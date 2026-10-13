@@ -35,7 +35,14 @@ class DetectarPushForzadoUnitarioTests(unittest.TestCase):
         ("--force-if-includes solo", "git push --force-if-includes origin x", NO),
         ("--no-force", "git push --no-force origin x", NO),
         ("--forced", "git push --forced origin x", NO),
-        ("refspec +rama (fuera de alcance)", "git push origin +rama", NO),
+        ("refspec +rama", "git push origin +rama", SI),
+        ("refspec +HEAD:rama", "git push origin +HEAD:rama", SI),
+        ("refspec + con -C", "git -C . push origin +rama", SI),
+        ("limite: -o con valor + da si por exceso", "git push -o +x origin rama", SI),
+        ("un + solo no es refspec", "git push origin +", NO),
+        ("push sin + sigue en no", "git push origin rama", NO),
+        ("push HEAD:rama sin + sigue en no", "git push origin HEAD:rama", NO),
+        ("+ en otro segmento no cuenta", "git push origin tag && git add +x", NO),
         ("echo con la cadena: no se (segmento sin reconocer)", 'echo "git push -f"', NOSE),
         ("bash -c envuelve el push", 'bash -c "git push --force x"', NOSE),
         ("sudo envuelve el push", "sudo git push --force x", NOSE),
@@ -122,6 +129,19 @@ class DetectarPushForzadoCliTests(unittest.TestCase):
             ("git push --force origin x", 0),
             ("git push origin x", 1),
             ('git push -f "sin cerrar', 3),
+        ):
+            with self.subTest(entrada=entrada):
+                self.assertEqual(self._main_con(entrada), esperado)
+
+    def test_refspec_con_mas_por_stdin_sale_0_y_sin_mas_sale_1(self):
+        """#325, caja negra del sensor: stdin -> exit code."""
+        for entrada, esperado in (
+            ("git push origin +rama", 0),
+            ("git push origin +HEAD:rama", 0),
+            ("git -C . push origin +rama", 0),
+            ("git push origin rama", 1),
+            ("git push origin HEAD:rama", 1),
+            ("git push origin tag && git add +x", 1),
         ):
             with self.subTest(entrada=entrada):
                 self.assertEqual(self._main_con(entrada), esperado)
