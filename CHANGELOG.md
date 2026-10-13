@@ -2,7 +2,7 @@
 
 ## 0.20.0 — en desarrollo
 
-- `agents/flechodiezx-hotfix.md` exige la retro en perfil plugin: la Fase 4 pasa de "Retro opcional" a "Retro (obligatoria en perfil plugin)" (item 9 CRITICO; si falla, `reintenta una vez` antes de marcar `retro_generada: no`; el perfil consumidor conserva los criterios de antes) y la Fase 6 no lanza `verify-dod` en perfil plugin si el issue no tiene el comentario `<!-- timonel:retro -->` (se detiene y reporta). Tests nuevos: `RetroHotfixPerfilPluginTests` (1 test, un subTest por fase, anclado en la sección de cada fase); mutación de `reintenta una vez`: 1 fallo de 106 contra 0 de base, y de `timonel:retro`: 1 de 106 contra 0 de base; verificación del plugin en verde con 481 tests (`verificar_plugin.py` PASSED). (#303)
+- `agents/flechodiezx-hotfix.md` exige la retro en perfil plugin: la Fase 4 pasa de "Retro opcional" a "Retro (obligatoria en perfil plugin)" (item 9 CRITICO; si falla, `reintenta una vez` antes de marcar `retro_generada: no`; el perfil consumidor conserva los criterios de antes) y la Fase 6 no lanza `verify-dod` en perfil plugin si el issue no tiene el comentario `<!-- timonel:retro -->` (se detiene y reporta). Tests nuevos: `RetroHotfixPerfilPluginTests` (1 test, un subTest por fase, anclado en la sección de cada fase); los literales del párrafo (`**Perfil plugin**`, `**Perfil consumidor**`, `si bloquea`, `reintenta una vez` en la Fase 4; `timonel:retro`, `no lances el DoD` en la Fase 6) dan cada uno 1 fallo de 106 contra 0 de base, y falla el subTest de su fase; verificación del plugin en verde con 481 tests (`verificar_plugin.py` PASSED). (#303)
 
 ## 0.19.0 — 2026-10-14
 

@@ -1176,8 +1176,8 @@ class RetroHotfixPerfilPluginTests(unittest.TestCase):
 
     SECCION = staticmethod(SincronizacionDelWorktreeTests._seccion)
     EXIGIDOS = {
-        "## Fase 4": ("perfil plugin", "reintenta una vez", "consumidor"),
-        "## Fase 6": ("timonel:retro",),
+        "## Fase 4": ("**Perfil plugin**", "**Perfil consumidor**", "si bloquea", "reintenta una vez"),
+        "## Fase 6": ("timonel:retro", "no lances el DoD"),
     }
 
     def test_cada_fase_declara_su_parte_de_la_retro(self):
