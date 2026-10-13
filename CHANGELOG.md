@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.19.0 — en desarrollo
+
+- `EscenarioRealContraElRepoTests` (`tests/test_mutar_literal.py`) se salta con `skipUnless((ROOT / ".git").exists(), ...)` cuando el árbol no tiene `.git` (la copia de `mutar_literal.py` o una exportación `git archive`), donde `git status --porcelain` salía 128 y toda medición sobre la suite completa arrancaba con `base: 1 de 467`; ahora `base: 0 de 467`, y con `.git` como directorio o archivo de worktree el test sigue corriendo. Verificado: `git archive` termina en `OK (skipped=1)`, la copia sin la condición vuelve a `base: 1 de 467`, suite en verde con 467 tests (`verificar_plugin.py` PASSED). (#313)
+
 ## 0.18.0 — 2026-10-13
 
 - Las 5 compuertas de `hooks/hooks.json` (onboard, versión, aviso de archivo raíz, push forzado + commits en base y guard de integración) resuelven el config del consumidor con `resolver_config_consumidor` de `scripts/_common.sh`, de modo que un worktree sin `.claude/timonel.config.json` propio decide con el config del checkout principal; si la función no existe usan un fallback local con la misma regla. Tests nuevos: `CompuertasResuelvenConfigDesdeWorktreeTests` (8) y `ParidadCompuertaResolverTests` parametrizada por compuerta; verificación del plugin en verde con 467 tests (`verificar_plugin.py` PASSED). El falso positivo del push forzado queda en #316. (#281)
