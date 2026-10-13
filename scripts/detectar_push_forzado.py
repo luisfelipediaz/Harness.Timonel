@@ -29,15 +29,23 @@ CLI: lee el comando CRUDO por stdin.
 Codigos de salida: 0 si invoca un push forzado, 1 si no, 3 no se (el guard
 aplica entonces su respaldo: el glob de siempre).
 
+Envoltorios (`bash -c`, `sudo`, `env`, `time`, `command`, `xargs`, `eval`,
+`$(...)`, `{ ...; }`, `if ...; then`): `clave_de_segmento` no los reconoce y
+devuelve `None`. Si el texto de un segmento sin reconocer (unido con espacios)
+casa con el glob de respaldo de hooks.json, el sensor responde "no se" (exit 3)
+y el hook cae a ese glob, que bloquea. Un segmento con clave conocida distinta
+de `git push` (p. ej. `git worktree`) nunca da "no se". Un `git push` forzado
+reconocido en otro segmento sigue ganando con "si".
+
 Limites declarados (aceptados, fail-closed): un heredoc cuyo contenido tenga
 una linea que empiece con un push forzado real sigue dando "si", igual que el
 sensor de commits; y `git push -o -f x` da "si" por exceso, porque el sensor no
-distingue el valor de una opcion con argumento de una bandera. `eval` y
-`bash -c` heredan el limite de `guard_integracion.py` (guard != sandbox).
+distingue el valor de una opcion con argumento de una bandera.
 """
 
 from __future__ import annotations
 
+import fnmatch
 import sys
 from pathlib import Path
 
@@ -46,6 +54,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import guard_integracion as gi  # noqa: E402
 
 CLAVE_PUSH = ("git", "push")
+
+# Reflejan, literalmente, el glob de respaldo de la compuerta en hooks/hooks.json
+# (`*'push'*'--force'*|*'push -f'*`). Un segmento que el sensor no reconoce y que
+# casa con alguno es "no se", no "no".
+_PATRONES_DE_RESPALDO = ("*push*--force*", "*push -f*")
 
 _BANDERAS_LARGAS_DE_FUERZA = ("--force", "--force-with-lease")
 
@@ -63,6 +76,11 @@ def _es_bandera_de_fuerza(argumento: str) -> bool:
     return es_grupo_corto and argumento[1:].isalpha() and "f" in argumento[1:]
 
 
+def _casa_con_el_respaldo(segmento: list[str]) -> bool:
+    texto = " ".join(segmento)
+    return any(fnmatch.fnmatchcase(texto, patron) for patron in _PATRONES_DE_RESPALDO)
+
+
 def invoca_push_forzado(cmd: str) -> bool | None:
     """Punto de entrada puro. True si algun segmento es un `git push` con una
     bandera de fuerza, False si ninguno lo es, None si no se pudo decidir."""
@@ -73,12 +91,17 @@ def invoca_push_forzado(cmd: str) -> bool | None:
     if segmentos is None:
         return None
     try:
+        sin_reconocer = False
         for segmento in segmentos:
-            if gi.clave_de_segmento(segmento) != CLAVE_PUSH:
+            clave = gi.clave_de_segmento(segmento)
+            if clave is None:
+                sin_reconocer = sin_reconocer or _casa_con_el_respaldo(segmento)
+                continue
+            if clave != CLAVE_PUSH:
                 continue
             if any(_es_bandera_de_fuerza(a) for a in gi.argumentos_de_segmento(segmento)):
                 return True
-        return False
+        return None if sin_reconocer else False
     except Exception:
         return None
 

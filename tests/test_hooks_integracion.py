@@ -1789,6 +1789,19 @@ class CompuertaPushForzadoPorSegmentoTests(unittest.TestCase):
                     self.assertEqual(r.returncode, 2, r.stderr)
                     self.assertIn("[timonel] Bloqueado: ", r.stderr)
 
+    def test_push_forzado_envuelto_bloquea_por_el_respaldo(self):
+        """El sensor dice 'no se' (rc 3) ante envoltorios y el glob de respaldo bloquea."""
+        fuerza = "--" + "force"
+        for perfil in self.PERFILES:
+            for cmd in (
+                f"sudo git push {fuerza} origin hu/82-x",
+                f'bash -c "git push {fuerza} origin hu/82-x"',
+            ):
+                with self.subTest(perfil=perfil, cmd=cmd):
+                    r = self._correr(perfil, "hu/82-x", cmd)
+                    self.assertEqual(r.returncode, 2, r.stderr)
+                    self.assertIn("[timonel] Bloqueado: ", r.stderr)
+
     def test_fila_mixta_rc1_no_salta_el_guard_de_commits(self):
         """El sensor dice 'no' (rc 1) para el push; la compuerta NO termina con
         `exit 0`: continua al bloque de commits, que bloquea el commit en la base."""
