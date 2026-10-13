@@ -83,6 +83,8 @@ npx nx affected --target=test --ci --runInBand
 
 Registra `LINT_RESULTADO`, `TESTS_RESULTADO` (`PASSED|FAILED|NO_SPECS`). Si falla, 1 intento de correccion directa; si persiste, reporta y espera decision. Marca `- [x] Implementación` y `- [x] Lint + tests afectados` en `## Tareas`.
 
+**Perfil plugin (Fase 2, CHANGELOG)**: tras consolidar, la linea del CHANGELOG y la version son tuyas, no del sub-agente (su skill le prohibe tocarlos). Que version abrir y como escribir la linea lo dice la viñeta **CHANGELOG** del perfil plugin de `consolidate-story`: aplicala tal cual, sin copiarla aqui. Escribe la seccion de `CHANGELOG.md` y la version de `.claude-plugin/plugin.json` en el **mismo commit** (`chore: changelog #N`): subir uno sin el otro rompe `test_version_plugin_coincide_con_changelog`. Corre `python3 scripts/verificar_plugin.py` despues del commit `chore: changelog #N` y no antes, porque esa es la unica corrida que ve ambos archivos coherentes. Nunca edites la version con `sed -i` (en macOS falla y deja `CHANGELOG.md` y `plugin.json` en versiones distintas): usa `jq` o la herramienta de edicion.
+
 ## Fase 3: Code review (siempre)
 
 Sub-agente `model: "sonnet"`, dentro de la rama `fix/N-<slug>` (ya consolidada tras el merge de la Fase 2), con `"$PLUGIN_ROOT/skills/code-review/SKILL.md"`. Parametros: `issue`, `repo`, `modulo`, `alcance`, `archivos_modificados`, `plugin_root` y `tests_primera_corrida` (el bloque de la Fase 2 tal cual). Publica `<!-- timonel:review -->` + label `review:*`. No abortes con `REQUIERE CAMBIOS`. Si falla en ejecucion, **reintenta una vez** antes de marcar `VEREDICTO: NO_GENERADO`. Marca `- [x] Code review`.
