@@ -1168,6 +1168,28 @@ class ModoRamaDelUsuarioHotfixTests(unittest.TestCase):
                       "la regla dura 4 no puede contradecir el modo rama del usuario (review #268, WARNING 2)")
 
 
+class RetroHotfixPerfilPluginTests(unittest.TestCase):
+    """#303: en perfil plugin la retro de `flechodiezx-hotfix` es obligatoria (item 9 del DoD
+    es CRITICO) y el DoD no se lanza sin ella. Cada subTest se ancla en SU seccion
+    (`## Fase 4`, `## Fase 6`), nunca en el archivo entero: un literal correcto en otra
+    fase no satisface la invariante (reusa `_seccion` de `SincronizacionDelWorktreeTests`)."""
+
+    SECCION = staticmethod(SincronizacionDelWorktreeTests._seccion)
+    EXIGIDOS = {
+        "## Fase 4": ("perfil plugin", "reintenta una vez", "consumidor"),
+        "## Fase 6": ("timonel:retro",),
+    }
+
+    def test_cada_fase_declara_su_parte_de_la_retro(self):
+        texto = (ROOT / "agents/flechodiezx-hotfix.md").read_text(encoding="utf-8")
+        for titulo, literales in self.EXIGIDOS.items():
+            with self.subTest(fase=titulo):
+                seccion = self.SECCION(texto, titulo)
+                self.assertTrue(seccion, f"agents/flechodiezx-hotfix.md no tiene la seccion `{titulo}`")
+                for literal in literales:
+                    self.assertIn(literal, seccion, f"`{titulo}` de flechodiezx-hotfix.md debe contener `{literal}`")
+
+
 class DodEstrictoTests(unittest.TestCase):
     """DoD estricto (gap 3 de la auditoria #24, issue #28): sin autoevaluacion sin evaluador."""
 
