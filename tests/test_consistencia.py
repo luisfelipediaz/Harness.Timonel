@@ -1257,8 +1257,8 @@ class LintYTestsDelHotfixPorPerfilTests(unittest.TestCase):
     def test_exit_2_no_es_passed(self):
         parrafo = self._parrafo()
         frase = next((f for f in parrafo.split(". ") if "exit 2" in f), "")
-        self.assertIn("no sé", frase, "la frase de `exit 2` debe decir `no sé`")
-        self.assertNotIn("exit 2 PASSED", frase, "`exit 2` no puede mapearse a PASSED")
+        self.assertRegex(frase, r"exit 2 `?no sé`?", "`exit 2` debe mapearse a `no sé`")
+        self.assertNotRegex(frase, r"exit 2 `?PASSED", "`exit 2` no puede mapearse a PASSED")
 
 
 class Item3PerfilPluginTests(unittest.TestCase):
