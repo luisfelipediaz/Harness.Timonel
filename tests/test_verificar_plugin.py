@@ -258,6 +258,26 @@ class MainEnProcesoTests(unittest.TestCase):
                     [f"{paso}: FAILED ({'scripts/' if herramienta == 'bash' else '.claude-plugin/'}{segundo})"],
                 )
 
+    def test_oserror_en_el_primer_archivo_no_oculta_un_rojo_posterior(self):
+        self._agregar_b_sh()
+        for herramienta, (primero, segundo) in self.ARCHIVOS_POR_HERRAMIENTA.items():
+            with self.subTest(herramienta=herramienta):
+                def run(cmd, **_k):
+                    if cmd[0] == herramienta and cmd[-1].endswith("/" + primero):
+                        raise PermissionError(herramienta)
+                    rc = 1 if cmd[0] == herramienta and cmd[-1].endswith("/" + segundo) else 0
+                    return subprocess.CompletedProcess(cmd, rc, "", "")
+                codigo, lineas, sr, _ = self._main(self.OK, run)
+                invocados = [Path(c.args[0][-1]).name for c in sr.call_args_list if c.args[0][0] == herramienta]
+                self.assertEqual(codigo, 1)
+                self.assertIn(primero, invocados)
+                self.assertIn(segundo, invocados)
+                paso = self.PASO_POR_HERRAMIENTA[herramienta]
+                self.assertEqual(
+                    [l for l in lineas if l.startswith(f"{paso}: ")],
+                    [f"{paso}: FAILED ({'scripts/' if herramienta == 'bash' else '.claude-plugin/'}{segundo})"],
+                )
+
     def test_timeout_en_el_primer_archivo_con_el_resto_verde_sigue_siendo_no_se(self):
         self._agregar_b_sh()
         for herramienta, (primero, segundo) in self.ARCHIVOS_POR_HERRAMIENTA.items():

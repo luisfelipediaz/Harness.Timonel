@@ -2,7 +2,7 @@
 
 ## 0.20.0 — en desarrollo
 
-- `scripts/verificar_plugin.py`: `_correr_por_archivo` ya no corta con `break` ante el primer `TimeoutExpired` u `OSError`, sino que sigue con `continue`, conserva el primer motivo sin evidencia y deja que un rojo posterior gane (FAILED sobre "no sé"; con la herramienta ausente en todos los archivos nada cambia), y el filtro `if p.is_file()` de `_archivos_bash` queda cubierto por un test. Tests nuevos en `MainEnProcesoTests` (5, los dos con subTest por herramienta): 25 en `tests.test_verificar_plugin` y 485 en la suite; `verificar_plugin.py` PASSED. Mutación con `mutar_literal.py`: quitar ` if p.is_file()` da 1 fallo de 25 contra base 0, borrar los dos `continue` 9 de 25 contra base 0, y revertir a `break` (timeout, `OSError` o ambas) 4 de 25 contra base 0. (#299)
+- `scripts/verificar_plugin.py`: `_correr_por_archivo` ya no corta con `break` ante el primer `TimeoutExpired` u `OSError`, sino que sigue con `continue`, conserva el primer motivo sin evidencia y deja que un rojo posterior gane (FAILED sobre "no sé"; con la herramienta ausente en todos los archivos nada cambia), y el filtro `if p.is_file()` de `_archivos_bash` queda cubierto por un test. Tests nuevos en `MainEnProcesoTests` (6, los de E2, E3, `OSError` y herramienta ausente con subTest por herramienta): 26 en `tests.test_verificar_plugin` y 486 en la suite; `verificar_plugin.py` PASSED. Mutación con `mutar_literal.py` (base 0 de 26 en todas): quitar ` if p.is_file()` da 1 fallo de 26, borrar los dos `continue` 10 de 26; revertir a `break` medido a mano, solo la rama timeout 4 de 26, solo la rama `OSError` 2 de 26 y ambas 6 de 26. (#299)
 
 ## 0.19.0 — 2026-10-14
 
