@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.19.0 — en desarrollo
+
+- La compuerta de push forzado de `hooks/hooks.json` deja de bloquear por coincidencia de texto sobre todo el comando y decide por segmento: el sensor nuevo `scripts/detectar_push_forzado.py` (0 sí / 1 no / 3 no sé) reutiliza `segmentar` y el seam público nuevo `argumentos_de_segmento` de `scripts/guard_integracion.py` para reconocer solo un `git push` real con bandera de forzado; con rc 1 la compuerta continúa y con cualquier otro código cae al glob de respaldo. Tests nuevos: `tests/test_detectar_push_forzado.py` (7) y `CompuertaPushForzadoPorSegmentoTests` (5); mutación del literal `detectar_push_forzado.py` en `hooks/hooks.json`: 8 fallos de 95 contra 0 de base; verificación del plugin en verde con 479 tests (`verificar_plugin.py` PASSED). (#316)
+
 ## 0.18.0 — 2026-10-13
 
 - Las 5 compuertas de `hooks/hooks.json` (onboard, versión, aviso de archivo raíz, push forzado + commits en base y guard de integración) resuelven el config del consumidor con `resolver_config_consumidor` de `scripts/_common.sh`, de modo que un worktree sin `.claude/timonel.config.json` propio decide con el config del checkout principal; si la función no existe usan un fallback local con la misma regla. Tests nuevos: `CompuertasResuelvenConfigDesdeWorktreeTests` (8) y `ParidadCompuertaResolverTests` parametrizada por compuerta; verificación del plugin en verde con 467 tests (`verificar_plugin.py` PASSED). El falso positivo del push forzado queda en #316. (#281)

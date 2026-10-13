@@ -136,9 +136,10 @@ Segundo seam publico (#176, hallazgo 1 del code review): `clave_de_segmento(segm
 `_clave_y_resto` -- que sigue siendo zona interna de este modulo, con el mismo
 derecho a cambiar sin aviso que ya declaraba el parser -- para no duplicar el
 salto de flags globales de `git` (`-C`/`-c`/`--git-dir`/etc.). Junto con
-`segmentar()`, son los DOS unicos seams publicos que `scripts/detectar_commit.py`
-consume; ninguno de los dos cambia `MANEJADORES`, `decidir()`, sus mensajes ni
-la politica de fail-open.
+`segmentar()`, son los seams publicos que `scripts/detectar_commit.py`
+consume; ninguno cambia `MANEJADORES`, `decidir()`, sus mensajes ni
+la politica de fail-open. Un tercer seam publico, `argumentos_de_segmento` (#316),
+lo consume `scripts/detectar_push_forzado.py`.
 """
 
 from __future__ import annotations
