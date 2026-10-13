@@ -1789,6 +1789,31 @@ class CompuertaPushForzadoPorSegmentoTests(unittest.TestCase):
                     self.assertEqual(r.returncode, 2, r.stderr)
                     self.assertIn("[timonel] Bloqueado: ", r.stderr)
 
+    def test_refspec_con_mas_bloquea_como_push_forzado(self):
+        """#325: `+rama` reescribe la historia remota igual que la bandera de fuerza."""
+        for perfil in self.PERFILES:
+            for cmd in (
+                "git push origin +hu/82-x",
+                "git push origin +HEAD:hu/82-x",
+                "git -C . push origin +hu/82-x",
+            ):
+                with self.subTest(perfil=perfil, cmd=cmd):
+                    r = self._correr(perfil, "hu/82-x", cmd)
+                    self.assertEqual(r.returncode, 2, r.stderr)
+                    self.assertIn("[timonel] Bloqueado: ", r.stderr)
+
+    def test_push_sin_mas_o_con_mas_en_otro_segmento_no_bloquea(self):
+        for perfil in self.PERFILES:
+            for cmd in (
+                "git push origin hu/82-x",
+                "git push origin HEAD:hu/82-x",
+                "git push origin tag && git add +x",
+            ):
+                with self.subTest(perfil=perfil, cmd=cmd):
+                    r = self._correr(perfil, "hu/82-x", cmd)
+                    self.assertEqual(r.returncode, 0, r.stderr)
+                    self.assertEqual(r.stderr, "")
+
     def test_push_forzado_envuelto_bloquea_por_el_respaldo(self):
         """El sensor dice 'no se' (rc 3) ante envoltorios y el glob de respaldo bloquea."""
         fuerza = "--" + "force"
