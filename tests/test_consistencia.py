@@ -1193,6 +1193,41 @@ class RetroHotfixPerfilPluginTests(unittest.TestCase):
                     self.assertIn(literal, seccion, f"`{titulo}` de flechodiezx-hotfix.md debe contener `{literal}`")
 
 
+class ChangelogEnHotfixPluginTests(unittest.TestCase):
+    """#321: en perfil plugin la `## Fase 2` de `flechodiezx-hotfix` dice quien escribe la
+    linea del CHANGELOG y la version de `plugin.json`. Evidencia: en #313 se subio
+    `plugin.json` sin la seccion del CHANGELOG (FAILED de
+    `test_version_plugin_coincide_con_changelog`) y en #299 el `sed -i` de macOS fallo y dejo
+    CHANGELOG 0.20.0 con `plugin.json` 0.19.0. Se ancla a la seccion `## Fase 2` y, dentro,
+    al parrafo `**Perfil plugin (Fase 2, CHANGELOG)**`: un literal en otra fase no cuenta."""
+
+    SECCION = staticmethod(SincronizacionDelWorktreeTests._seccion)
+    INICIO = "**Perfil plugin (Fase 2, CHANGELOG)**"
+    LITERALES = ("consolidate-story", "CHANGELOG.md", "plugin.json", "mismo commit", "jq",
+                "Nunca edites la version con `sed -i`")
+
+    def _parrafo(self):
+        texto = (ROOT / "agents/flechodiezx-hotfix.md").read_text(encoding="utf-8")
+        seccion = self.SECCION(texto, "## Fase 2")
+        self.assertTrue(seccion, "agents/flechodiezx-hotfix.md no tiene la seccion `## Fase 2`")
+        return next((b for b in seccion.split("\n\n") if b.startswith(self.INICIO)), "")
+
+    def test_parrafo_existe_con_sus_literales(self):
+        parrafo = self._parrafo()
+        self.assertTrue(parrafo, f"la `## Fase 2` debe tener un parrafo que empiece con `{self.INICIO}`")
+        for literal in self.LITERALES:
+            with self.subTest(literal=literal):
+                self.assertIn(literal, parrafo, f"el parrafo de CHANGELOG debe contener `{literal}`")
+
+    def test_verificar_plugin_va_despues_del_commit_del_changelog(self):
+        parrafo = self._parrafo()
+        self.assertIn("verificar_plugin.py", parrafo, "el parrafo debe mandar correr `verificar_plugin.py`")
+        orden = "despues del commit `chore: changelog #N` y no antes"
+        self.assertIn(orden, parrafo, f"el parrafo debe exigir el orden literal `{orden}`")
+        frase = next(f for f in parrafo.split(". ") if "verificar_plugin.py" in f)
+        self.assertIn(orden, frase, "el orden debe estar en la misma frase que manda correr `verificar_plugin.py`")
+
+
 class Item3PerfilPluginTests(unittest.TestCase):
     """#304: en perfil plugin el item 3 del DoD tiene criterio propio (PASSED si el diff de
     `tests/` lista algo; `SKIPPED solo si` el diff esta vacio y no se tocan `scripts/*.py` ni
