@@ -21,6 +21,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -1888,6 +1889,9 @@ class RutaDeMensajeUnitarioTests(unittest.TestCase):
         ("git -C sub commit -F", "git -C sub commit -F m.txt", SI, "m.txt"),
         ("ruta con comillas y espacio", "git commit -F 'a b.txt'", SI, "a b.txt"),
         ("ruta absoluta", "git commit -F /tmp/m.txt", SI, "/tmp/m.txt"),
+        ("-F antes del valor de -m que empieza con guion", 'git commit -F m.txt -m "- Fix x"', SI, "m.txt"),
+        ("--message con valor que empieza con guion antes de -F", 'git commit --message "- Fix x" -F m.txt', SI, "m.txt"),
+        ("el valor de -m no es un -F", 'git commit -m "-F x"', NO, None),
         ("commit sin -F", 'git commit -m "x"', NO, None),
         ("sin commit", "git status", NO, None),
         ("-F de otro programa, no de git commit", "grep -F x archivo", NO, None),
@@ -1913,6 +1917,10 @@ class RutaDeMensajeUnitarioTests(unittest.TestCase):
                 resultado = dc.ruta_de_mensaje(cmd)
                 esperada = {self.SI: ruta, self.NO: "", self.NOSE: None}[esperado]
                 self.assertEqual(resultado, esperada)
+
+    def test_excepcion_en_segmentar_es_nose(self):
+        with mock.patch.object(dc.gi, "segmentar", side_effect=RuntimeError("boom")):
+            self.assertIsNone(dc.ruta_de_mensaje("git commit -F msg.txt"))
 
     def _cli(self, cmd: str, *args: str) -> subprocess.CompletedProcess:
         return subprocess.run(
@@ -1950,6 +1958,7 @@ class GuardCommitsLeeArchivoMensajeTests(unittest.TestCase):
         comando = self.PERFILES[perfil][0]()
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
+            cmd = cmd.replace("{tmp}", str(tmp_path))
             _preparar_repo(tmp_path, "hu/1-x", perfil=perfil)
             for d in dirs:
                 _preparar_repo_destino(tmp_path, "hu/1-x", d)
@@ -1988,6 +1997,37 @@ class GuardCommitsLeeArchivoMensajeTests(unittest.TestCase):
                 r = self._correr(perfil, "git -C sub commit -F msg.txt", dirs=("sub",),
                                  archivos={"sub/msg.txt": "fix: algo #1"})
                 self._assert_permitido(r)
+
+    def test_ruta_absoluta_se_lee_tal_cual(self):
+        for perfil in self.PERFILES:
+            with self.subTest(perfil=perfil):
+                self._assert_permitido(
+                    self._correr(perfil, "git commit -F {tmp}/msg.txt", {"msg.txt": "fix: algo #1"}))
+
+    def test_valor_pegado_de_F_se_lee(self):
+        for perfil in self.PERFILES:
+            with self.subTest(perfil=perfil):
+                self._assert_permitido(
+                    self._correr(perfil, "git commit -Fmsg.txt", {"msg.txt": "fix: algo #1"}))
+
+    def test_F_con_un_directorio_bloquea_sin_ruido_de_cat(self):
+        for perfil in self.PERFILES:
+            with self.subTest(perfil=perfil):
+                with tempfile.TemporaryDirectory() as tmp:
+                    tmp_path = Path(tmp)
+                    _preparar_repo(tmp_path, "hu/1-x", perfil=perfil)
+                    (tmp_path / "d").mkdir()
+                    r = _correr_hook(self.PERFILES[perfil][0](), "git commit -F d", tmp_path, plugin_root=str(ROOT))
+                self.assertEqual(r.returncode, 2, r.stderr)
+                self.assertTrue(r.stderr.startswith("[timonel] Bloqueado: "), r.stderr)
+                self.assertNotIn("cat:", r.stderr)
+                self.assertEqual(r.stderr.count("\n"), 1, r.stderr)
+
+    def test_valor_de_m_con_guion_no_impide_leer_el_archivo(self):
+        for perfil in self.PERFILES:
+            with self.subTest(perfil=perfil):
+                self._assert_permitido(
+                    self._correr(perfil, 'git commit -F m.txt -m "- Fix x"', {"m.txt": "fix: algo #1"}))
 
     def test_control_con_m_sigue_permitido(self):
         for perfil in self.PERFILES:

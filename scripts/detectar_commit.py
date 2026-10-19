@@ -121,9 +121,13 @@ def _ruta_en(args: list[str], i: int) -> tuple[str | None, int]:
     consumidos). Las formas se resuelven por lookup, no por cadena de `if`."""
     arg = args[i]
     siguiente = args[i + 1] if i + 1 < len(args) else None
+    # `-m`/`--message` toman su valor como siguiente token: ese valor puede
+    # empezar con `-` (`-m "- Fix x"`) y no es una bandera, se salta (#363).
     formas = {
         "-F": (siguiente, 2),
         "--file": (siguiente, 2),
+        "-m": ("", 2),
+        "--message": ("", 2),
     }
     if arg in formas:
         return formas[arg]
@@ -165,7 +169,7 @@ def ruta_de_mensaje(cmd: str) -> str | None:
     if not rutas:
         return ""
     ruta = rutas[0]
-    sin_resolver = len(rutas) > 1 or not ruta or ruta in _VALORES_DE_STDIN
+    sin_resolver = len(rutas) > 1 or ruta in _VALORES_DE_STDIN
     return {True: None, False: ruta}[sin_resolver]
 
 
