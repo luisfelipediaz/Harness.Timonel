@@ -33,7 +33,7 @@ Modos (la unidad es la linea; se mutan TODAS las que contienen el literal):
             comportamiento (`*/.git)` -> `*)`, `continue` -> `break`) donde
             borrar dejaria un error de sintaxis.
 
-`--linea N` (entero, 1-based como `grep -n`) acota `borrar` y `sustituir` a esa
+`--linea N` (entero, 1-based como `grep -n`: las lineas se cuentan solo por "\\n") acota `borrar` y `sustituir` a esa
 linea cuando el literal se repite; una linea sin el literal es
 `mutacion_no_aplicada`. Con `mover` no aplica. `--por` solo aplica a `sustituir`.
 
@@ -116,6 +116,13 @@ class NoSe(Exception):
         self.clave = clave
 
 
+def cortar_por_salto(texto: str) -> list[str]:
+    """Lineas del texto cortando solo en "\\n" (como `grep -n`): unirlas
+    reconstruye el texto byte a byte. `splitlines` corta tambien en \\f, \\v,
+    \\x1c-\\x1e, \\x85, U+2028 y U+2029 y desalinearia `--linea`."""
+    return [l for l in re.split(r"(?<=\n)", texto) if l]
+
+
 def _nivel(linea: str) -> int:
     m = re.match(r"(#+)\s", linea)
     return len(m.group(1)) if m else 0
@@ -196,7 +203,7 @@ def mutar(
     Lanza NoSe si el literal no esta, la seccion no existe, las opciones no
     aplican al modo, `linea` cae fuera del archivo o la copia no cambio."""
     validar_opciones(literal, modo, por, linea)
-    lineas = texto.splitlines(keepends=True)
+    lineas = cortar_por_salto(texto)
     if linea is not None and linea > len(lineas):
         raise NoSe("linea_invalida")
     contadores = {
