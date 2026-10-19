@@ -1028,7 +1028,7 @@ class ModoRamaDelUsuarioTests(unittest.TestCase):
     def test_10_code_review_declara_directorio_de_trabajo(self):
         texto = (ROOT / "skills/code-review/SKILL.md").read_text(encoding="utf-8")
         self._exige(self.SECCION(texto, "## Parametros de entrada"), ("| `directorio_trabajo` |",), "code-review, tabla")
-        self._exige(self.SECCION(texto, "## Paso 2"), ("git -C <directorio_trabajo> diff <rama-base>...HEAD",), "code-review, Paso 2")
+        self._exige(self.SECCION(texto, "## Paso 2"), ("git -C <directorio_trabajo> diff origin/<rama-base>...HEAD",), "code-review, Paso 2")
 
     def test_9_el_modo_harness_queda_identico(self):
         """Escenario 6: el modo de hoy sigue entero, cada literal en su fase."""
@@ -2036,6 +2036,41 @@ class VacuoConLineaBaseTests(unittest.TestCase):
         for archivo in (self.CODE_REVIEW, self.IMPLEMENTADOR):
             with self.subTest(archivo=archivo.parent.name):
                 self.assertIn("N <= B", archivo.read_text(encoding="utf-8"))
+
+
+class RamaBaseRemotaTests(unittest.TestCase):
+    """#362: los diffs de verify-dod (items 3, 5 y 10) y de code-review (Paso 2) se calculan contra
+    `origin/<rama-base>` tras `git fetch origin <rama-base>`, nunca contra la rama local (una `main`
+    local atrasada contó 7 archivos de `tests/` cuando el PR tocaba uno). `pr_check.py --base` sigue
+    recibiendo el nombre de la rama."""
+
+    @staticmethod
+    def _filas(texto, numeros):
+        return {n: next((l for l in texto.splitlines() if l.startswith(f"| {n} |")), "") for n in numeros}
+
+    def test_verify_dod(self):
+        texto = (ROOT / "skills/verify-dod/SKILL.md").read_text(encoding="utf-8")
+        definicion = next((l for l in texto.splitlines() if l.startswith("`<rama-base>` es")), "")
+        plugin = next((b for b in texto.split("\n\n") if b.startswith("**Perfil plugin**")), "")
+        for nombre, ancla in (("definicion de <rama-base>", definicion), ("parrafo Perfil plugin", plugin)):
+            with self.subTest(ancla=nombre):
+                self.assertIn("git fetch origin <rama-base>", ancla)
+        for n, fila in self._filas(texto, (3, 5, 10)).items():
+            with self.subTest(item=n):
+                self.assertIn("origin/<rama-base>...HEAD", fila)
+        self.assertIn("no se", definicion.lower())
+
+    def test_pr_check_sin_origin(self):
+        texto = (ROOT / "skills/verify-dod/SKILL.md").read_text(encoding="utf-8")
+        fila = self._filas(texto, (1,))[1]
+        self.assertIn("--base <rama-base>", fila)
+        self.assertNotIn("origin/", fila)
+
+    def test_code_review(self):
+        texto = (ROOT / "skills/code-review/SKILL.md").read_text(encoding="utf-8")
+        paso = texto.split("## Paso 2", 1)[1].split("## Paso 3", 1)[0]
+        self.assertIn("origin/<rama-base>...HEAD", paso)
+        self.assertIn("git fetch origin <rama-base>", texto)
 
 
 class ModoSustituirEnSkillTests(unittest.TestCase):
