@@ -1203,8 +1203,8 @@ class ChangelogEnHotfixPluginTests(unittest.TestCase):
 
     SECCION = staticmethod(SincronizacionDelWorktreeTests._seccion)
     INICIO = "**Perfil plugin (Fase 2, CHANGELOG)**"
-    LITERALES = ("consolidate-story", "CHANGELOG.md", "plugin.json", "mismo commit", "jq",
-                "Nunca edites la version con `sed -i`")
+    LITERALES = ("consolidate-story", "CHANGELOG.md", "plugin.json", "mismo commit",
+                "usa `jq` o la herramienta de edicion", "Nunca edites la version con `sed -i`")
 
     def _parrafo(self):
         texto = (ROOT / "agents/flechodiezx-hotfix.md").read_text(encoding="utf-8")
