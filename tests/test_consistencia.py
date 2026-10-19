@@ -1028,7 +1028,7 @@ class ModoRamaDelUsuarioTests(unittest.TestCase):
     def test_10_code_review_declara_directorio_de_trabajo(self):
         texto = (ROOT / "skills/code-review/SKILL.md").read_text(encoding="utf-8")
         self._exige(self.SECCION(texto, "## Parametros de entrada"), ("| `directorio_trabajo` |",), "code-review, tabla")
-        self._exige(self.SECCION(texto, "## Paso 2"), ("git -C <directorio_trabajo> diff <rama-base>...HEAD",), "code-review, Paso 2")
+        self._exige(self.SECCION(texto, "## Paso 2"), ("git -C <directorio_trabajo> diff origin/<rama-base>...HEAD",), "code-review, Paso 2")
 
     def test_9_el_modo_harness_queda_identico(self):
         """Escenario 6: el modo de hoy sigue entero, cada literal en su fase."""
@@ -1226,6 +1226,39 @@ class ChangelogEnHotfixPluginTests(unittest.TestCase):
         self.assertIn(orden, parrafo, f"el parrafo debe exigir el orden literal `{orden}`")
         frase = next(f for f in parrafo.split(". ") if "verificar_plugin.py" in f)
         self.assertIn(orden, frase, "el orden debe estar en la misma frase que manda correr `verificar_plugin.py`")
+
+
+class LintYTestsDelHotfixPorPerfilTests(unittest.TestCase):
+    """#356: en la `## Fase 2` de `flechodiezx-hotfix` el bloque `npx nx affected` es del
+    perfil consumidor; en perfil plugin (sin Nx) el lint y los tests los da
+    `python3 scripts/verificar_plugin.py`, con su mapeo a `LINT_RESULTADO`/`TESTS_RESULTADO`
+    (exit 0 PASSED, 1 FAILED, 2 "no sé", que no es PASSED). Se ancla a la seccion `## Fase 2`
+    (sin su encabezado) y, dentro, al parrafo que empieza con `INICIO`."""
+
+    SECCION = staticmethod(SincronizacionDelWorktreeTests._seccion)
+    INICIO = "**Perfil plugin (Fase 2, lint y tests)**"
+    LITERALES = ("perfil consumidor", "npx nx affected", "python3 scripts/verificar_plugin.py",
+                 "LINT_RESULTADO", "TESTS_RESULTADO", "exit 0", "PASSED", "exit 1", "FAILED",
+                 "exit 2", "no sé", "dos corridas")
+
+    def _parrafo(self):
+        texto = (ROOT / "agents/flechodiezx-hotfix.md").read_text(encoding="utf-8")
+        seccion = self.SECCION(texto, "## Fase 2")
+        self.assertTrue(seccion, "agents/flechodiezx-hotfix.md no tiene la seccion `## Fase 2`")
+        return next((b for b in seccion.split("\n\n") if b.startswith(self.INICIO)), "")
+
+    def test_parrafo_existe_con_sus_literales(self):
+        parrafo = self._parrafo()
+        self.assertTrue(parrafo, f"la `## Fase 2` debe tener un parrafo que empiece con `{self.INICIO}`")
+        for literal in self.LITERALES:
+            with self.subTest(literal=literal):
+                self.assertIn(literal, parrafo, f"el parrafo de lint y tests debe contener `{literal}`")
+
+    def test_exit_2_no_es_passed(self):
+        parrafo = self._parrafo()
+        frase = next((f for f in parrafo.split(". ") if "exit 2" in f), "")
+        self.assertRegex(frase, r"exit 2 `?no sé`?", "`exit 2` debe mapearse a `no sé`")
+        self.assertNotRegex(frase, r"exit 2 `?PASSED", "`exit 2` no puede mapearse a PASSED")
 
 
 class Item3PerfilPluginTests(unittest.TestCase):
@@ -2003,6 +2036,41 @@ class VacuoConLineaBaseTests(unittest.TestCase):
         for archivo in (self.CODE_REVIEW, self.IMPLEMENTADOR):
             with self.subTest(archivo=archivo.parent.name):
                 self.assertIn("N <= B", archivo.read_text(encoding="utf-8"))
+
+
+class RamaBaseRemotaTests(unittest.TestCase):
+    """#362: los diffs de verify-dod (items 3, 5 y 10) y de code-review (Paso 2) se calculan contra
+    `origin/<rama-base>` tras `git fetch origin <rama-base>`, nunca contra la rama local (una `main`
+    local atrasada contó 7 archivos de `tests/` cuando el PR tocaba uno). `pr_check.py --base` sigue
+    recibiendo el nombre de la rama."""
+
+    @staticmethod
+    def _filas(texto, numeros):
+        return {n: next((l for l in texto.splitlines() if l.startswith(f"| {n} |")), "") for n in numeros}
+
+    def test_verify_dod(self):
+        texto = (ROOT / "skills/verify-dod/SKILL.md").read_text(encoding="utf-8")
+        definicion = next((l for l in texto.splitlines() if l.startswith("`<rama-base>` es")), "")
+        plugin = next((b for b in texto.split("\n\n") if b.startswith("**Perfil plugin**")), "")
+        for nombre, ancla in (("definicion de <rama-base>", definicion), ("parrafo Perfil plugin", plugin)):
+            with self.subTest(ancla=nombre):
+                self.assertIn("git fetch origin <rama-base>", ancla)
+        for n, fila in self._filas(texto, (3, 5, 10)).items():
+            with self.subTest(item=n):
+                self.assertIn("origin/<rama-base>...HEAD", fila)
+        self.assertIn("no se", definicion.lower())
+
+    def test_pr_check_sin_origin(self):
+        texto = (ROOT / "skills/verify-dod/SKILL.md").read_text(encoding="utf-8")
+        fila = self._filas(texto, (1,))[1]
+        self.assertIn("--base <rama-base>", fila)
+        self.assertNotIn("origin/", fila)
+
+    def test_code_review(self):
+        texto = (ROOT / "skills/code-review/SKILL.md").read_text(encoding="utf-8")
+        paso = texto.split("## Paso 2", 1)[1].split("## Paso 3", 1)[0]
+        self.assertIn("origin/<rama-base>...HEAD", paso)
+        self.assertIn("git fetch origin <rama-base>", texto)
 
 
 class ModoSustituirEnSkillTests(unittest.TestCase):

@@ -406,6 +406,50 @@ class MainSubprocessTests(unittest.TestCase):
                 self.assertNotIn("fallos:", r.stdout)
 
 
+class MutacionQueNoCompilaTests(unittest.TestCase):
+    """#352: una copia que no compila sale 2 antes de correr tests (repo sintetico)."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.repo = _repo_minimo(tmp.name)
+        (self.repo / "m.py").write_text("if x in (1, 2):\n    pass\n", encoding="utf-8")
+        (self.repo / "m.json").write_text('{"a": 1}\n', encoding="utf-8")
+        (self.repo / "m.sh").write_text("if true; then\n  echo hi\nfi\n", encoding="utf-8")
+        (self.repo / "roto.py").write_text("def f(:\n    pass\nMARCA = 1\n", encoding="utf-8")
+
+    def _medir(self, ruta: str, literal: str) -> subprocess.CompletedProcess:
+        return _correr(self.repo, "--ruta", ruta, "--literal", literal, "--modo", "borrar", "--test", "tests.test_x.TestA")
+
+    def test_filas_que_dejan_la_copia_sin_compilar_salen_2_con_el_motivo(self):
+        filas = {"py": ("m.py", "if x in (1, 2):"), "json": ("m.json", '"a": '), "sh": ("m.sh", "then")}
+        for nombre, (ruta, literal) in filas.items():
+            with self.subTest(nombre):
+                r = self._medir(ruta, literal)
+                self.assertEqual(r.returncode, 2, r.stderr)
+                self.assertIn(ml.MOTIVOS["mutacion_no_compila"], r.stderr)
+                self.assertNotIn("fallos:", r.stdout)
+
+    def test_no_corre_la_corrida_mutada(self):
+        with mock.patch.object(ml, "correr_unittest") as corrida, mock.patch.object(ml.Path, "cwd", return_value=self.repo):
+            args = ["--ruta", "m.json", "--literal", '"a": ', "--modo", "borrar"]
+            self.assertEqual(ml.main(args), 2)
+        corrida.assert_not_called()
+
+    def test_sin_bash_o_con_timeout_sale_2_verificador_no_disponible(self):
+        fallas = {"sin_bash": OSError("bash"), "timeout": subprocess.TimeoutExpired("bash", 30)}
+        for nombre, falla in fallas.items():
+            with self.subTest(nombre), mock.patch.object(ml.subprocess, "run", side_effect=falla):
+                with self.assertRaises(ml.NoSe) as ctx:
+                    ml.verificar_que_compila("m.sh", "echo a\n", "echo b\n")
+                self.assertEqual(ctx.exception.clave, "verificador_no_disponible")
+
+    def test_original_que_no_compila_conserva_el_comportamiento_actual(self):
+        r = self._medir("roto.py", "MARCA")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("fallos:", r.stdout)
+
+
 class MainEnProcesoTests(unittest.TestCase):
     """Las dos filas que no se pueden provocar de forma barata con un subproceso real."""
 

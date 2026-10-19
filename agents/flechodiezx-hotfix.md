@@ -83,6 +83,8 @@ npx nx affected --target=test --ci --runInBand
 
 Registra `LINT_RESULTADO`, `TESTS_RESULTADO` (`PASSED|FAILED|NO_SPECS`). Si falla, 1 intento de correccion directa; si persiste, reporta y espera decision. Marca `- [x] Implementación` y `- [x] Lint + tests afectados` en `## Tareas`.
 
+**Perfil plugin (Fase 2, lint y tests)**: el bloque `npx nx affected` de arriba es del perfil consumidor; en perfil plugin (sin Nx) corre en su lugar `python3 scripts/verificar_plugin.py` y registra `LINT_RESULTADO` y `TESTS_RESULTADO` con su salida: exit 0 `PASSED`, exit 1 `FAILED`, exit 2 `no sé` (que no es `PASSED`: se reporta como pendiente, nunca como verde). En perfil plugin hay dos corridas: esta, tras el merge, y la del commit `chore: changelog #N` (parrafo siguiente).
+
 **Perfil plugin (Fase 2, CHANGELOG)**: tras consolidar, la linea del CHANGELOG y la version son tuyas, no del sub-agente (su skill le prohibe tocarlos). Que version abrir y como escribir la linea lo dice la viñeta **CHANGELOG** del perfil plugin de `consolidate-story`: aplicala tal cual, sin copiarla aqui. Escribe la seccion de `CHANGELOG.md` y la version de `.claude-plugin/plugin.json` en el **mismo commit** (`chore: changelog #N`): subir uno sin el otro rompe `test_version_plugin_coincide_con_changelog`. Corre `python3 scripts/verificar_plugin.py` despues del commit `chore: changelog #N` y no antes, porque esa es la unica corrida que ve ambos archivos coherentes. Nunca edites la version con `sed -i` (en macOS falla y deja `CHANGELOG.md` y `plugin.json` en versiones distintas): usa `jq` o la herramienta de edicion.
 
 ## Fase 3: Code review (siempre)
