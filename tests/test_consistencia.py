@@ -2093,5 +2093,52 @@ class ModoSustituirEnSkillTests(unittest.TestCase):
                 self.assertIn(literal, seccion)
 
 
+class AsercionesNoVaciasEnPluginTests(unittest.TestCase):
+    """La heuristica `aserciones-no-vacuas.md` existe en el plugin y dice lo que costo caro (#376).
+
+    Cada test acota su aseveracion a la seccion que debe contener la instruccion, no al
+    archivo entero (`unidad-de-verificacion.md`): un literal que sobrevive en otra seccion
+    no cuenta. Los tres tests de `## Que hacer` se reparten las tres ideas para que borrar
+    una sola deje un solo test en rojo.
+    """
+
+    RUTA = ROOT / "heuristics" / "general" / "aserciones-no-vacuas.md"
+    SECCION_QUE_HACER = "Qué hacer"
+
+    @classmethod
+    def _seccion(cls, titulo: str) -> str:
+        cuerpo = HeuristicasDescubriblesTests._cuerpo_de_seccion(cls.RUTA.read_text(encoding="utf-8"), titulo)
+        assert cuerpo is not None, f"{cls.RUTA.name} no tiene `## {titulo}`"
+        return cuerpo
+
+    def test_el_archivo_existe(self):
+        self.assertTrue(self.RUTA.exists(), "falta heuristics/general/aserciones-no-vacuas.md")
+
+    def test_que_hacer_dice_que_la_prosa_se_compara_tolerante_al_markup(self):
+        self.assertRegex(self._seccion(self.SECCION_QUE_HACER), r"tolerante al markup")
+
+    def test_que_hacer_nombra_el_markup_que_rompe_la_subcadena(self):
+        cuerpo = self._seccion(self.SECCION_QUE_HACER)
+        self.assertRegex(cuerpo, r"backticks")
+        self.assertRegex(cuerpo, r"negritas")
+
+    def test_que_hacer_dice_que_la_mutacion_sustituye_el_literal(self):
+        self.assertRegex(self._seccion(self.SECCION_QUE_HACER), r"(?i)mutaci[oó]n\W+sustituye\W+el\W+literal")
+
+    def test_caso_real_cita_el_issue_y_el_commit(self):
+        cuerpo = self._seccion("Caso real")
+        self.assertRegex(cuerpo, r"#356")
+        self.assertRegex(cuerpo, r"4ba26da")
+
+    def test_relacion_nombra_unidad_de_verificacion(self):
+        self.assertRegex(self._seccion("Relación con otras heurísticas"), r"unidad-de-verificacion\.md")
+
+    def test_la_cita_de_los_hooks_apunta_a_un_archivo_existente(self):
+        """`tests/test_hooks_integracion.py` cita esta ruta en un docstring; sin el archivo la cita cuelga."""
+        cita = "heuristics/general/aserciones-no-vacuas.md"
+        self.assertIn(cita, (ROOT / "tests" / "test_hooks_integracion.py").read_text(encoding="utf-8"))
+        self.assertTrue((ROOT / cita).exists())
+
+
 if __name__ == "__main__":
     unittest.main()
