@@ -18,7 +18,7 @@ Revisa la implementacion de una historia contra su issue y las convenciones del 
 | `tests_primera_corrida` | **Opcional.** El bloque `Tests verdes en su primera corrida` del sub-agente, tal cual. Ausente = no informado |
 | `directorio_trabajo` | **Opcional.** Ruta del worktree donde esta checkouteada la rama a revisar (default: el directorio actual). En el modo "rama del usuario" del orquestador es la ruta del usuario |
 
-**`directorio_trabajo`**: el `git diff <rama-base>...HEAD` del Paso 2 corre **ahi** (`git -C <directorio_trabajo>`), porque `HEAD` es la rama de ese directorio, no la del arbol del orquestador. Sin el parametro, corre en el directorio actual, como antes.
+**`directorio_trabajo`**: el `git diff origin/<rama-base>...HEAD` del Paso 2 corre **ahi** (`git -C <directorio_trabajo>`), porque `HEAD` es la rama de ese directorio, no la del arbol del orquestador. Sin el parametro, corre en el directorio actual, como antes.
 
 Si falta alguno de los obligatorios, detente y reporta.
 
@@ -37,7 +37,7 @@ Si el issue no declara Gherkin verificable, registra WARNING tipo `Gherkin` "iss
 
 ## Paso 2: Localizar el codigo
 
-`archivos_modificados` es la lista autorizada. Complementa con `git -C <directorio_trabajo> diff <rama-base>...HEAD --name-only` si hace falta. No audites el resto del repo.
+`archivos_modificados` es la lista autorizada. Complementa con `git -C <directorio_trabajo> diff origin/<rama-base>...HEAD --name-only` si hace falta (antes corre `git fetch origin <rama-base>` en `directorio_trabajo`: contra la rama local atrasada el diff se infla; si el `fetch` falla, no cuentes contra la ref local, reporta "no se" y usa solo `archivos_modificados`). No audites el resto del repo.
 
 ## Paso 3: Revision con severidad
 
