@@ -38,9 +38,14 @@ linea cuando el literal se repite; una linea sin el literal es
 `mutacion_no_aplicada`. Con `mover` no aplica. `--por` solo aplica a `sustituir`.
 
 Borrar una llamada completa con sus paréntesis (`f(x)` entero) deja la copia
-con un error de sintaxis: los tests no importan, el objetivo "no se encuentra"
-y sale `no sé` (exit 2). Hay que mutar el argumento o la condicion, no la
-llamada entera.
+con un error de sintaxis. Si el test importa el archivo, el objetivo "no se
+encuentra" y sale `no sé` (exit 2); si lo ejecuta por subprocess, el error de
+sintaxis se contaria como fallo del test. Por eso, antes de correr nada, la
+mutacion se verifica por sufijo (`VERIFICADORES`: `.py` compila, `.json`
+parsea, `.sh` pasa `bash -n`) y una copia que ya no compila sale `no sé`
+(`mutacion_no_compila`). Solo cuenta si el original si compilaba; otras
+extensiones (`.md`) no se verifican. Hay que mutar el argumento o la
+condicion, no la llamada entera.
 
 Sin `--test` corre `unittest discover -s tests` en la copia.
 
@@ -59,12 +64,15 @@ Codigos de salida:
         mutada (`base_inconsistente`), o argumentos invalidos (coincide con el exit de uso de
         argparse): `sustituir` sin `--por`, `--por` vacio, igual a `--literal` o
         con salto de linea, `--por` fuera de `sustituir`, `--linea` con `mover`
-        o fuera de rango. Todos salen antes de correr tests. No hay exit 1: ningun "no pude medir" termina en traceback.
+        o fuera de rango; `mutacion_no_compila` (la copia mutada no compila o
+        no parsea y el original si) y `verificador_no_disponible` (no se pudo
+        correr el verificador, p. ej. sin `bash` para un `.sh`). Todos salen antes de correr tests. No hay exit 1: ningun "no pude medir" termina en traceback.
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import shutil
@@ -87,6 +95,8 @@ MOTIVOS = {
     "linea_no_aplica_al_modo": "--linea solo aplica a --modo borrar o sustituir",
     "linea_invalida": "--linea debe estar entre 1 y el número de líneas de la ruta",
     "mutacion_no_aplicada": "la mutación no se aplicó (el literal no está fuera del destino o la copia quedó idéntica)",
+    "mutacion_no_compila": "la mutación deja la copia sin compilar o parsear (el original sí): sus fallos serían de sintaxis, no de la invariante",
+    "verificador_no_disponible": "no se pudo verificar si la copia mutada compila (sin `bash` o con timeout en `bash -n`)",
     "destino_no_es_encabezado": "--a debe ser un encabezado markdown completo (`#+ ` seguido del título)",
     "seccion_destino_inexistente": "sección destino no existe en la ruta",
     "objetivo_no_encontrado": "objetivo de test no encontrado",
@@ -219,6 +229,47 @@ def parsear_unittest(salida: str, con_objetivo: bool) -> tuple[int, int]:
     return fallos, total
 
 
+def _compila_py(texto: str) -> bool:
+    try:
+        compile(texto, "<mutada>", "exec")
+    except (SyntaxError, ValueError):
+        return False
+    return True
+
+
+def _parsea_json(texto: str) -> bool:
+    try:
+        json.loads(texto)
+    except ValueError:
+        return False
+    return True
+
+
+def _pasa_bash_n(texto: str) -> bool | None:
+    """None = no se: sin bash (o con timeout) no hay evidencia en ningun sentido."""
+    try:
+        r = subprocess.run(["bash", "-n"], input=texto, capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return r.returncode == 0
+
+
+# sufijo -> verificador (texto -> compila: True | False | None = no se).
+# Sin entrada: no se verifica.
+VERIFICADORES = {".py": _compila_py, ".json": _parsea_json, ".sh": _pasa_bash_n}
+
+
+def verificar_que_compila(ruta: str, original: str, nuevo: str) -> None:
+    """NoSe si la mutacion rompe un archivo que antes compilaba, o si no se puede saber."""
+    verificador = VERIFICADORES.get(Path(ruta).suffix, lambda texto: True)
+    antes = verificador(original)
+    despues = verificador(nuevo)
+    if None in (antes, despues):
+        raise NoSe("verificador_no_disponible")
+    if antes and not despues:
+        raise NoSe("mutacion_no_compila")
+
+
 def _ignorar(origen: Path):
     def ignorar(directorio: str, nombres: list[str]) -> set[str]:
         rel = Path(directorio).resolve().relative_to(origen)
@@ -276,6 +327,7 @@ def medir(args: argparse.Namespace) -> tuple[int, int, int, int]:
         except (OSError, UnicodeDecodeError):
             raise NoSe("copia_o_lectura_imposible")
         nuevo, k = mutar(original, args.literal, args.modo, args.a, args.por, args.linea)
+        verificar_que_compila(args.ruta, original, nuevo)
         base, total_base = parsear_unittest(correr_unittest(copia, args.test), args.test is not None)
         try:
             archivo.write_text(nuevo, encoding="utf-8")
