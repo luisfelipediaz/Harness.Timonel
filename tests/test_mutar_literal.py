@@ -652,5 +652,56 @@ class EscenarioRealContraElRepoTests(unittest.TestCase):
         self.assertEqual(self._status(), antes)
 
 
+class VariosObjetivosTests(unittest.TestCase):
+    """#343: `--test` repetido suma los objetivos en UNA invocacion de unittest."""
+
+    TEST_Y = (
+        "import unittest\n"
+        "from pathlib import Path\n\n"
+        "DOC = (Path(__file__).resolve().parents[1] / \"doc.md\").read_text(encoding=\"utf-8\")\n\n\n"
+        "class TestY(unittest.TestCase):\n"
+        "    def test_marca_en_el_doc(self):\n"
+        "        self.assertIn(\"MARCA\", DOC)\n"
+    )
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.repo = _repo_minimo(tmp.name)
+        (self.repo / "tests" / "test_y.py").write_text(self.TEST_Y, encoding="utf-8")
+        self.base = ["--ruta", "doc.md", "--literal", "MARCA", "--modo", "borrar"]
+
+    def test_dos_objetivos_suman_fallos_y_total_en_la_misma_corrida(self):
+        r = _correr(self.repo, *self.base, "--test", "tests.test_x.TestA", "--test", "tests.test_y.TestY")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout.splitlines(), ["lineas mutadas: 1", "fallos: 2 de 2", "base: 0 de 2"])
+
+    def test_un_objetivo_inexistente_entre_varios_sale_2_sin_conteo_parcial(self):
+        r = _correr(self.repo, *self.base, "--test", "tests.test_x.NoExiste", "--test", "tests.test_x.TestA")
+        self.assertEqual(r.returncode, 2)
+        self.assertIn(ml.MOTIVOS["objetivo_no_encontrado"], r.stderr)
+        self.assertNotIn("fallos:", r.stdout)
+
+    def test_cada_corrida_recibe_la_lista_completa_en_una_sola_invocacion(self):
+        recibidos = []
+
+        def espia(copia, objetivos):
+            recibidos.append(objetivos)
+            return "Ran 2 tests in 0.1s\n\nOK\n"
+
+        with mock.patch.object(ml.Path, "cwd", return_value=self.repo), \
+                mock.patch.object(ml, "correr_unittest", side_effect=espia), \
+                contextlib.redirect_stdout(io.StringIO()):
+            ml.main([*self.base, "--test", "a.A", "--test", "b.B"])
+        self.assertEqual(recibidos, [["a.A", "b.B"], ["a.A", "b.B"]])
+
+    def test_la_invocacion_de_unittest_lleva_todos_los_objetivos(self):
+        with mock.patch.object(
+            ml.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, stdout="", stderr=""),
+        ) as run:
+            ml.correr_unittest(Path("/copia"), ["a.A", "b.B"])
+        self.assertEqual(run.call_args.args[0][-3:], ["unittest", "a.A", "b.B"])
+
+
 if __name__ == "__main__":
     unittest.main()
