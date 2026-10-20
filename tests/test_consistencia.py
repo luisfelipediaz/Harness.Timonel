@@ -1261,6 +1261,44 @@ class LintYTestsDelHotfixPorPerfilTests(unittest.TestCase):
         self.assertNotRegex(frase, r"exit 2 `?PASSED", "`exit 2` no puede mapearse a PASSED")
 
 
+class RemisionAlPerfilPluginTests(unittest.TestCase):
+    """#339: cada item que el parrafo **Perfil plugin** de verify-dod cambia en perfil plugin
+    debe remitir a ese parrafo desde su fila de la checklist. Los items se DERIVAN del parrafo
+    (regla generadora), no de una lista fija: si el parrafo suma un item, el test lo exige."""
+
+    RUTA = "skills/verify-dod/SKILL.md"
+    ENUMERACION = re.compile(r"\bitems?\s+(\d+(?:\s*(?:,|y)\s*\d+)*)", re.IGNORECASE)
+
+    @classmethod
+    def items_del_parrafo(cls, texto):
+        parrafo = Item3PerfilPluginTests._parrafo(texto, "**Perfil plugin**")
+        return {int(n) for grupo in cls.ENUMERACION.findall(parrafo) for n in re.findall(r"\d+", grupo)}
+
+    @staticmethod
+    def fila(texto, n):
+        return next((l for l in texto.splitlines() if l.startswith(f"| {n} |")), "")
+
+    def _texto(self):
+        return (ROOT / self.RUTA).read_text(encoding="utf-8")
+
+    def test_la_derivacion_no_es_vacua(self):
+        items = self.items_del_parrafo(self._texto())
+        self.assertTrue({3, 9} <= items, f"el parrafo Perfil plugin debe enumerar al menos 3 y 9: {sorted(items)}")
+
+    def test_cada_item_del_parrafo_remite_desde_su_fila(self):
+        texto = self._texto()
+        for n in sorted(self.items_del_parrafo(texto)):
+            with self.subTest(item=n):
+                fila = self.fila(texto, n)
+                self.assertTrue(fila, f"no hay fila | {n} | en la checklist")
+                self.assertIn("perfil plugin", fila.lower(), f"la fila {n} cambia en perfil plugin y no remite al parrafo **Perfil plugin**")
+
+    def test_la_derivacion_sigue_al_parrafo(self):
+        texto = self._texto().replace("item 3 usa", "item 10 e item 3 usa", 1)
+        self.assertIn(10, self.items_del_parrafo(texto))
+        self.assertNotIn("perfil plugin", self.fila(texto, 10).lower())
+
+
 class Item3PerfilPluginTests(unittest.TestCase):
     """#304: en perfil plugin el item 3 del DoD tiene criterio propio (PASSED si el diff de
     `tests/` lista algo; `SKIPPED solo si` el diff esta vacio y no se tocan `scripts/*.py` ni
