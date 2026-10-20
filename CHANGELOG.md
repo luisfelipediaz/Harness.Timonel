@@ -1,7 +1,8 @@
 # Changelog
 
-## 0.25.0 — en desarrollo
+## 0.25.0 — 2026-10-19
 
+- Los dos guards de commit de `hooks/hooks.json` y `ruta_de_mensaje` de `scripts/detectar_commit.py` cierran los cinco WARNING del review de #326 en la lectura de `git commit -F`: la compuerta pasa a `[ -f "$f" ] && [ -r "$f" ]` (un directorio como `-F` bloquea solo con el mensaje `[timonel] Bloqueado: ...`, sin el `cat: ...: Is a directory` previo); `_ruta_en` salta el valor de `-m`/`--message` (lookup map, consume 2 tokens), así que `git commit -F m.txt -m "- Fix x"` devuelve `m.txt` y `git commit -m "-F x"` sigue sin leer archivo; se borra `or not ruta` de `sin_resolver` (código muerto). Tests nuevos en `RutaDeMensajeUnitarioTests` (3 filas de `-m`/`--message` y la rama `except` de `segmentar`) y `GuardCommitsLeeArchivoMensajeTests` (ruta absoluta, `-Fmsg.txt`, directorio con stderr exacto y `-m` con guion, en ambos perfiles): 115 en `tests.test_hooks_integracion`; 7 fallos contra el código anterior. Mutación con `mutar_literal.py --modo sustituir` (base 0 de 115): `case "$f" in /*) ;; *) f="$dir/$f" ;; esac` por `f="$dir/$f"` da 2 fallos (ruta absoluta, una por perfil), `"-F"` por `"-Z"` en `_PREFIJOS_CON_VALOR_PEGADO` da 3 y `except Exception:` por `except ZeroDivisionError:` en `ruta_de_mensaje` da 1. (#363)
 - `ChangelogEnHotfixPluginTests.LITERALES` (`tests/test_consistencia.py`) cambia el literal `jq` por la recomendación completa ``usa `jq` o la herramienta de edicion``: la subcadena `jq` también la cumplía "no uses `jq`" (aserción vacua de polaridad). `agents/flechodiezx-hotfix.md` no cambia. Evidencia con ``mutar_literal.py --ruta agents/flechodiezx-hotfix.md --literal 'usa `jq`' --modo sustituir --por 'no uses `jq`' --linea 86 --test tests.test_consistencia.ChangelogEnHotfixPluginTests``: antes del cambio 0 fallos de 2 (base 0), después 1 de 2 (base 0), solo el subTest del literal nuevo; 524 en la suite. (#358)
 
 ## 0.24.0 — 2026-10-19
