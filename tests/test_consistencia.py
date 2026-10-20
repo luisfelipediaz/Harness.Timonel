@@ -2140,5 +2140,45 @@ class AsercionesNoVaciasEnPluginTests(unittest.TestCase):
         self.assertTrue((ROOT / cita).exists())
 
 
+class CasoRealDelVerificadorTests(unittest.TestCase):
+    """`sensor-declara-su-evidencia.md` registra el caso #352 como su defecto real (#380).
+
+    Cada test acota su aseveracion a la seccion que debe contener la evidencia
+    (`unidad-de-verificacion.md`), no al archivo entero.
+    """
+
+    RUTA = ROOT / "heuristics" / "general" / "sensor-declara-su-evidencia.md"
+
+    @classmethod
+    def _seccion(cls, titulo: str) -> str:
+        cuerpo = HeuristicasDescubriblesTests._cuerpo_de_seccion(cls.RUTA.read_text(encoding="utf-8"), titulo)
+        assert cuerpo is not None, f"{cls.RUTA.name} no tiene `## {titulo}`"
+        return cuerpo
+
+    def test_caso_real_cita_el_issue_y_el_commit_del_verificador(self):
+        cuerpo = self._seccion("Caso real")
+        self.assertRegex(cuerpo, r"#352")
+        self.assertRegex(cuerpo, r"6221478")
+
+    def test_caso_real_cita_textual_la_retro_de_352(self):
+        cita = "Un verificador que no puede responder se colapsó a la rama favorable (`True`)"
+        self.assertIn(cita, self._seccion("Caso real"))
+
+    def test_caso_real_conserva_el_origen_del_patron_en_29(self):
+        cuerpo = self._seccion("Caso real")
+        self.assertRegex(cuerpo, r"#29\b")
+        self.assertRegex(cuerpo, r"smoke_harness")
+
+    def test_caso_real_ya_no_declara_que_no_hay_defecto(self):
+        self.assertNotRegex(self._seccion("Caso real"), r"(?i)sin\W+defecto\W+registrado")
+
+    def test_senales_incluye_la_degradacion_que_devuelve_el_resultado_favorable(self):
+        cuerpo = self._seccion("Señales de que lo estás haciendo mal")
+        self.assertRegex(
+            cuerpo,
+            r"(?im)^\s*-[^\n]*(?:herramienta\W+ausente|timeout)[^\n]*(?:resultado\W+favorable|\bTrue\b)",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -48,18 +48,23 @@ El mismo criterio, al no medir algo: decilo. `_filas_disparo` lo deja escrito �
 - La evidencia vive en un archivo cuya ubicación el reporte no nombra, y el lector la busca en el repo equivocado.
 - El conteo se hace con un `in` o un `contains` en vez de un ancla anclada al inicio de línea: cualquier mención en prosa infla el número.
 - El sensor cubre un perfil y en el otro devuelve el mismo valor que un fallo real.
+- La rama de degradación (herramienta ausente, timeout, salida ilegible) devuelve el resultado favorable en vez de "no sé": el `except` que "no rechaza" por no poder verificar.
 
 ## Caso real
 
-**Sin defecto registrado: esta heurística nace de una observación de proceso, no de un bug.** Es la excepción del conjunto y conviene decirlo, porque inventarle un commit la volvería tan poco confiable como los comentarios que `comentarios-verificables.md` prohíbe.
+**El defecto puntual: #352, commit `6221478`** (`fix(plugin): #352 verificador no disponible sale no sé`). En `scripts/mutar_literal.py`, `_pasa_bash_n` devolvía `True` en `except (OSError, subprocess.TimeoutExpired)` con el razonamiento "sin bash no se puede afirmar que no compila: no se rechaza". Un verificador que no pudo correr contestó "sí compila" y dejó pasar una mutación sin verificar. El fix cambió el retorno a `bool | None` y, con `None`, la herramienta sale 2 con el motivo `verificador_no_disponible`. La retro de #352 lo nombra textual:
 
-El origen es la retro del issue #29, punto 5 ("patrones descubiertos"), registrado al construir y medir el smoke del harness (`tests/test_smoke_harness.py` sobre `medir_issue`, `contar_eventos`, `tabla_disparos`). Dos patrones, textuales:
+> Un verificador que no puede responder se colapsó a la rama favorable (`True`)
+
+Es el tercer estado de esta heurística violado en la rama de degradación: no en el resultado normal, sino en el `except` que nadie ejercita.
+
+**El origen del patrón: la retro del issue #29**, punto 5 ("patrones descubiertos"), registrado al construir y medir el smoke del harness (`tests/test_smoke_harness.py` sobre `medir_issue`, `contar_eventos`, `tabla_disparos`). Dos patrones, textuales:
 
 > un sensor con tres estados (sí/no/N/A en perfil <p>) informa más que un booleano
 
 > la evidencia de los hooks vive en el cwd de la sesión de Claude, no en el repo del issue
 
-Es evidencia de **patrón**, no de un archivo con el defecto puntual: no hubo un commit del bug ni un commit del fix. Lo que sí existe hoy, como forma ya aplicada, es `scripts/smoke_harness.py:76-84` (`fila_hook`, los tres estados) y `:87-89` (`_filas_disparo`, la declaración de lo que no se mide) — el código citado arriba en "Qué hacer" sale de ahí. La heurística se registró como #45 para que la forma sobreviva a la memoria de quien la descubrió.
+Allí no hubo un commit del bug ni del fix: era evidencia de **patrón**. Lo que existe como forma ya aplicada es `scripts/smoke_harness.py:76-84` (`fila_hook`, los tres estados) y `:87-89` (`_filas_disparo`, la declaración de lo que no se mide) — el código citado arriba en "Qué hacer" sale de ahí. La heurística se registró como #45; #352 es el primer defecto que la confirma.
 
 ## Cuándo NO aplica
 
