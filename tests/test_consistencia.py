@@ -1261,6 +1261,44 @@ class LintYTestsDelHotfixPorPerfilTests(unittest.TestCase):
         self.assertNotRegex(frase, r"exit 2 `?PASSED", "`exit 2` no puede mapearse a PASSED")
 
 
+class RemisionAlPerfilPluginTests(unittest.TestCase):
+    """#339: cada item que el parrafo **Perfil plugin** de verify-dod cambia en perfil plugin
+    debe remitir a ese parrafo desde su fila de la checklist. Los items se DERIVAN del parrafo
+    (regla generadora), no de una lista fija: si el parrafo suma un item, el test lo exige."""
+
+    RUTA = "skills/verify-dod/SKILL.md"
+    ENUMERACION = re.compile(r"\bitems?\s+(\d+(?:\s*(?:,|y)\s*\d+)*)", re.IGNORECASE)
+
+    @classmethod
+    def items_del_parrafo(cls, texto):
+        parrafo = Item3PerfilPluginTests._parrafo(texto, "**Perfil plugin**")
+        return {int(n) for grupo in cls.ENUMERACION.findall(parrafo) for n in re.findall(r"\d+", grupo)}
+
+    @staticmethod
+    def fila(texto, n):
+        return next((l for l in texto.splitlines() if l.startswith(f"| {n} |")), "")
+
+    def _texto(self):
+        return (ROOT / self.RUTA).read_text(encoding="utf-8")
+
+    def test_la_derivacion_no_es_vacua(self):
+        items = self.items_del_parrafo(self._texto())
+        self.assertTrue({3, 9} <= items, f"el parrafo Perfil plugin debe enumerar al menos 3 y 9: {sorted(items)}")
+
+    def test_cada_item_del_parrafo_remite_desde_su_fila(self):
+        texto = self._texto()
+        for n in sorted(self.items_del_parrafo(texto)):
+            with self.subTest(item=n):
+                fila = self.fila(texto, n)
+                self.assertTrue(fila, f"no hay fila | {n} | en la checklist")
+                self.assertIn("perfil plugin", fila.lower(), f"la fila {n} cambia en perfil plugin y no remite al parrafo **Perfil plugin**")
+
+    def test_la_derivacion_sigue_al_parrafo(self):
+        texto = self._texto().replace("item 3 usa", "item 10 e item 3 usa", 1)
+        self.assertIn(10, self.items_del_parrafo(texto))
+        self.assertNotIn("perfil plugin", self.fila(texto, 10).lower())
+
+
 class Item3PerfilPluginTests(unittest.TestCase):
     """#304: en perfil plugin el item 3 del DoD tiene criterio propio (PASSED si el diff de
     `tests/` lista algo; `SKIPPED solo si` el diff esta vacio y no se tocan `scripts/*.py` ni
@@ -2138,6 +2176,46 @@ class AsercionesNoVaciasEnPluginTests(unittest.TestCase):
         cita = "heuristics/general/aserciones-no-vacuas.md"
         self.assertIn(cita, (ROOT / "tests" / "test_hooks_integracion.py").read_text(encoding="utf-8"))
         self.assertTrue((ROOT / cita).exists())
+
+
+class CasoRealDelVerificadorTests(unittest.TestCase):
+    """`sensor-declara-su-evidencia.md` registra el caso #352 como su defecto real (#380).
+
+    Cada test acota su aseveracion a la seccion que debe contener la evidencia
+    (`unidad-de-verificacion.md`), no al archivo entero.
+    """
+
+    RUTA = ROOT / "heuristics" / "general" / "sensor-declara-su-evidencia.md"
+
+    @classmethod
+    def _seccion(cls, titulo: str) -> str:
+        cuerpo = HeuristicasDescubriblesTests._cuerpo_de_seccion(cls.RUTA.read_text(encoding="utf-8"), titulo)
+        assert cuerpo is not None, f"{cls.RUTA.name} no tiene `## {titulo}`"
+        return cuerpo
+
+    def test_caso_real_cita_el_issue_y_el_commit_del_verificador(self):
+        cuerpo = self._seccion("Caso real")
+        self.assertRegex(cuerpo, r"#352")
+        self.assertRegex(cuerpo, r"6221478")
+
+    def test_caso_real_cita_textual_la_retro_de_352(self):
+        cita = "Un verificador que no puede responder se colapsó a la rama favorable (`True`)"
+        self.assertIn(cita, self._seccion("Caso real"))
+
+    def test_caso_real_conserva_el_origen_del_patron_en_29(self):
+        cuerpo = self._seccion("Caso real")
+        self.assertRegex(cuerpo, r"#29\b")
+        self.assertRegex(cuerpo, r"smoke_harness")
+
+    def test_caso_real_ya_no_declara_que_no_hay_defecto(self):
+        self.assertNotRegex(self._seccion("Caso real"), r"(?i)sin\W+defecto\W+registrado")
+
+    def test_senales_incluye_la_degradacion_que_devuelve_el_resultado_favorable(self):
+        cuerpo = self._seccion("Señales de que lo estás haciendo mal")
+        self.assertRegex(
+            cuerpo,
+            r"(?im)^\s*-[^\n]*(?:herramienta\W+ausente|timeout)[^\n]*(?:resultado\W+favorable|\bTrue\b)",
+        )
 
 
 if __name__ == "__main__":

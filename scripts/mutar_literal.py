@@ -15,7 +15,7 @@ reportan como `fallos: 0 de M`: ese 0 diria "invariante vacua" sin haberla
 probado.
 
     python3 scripts/mutar_literal.py --ruta agents/x.md --literal "texto" \\
-        --modo borrar [--test tests.modulo.Clase]
+        --modo borrar [--test tests.modulo.Clase]...
     python3 scripts/mutar_literal.py --ruta x.md --literal "texto" \\
         --modo mover --a "## Notas"
     python3 scripts/mutar_literal.py --ruta x.sh --literal "continue" \\
@@ -47,6 +47,9 @@ parsea, `.sh` pasa `bash -n`) y una copia que ya no compila sale `no sé`
 extensiones (`.md`) no se verifican. Hay que mutar el argumento o la
 condicion, no la llamada entera.
 
+`--test` se puede repetir: todos los objetivos corren en UNA invocacion de
+unittest, tanto la base como la mutada, y `fallos`/`base` son la suma de todos
+(un objetivo inexistente entre varios es `no sé`, nunca un conteo parcial).
 Sin `--test` corre `unittest discover -s tests` en la copia.
 
 Stdout: `lineas mutadas: K`, `fallos: N de M` y `base: B de M`, en ese orden y
@@ -289,10 +292,9 @@ def _ignorar(origen: Path):
     return ignorar
 
 
-def correr_unittest(copia: Path, objetivo: str | None) -> str:
-    cmd = [sys.executable, "-m", "unittest"] + (
-        [objetivo] if objetivo else ["discover", "-s", "tests"]
-    )
+def correr_unittest(copia: Path, objetivos: list[str] | None) -> str:
+    """Una sola invocacion de unittest con todos los objetivos (#343)."""
+    cmd = [sys.executable, "-m", "unittest"] + (objetivos or ["discover", "-s", "tests"])
     # Los tests importan hermanos (`from test_x import ...`): `<copia>/tests`
     # va delante del PYTHONPATH del llamador, que se conserva (#286).
     pythonpath = os.pathsep.join(
@@ -355,7 +357,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--a")
     parser.add_argument("--por")
     parser.add_argument("--linea", type=int)
-    parser.add_argument("--test")
+    parser.add_argument("--test", action="append")
     args = parser.parse_args(argv)
     try:
         k, fallos, total, base = medir(args)
