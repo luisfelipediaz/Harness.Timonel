@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.25.0 — en desarrollo
+
+- `ChangelogEnHotfixPluginTests.LITERALES` (`tests/test_consistencia.py`) cambia el literal `jq` por la recomendación completa ``usa `jq` o la herramienta de edicion``: la subcadena `jq` también la cumplía "no uses `jq`" (aserción vacua de polaridad). `agents/flechodiezx-hotfix.md` no cambia. Evidencia con ``mutar_literal.py --ruta agents/flechodiezx-hotfix.md --literal 'usa `jq`' --modo sustituir --por 'no uses `jq`' --linea 86 --test tests.test_consistencia.ChangelogEnHotfixPluginTests``: antes del cambio 0 fallos de 2 (base 0), después 1 de 2 (base 0), solo el subTest del literal nuevo; 524 en la suite. (#358)
+
 ## 0.24.0 — 2026-10-19
 
 - `agents/flechodiezx-hotfix.md` acota el bloque `npx nx affected` de la `## Fase 2` al perfil consumidor con un párrafo nuevo **Perfil plugin (Fase 2, lint y tests)**: en perfil plugin (sin Nx) se corre `python3 scripts/verificar_plugin.py` y su salida se registra en `LINT_RESULTADO`/`TESTS_RESULTADO` (exit 0 `PASSED`, 1 `FAILED`, 2 `no sé`, que no es `PASSED`); hay dos corridas, tras el merge y tras `chore: changelog #N`, y el párrafo de CHANGELOG de #321 no cambia (`ChangelogEnHotfixPluginTests` sigue verde). Tests nuevos: `LintYTestsDelHotfixPorPerfilTests` (2, anclados a `## Fase 2`; rojos antes del cambio con `FAILED (failures=2)`): 513 en la suite; `verificar_plugin.py` PASSED. Mutación con `mutar_literal.py --modo borrar` del encabezado `**Perfil plugin (Fase 2, lint y tests)**`: líneas mutadas 1, 2 fallos de 513 (base 0), solo los de la clase nueva; cambiar a mano ``exit 2 `no sé` `` por ``exit 2 `PASSED` `` da `FAILED (failures=2)` de 116 en `tests.test_consistencia` (`test_exit_2_no_es_passed`, que tras el review asevera con regex y ya no con una subcadena sin backticks, y el subTest `no sé`). (#356)
