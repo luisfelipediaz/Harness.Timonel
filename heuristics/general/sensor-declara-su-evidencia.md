@@ -52,7 +52,7 @@ El mismo criterio, al no medir algo: decilo. `_filas_disparo` lo deja escrito �
 
 ## Caso real
 
-**El defecto puntual: #352, commit `6221478`** (`fix(plugin): #352 verificador no disponible sale no sé`). En `scripts/mutar_literal.py`, `_pasa_bash_n` devolvía `True` en `except (OSError, subprocess.TimeoutExpired)` con el razonamiento "sin bash no se puede afirmar que no compila: no se rechaza". Un verificador que no pudo correr contestó "sí compila" y dejó pasar una mutación sin verificar. El fix cambió el retorno a `bool | None` y, con `None`, la herramienta sale 2 con el motivo `verificador_no_disponible`. La retro de #352 lo nombra textual:
+**El defecto puntual: #352, commit `6221478`** (`fix(plugin): #352 verificador no disponible sale no se en mutar_literal.py`). En `scripts/mutar_literal.py`, `_pasa_bash_n` devolvía `True` en `except (OSError, subprocess.TimeoutExpired)` con el razonamiento "sin bash no se puede afirmar que no compila: no se rechaza". Un verificador que no pudo correr contestó "sí compila" y dejó pasar una mutación sin verificar. El fix cambió el retorno a `bool | None` y, con `None`, la herramienta sale 2 con el motivo `verificador_no_disponible`. La retro de #352 lo nombra textual:
 
 > Un verificador que no puede responder se colapsó a la rama favorable (`True`)
 
