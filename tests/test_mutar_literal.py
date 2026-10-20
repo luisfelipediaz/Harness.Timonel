@@ -106,6 +106,25 @@ class SeccionYMutacionTests(unittest.TestCase):
         nuevo, k = ml.mutar("a LIT\nb LIT\n", "LIT", "borrar", None, linea=1)
         self.assertEqual((nuevo, k), ("a \nb LIT\n", 1))
 
+    def test_linea_cuenta_solo_saltos_de_linea_no_form_feed(self):
+        texto = "a\fb\nX uno\nX dos\n"
+        nuevo, k = ml.mutar(texto, "X", "sustituir", None, por="Y", linea=3)
+        self.assertEqual((nuevo, k), ("a\fb\nX uno\nY dos\n", 1))
+        nuevo, k = ml.mutar(texto, "X", "sustituir", None, por="Y", linea=2)
+        self.assertEqual((nuevo, k), ("a\fb\nY uno\nX dos\n", 1))
+
+    def test_linea_fuera_del_conteo_por_salto_es_linea_invalida(self):
+        with self.assertRaises(ml.NoSe) as c:
+            ml.mutar("a\fb\nX uno\nX dos\n", "X", "sustituir", None, por="Y", linea=4)
+        self.assertEqual(c.exception.clave, "linea_invalida")
+
+    def test_cortar_por_salto_reconstruye_el_texto_byte_a_byte(self):
+        separadores = "\f\v\x1c\x1d\x1e\x85\u2028\u2029\r"
+        for texto in (f"a{separadores}b\nc\n", f"a{separadores}b\nc", "", "\n\n", "sin salto"):
+            with self.subTest(texto=texto):
+                self.assertEqual("".join(ml.cortar_por_salto(texto)), texto)
+        self.assertEqual(ml.cortar_por_salto("a\u2028b\nc"), ["a\u2028b\n", "c"])
+
     def test_sustituir_es_literal_no_regex(self):
         nuevo, _ = ml.mutar("x */.git) y\n", "*/.git)", "sustituir", None, por="*)")
         self.assertEqual(nuevo, "x *) y\n")
