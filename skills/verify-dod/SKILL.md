@@ -32,13 +32,13 @@ Ejecuta la checklist de DoD con los resultados acumulados de fases anteriores ma
 | 2 | Lint pasa | CRITICO | `lint_resultado` |
 | 3 | Tests unitarios creados | NO critico | `git diff --name-only --diff-filter=A origin/<rama-base>...HEAD -- '*.spec.ts' \| grep <modulo>` → PASSED si hay; SKIPPED si `NO_SPECS`. En perfil plugin, criterio propio: ver el parrafo **Perfil plugin** |
 | 4 | Tests pasan | CRITICO | `tests_resultado` (SKIPPED si `NO_SPECS`) |
-| 5 | Modelos compartidos | NO critico | `git diff --name-only origin/<rama-base>...HEAD -- <modelos.path>` → PASSED si hay; SKIPPED si el alcance no los implica |
-| 6 | Providers registrados | CRITICO si aplica | `providers_registrados` (`n-a` → SKIPPED) |
-| 7 | Rutas registradas | CRITICO si aplica | `rutas_registradas` (`n-a` → SKIPPED) |
-| 8 | Checklist de tareas completo | CRITICO | `tareas_completas`; verifica en el body: `gh issue view <issue> -R <repo> --json body -q .body \| awk '/^## Tareas/{f=1} f'` — las tareas no aplicables al alcance (ej. Frontend en `alcance:backend`) cuentan como SKIPPED; `PR abierto` debe estar **marcada** (el PR se abre en la Fase 6.5, antes del DoD, #80) — ya no cuenta como SKIPPED |
+| 5 | Modelos compartidos | NO critico | `git diff --name-only origin/<rama-base>...HEAD -- <modelos.path>` → PASSED si hay; SKIPPED si el alcance no los implica. En perfil plugin: SKIPPED, ver el parrafo **Perfil plugin** |
+| 6 | Providers registrados | CRITICO si aplica | `providers_registrados` (`n-a` → SKIPPED). En perfil plugin: SKIPPED, ver el parrafo **Perfil plugin** |
+| 7 | Rutas registradas | CRITICO si aplica | `rutas_registradas` (`n-a` → SKIPPED). En perfil plugin: SKIPPED, ver el parrafo **Perfil plugin** |
+| 8 | Checklist de tareas completo | CRITICO | `tareas_completas`; verifica en el body: `gh issue view <issue> -R <repo> --json body -q .body \| awk '/^## Tareas/{f=1} f'` — las tareas no aplicables al alcance (ej. Frontend en `alcance:backend`) cuentan como SKIPPED; `PR abierto` debe estar **marcada** (el PR se abre en la Fase 6.5, antes del DoD, #80) — ya no cuenta como SKIPPED. En perfil plugin, tareas que cuentan como SKIPPED: ver el parrafo **Perfil plugin** |
 | 9 | Retrospectiva publicada | NO critico (CRITICO en perfil plugin) | `retro_generada`: `si` → PASSED; `no` → FAILED CRITICO en perfil plugin, FAILED NO critico en perfil consumidor |
 | 10 | Sin TODOs criticos en archivos nuevos | NO critico | `git diff --name-only --diff-filter=A origin/<rama-base>...HEAD \| xargs grep -l 'TODO'` → lista si hay (no bloquea) |
-| 11 | Code review aprobado | CRITICO | `APROBADO`/`APROBADO CON OBSERVACIONES` → PASSED; `REQUIERE CAMBIOS`, `NO_GENERADO` o `SKIPPED` → FAILED CRITICO en `tipo:hu` y `tipo:hotfix` (sin autoevaluacion sin evaluador: nunca se degrada a NO critico) |
+| 11 | Code review aprobado | CRITICO | `APROBADO`/`APROBADO CON OBSERVACIONES` → PASSED; `REQUIERE CAMBIOS`, `NO_GENERADO` o `SKIPPED` → FAILED CRITICO en `tipo:hu` y `tipo:hotfix` (sin autoevaluacion sin evaluador: nunca se degrada a NO critico). En perfil plugin tambien aplica (nunca SKIPPED): ver el parrafo **Perfil plugin** |
 
 `<rama-base>` es la rama desde la que se creo `hu/N-slug` (normalmente `main` o `develop`; usa `git merge-base`). Los diffs de los items 3, 5 y 10 se calculan contra la ref **remota** `origin/<rama-base>`, nunca contra la rama local (una local atrasada infla el diff): antes corre `git fetch origin <rama-base>` en `directorio_trabajo`. Si el `fetch` falla, el diff es "no se": el item afectado queda FAILED no critico con el motivo `fetch fallido`, nunca un conteo contra la ref local. El item 1 no cambia: `pr_check.py --base` recibe el nombre de la rama, sin `origin/`.
 
