@@ -1228,6 +1228,39 @@ class ChangelogEnHotfixPluginTests(unittest.TestCase):
         self.assertIn(orden, frase, "el orden debe estar en la misma frase que manda correr `verificar_plugin.py`")
 
 
+class MutacionCompletaEnChangelogTests(unittest.TestCase):
+    """#350: si la linea del CHANGELOG cita evidencia de mutacion, la viñeta de
+    `consolidate-story` manda listar la cifra de cada modulo medido, no solo la del que sale
+    limpio (`sensor-declara-su-evidencia`). Evidencia #327: el CHANGELOG reporto la mutacion de
+    `test_hooks_integracion` (8 de 100) y omitio la de `test_detectar_push_forzado`. Se ancla a
+    la viñeta del perfil plugin (`- **CHANGELOG**: con la Fase B en verde`), no a la
+    `- **CHANGELOG** (perfil plugin)` de otra seccion; la prosa se compara con regex tolerante
+    al markup (`aserciones-no-vacuas`)."""
+
+    INICIO = "- **CHANGELOG**: con la Fase B en verde"
+    PATRONES = (
+        r"cita\w*\s+(?:evidencia\s+de\s+)?mutaci",
+        r"`?fallos: N de M`?",
+        r"`?base: B de M`?",
+        r"cada\s+m[oó]dulo\s+medido",
+        r"fuera\s+de\s+lo\s+esperado",
+    )
+
+    def _vineta(self):
+        texto = (ROOT / "skills/consolidate-story/SKILL.md").read_text(encoding="utf-8")
+        return next((l for l in texto.splitlines() if l.startswith(self.INICIO)), "")
+
+    def test_vineta_existe(self):
+        self.assertTrue(self._vineta(), f"consolidate-story debe tener la viñeta `{self.INICIO}`")
+
+    def test_vineta_exige_la_mutacion_de_cada_modulo_medido(self):
+        vineta = self._vineta()
+        self.assertTrue(vineta, f"consolidate-story debe tener la viñeta `{self.INICIO}`")
+        for patron in self.PATRONES:
+            with self.subTest(patron=patron):
+                self.assertRegex(vineta, patron, f"la viñeta CHANGELOG debe cubrir `{patron}`")
+
+
 class LintYTestsDelHotfixPorPerfilTests(unittest.TestCase):
     """#356: en la `## Fase 2` de `flechodiezx-hotfix` el bloque `npx nx affected` es del
     perfil consumidor; en perfil plugin (sin Nx) el lint y los tests los da
