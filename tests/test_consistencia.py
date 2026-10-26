@@ -2218,5 +2218,37 @@ class CasoRealDelVerificadorTests(unittest.TestCase):
         )
 
 
+class GherkinDelRefinamientoTests(unittest.TestCase):
+    """El bullet **Ficha incompleta** de la Fase 4 del refiner manda dos reglas al redactar Gherkin (#365).
+
+    Defecto: un Gherkin de #325/#326 nombro `TABLA_DE_CASOS` como la tabla que debia fallar
+    en la mutacion cuando no era la que ejercia el guard; y en #327 "no cambia lo existente"
+    se midio solo en el hook cuando, a nivel del sensor, 9 filas pasaban de NOSE a SI por diseno.
+    Cada test se acota al bullet: la misma palabra en otra parte del agente no lo satisface.
+    """
+
+    @staticmethod
+    def _bullet() -> str:
+        texto = (ROOT / "agents" / "backlog-refiner.md").read_text(encoding="utf-8")
+        fase = SincronizacionDelWorktreeTests._seccion(texto, "## Fase 4")
+        bullets = [b for b in re.split(r"(?m)^- ", fase) if b.startswith("**Ficha incompleta**")]
+        assert len(bullets) == 1, "el bullet **Ficha incompleta** debe existir una sola vez en la Fase 4"
+        return bullets[0]
+
+    def test_contenedor(self):
+        self.assertRegex(
+            self._bullet(),
+            r"(?is)mutaci\W*on[^.]*nombr\w*[^.]*escenarios[^.]*deben\s+fallar"
+            r"[^.]*verific\w*[^.]*`?grep`?[^.]*contenedor[^.]*ejerce",
+        )
+
+    def test_sensor(self):
+        self.assertRegex(
+            self._bullet(),
+            r"(?is)fix\s+de\s+sensor[^.]*m\w+\s+el\s+m\w*dulo\s+unitario\s+del\s+sensor"
+            r"[^.]*\bhook\b[^.]*no\s+cambia\s+lo\s+existente[^.]*nivel\s+observable",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
