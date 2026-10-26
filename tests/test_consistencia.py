@@ -1721,6 +1721,7 @@ class HeuristicasDescubriblesTests(unittest.TestCase):
     PREFIJO_CUANDO = "Cuándo"
     CARPETA_SIEMPRE_ALCANZABLE = "general"
     DIRS_CON_MARKDOWN = ("agents", "commands", "skills", "scripts", "hooks", "heuristics", "docs", "evals", "tests", ".github")
+    DIRS_CON_PYTHON = ("scripts", "tests", "hooks")
     _RE_RUTA_HEURISTICA = re.compile(r"heuristics/([A-Za-z0-9_-]+)/([A-Za-z0-9_.-]+\.md)")
 
     @staticmethod
@@ -1766,12 +1767,14 @@ class HeuristicasDescubriblesTests(unittest.TestCase):
         return re.split(r"\n[ \t]*\n", texto)
 
     @classmethod
-    def _markdown_del_repo(cls):
-        """Solo los directorios versionados con documentacion. `rglob` desde la raiz
-        entraria a `.claude/worktrees/`, donde viven copias completas del repo."""
+    def _documentos_que_citan(cls):
+        """Markdown y `.py` (docstrings, comentarios) de los directorios versionados.
+        `rglob` desde la raiz entraria a `.claude/worktrees/`, donde viven copias completas del repo."""
         yield from sorted(ROOT.glob("*.md"))
         for carpeta in cls.DIRS_CON_MARKDOWN:
             yield from sorted((ROOT / carpeta).rglob("*.md"))
+        for carpeta in cls.DIRS_CON_PYTHON:
+            yield from sorted((ROOT / carpeta).rglob("*.py"))
 
     # --- A: descubrimiento por glob -------------------------------------------------
 
@@ -1806,13 +1809,23 @@ class HeuristicasDescubriblesTests(unittest.TestCase):
     # --- B: sin referencias huerfanas -----------------------------------------------
 
     def test_b_toda_ruta_de_heuristica_citada_existe_en_disco(self):
-        for doc in self._markdown_del_repo():
+        for doc in self._documentos_que_citan():
             for carpeta, archivo in self._RE_RUTA_HEURISTICA.findall(doc.read_text(encoding="utf-8")):
                 ruta = ROOT / "heuristics" / carpeta / archivo
                 self.assertTrue(
                     ruta.exists(),
                     f"{doc.relative_to(ROOT)} cita `heuristics/{carpeta}/{archivo}` y ese archivo no existe",
                 )
+
+    def test_b_el_recorrido_incluye_los_py_de_scripts_tests_y_hooks(self):
+        """Sin esto, una cita en un docstring `.py` quedaria fuera de la invariante en silencio (#195)."""
+        sufijos_por_carpeta = {
+            carpeta: {d.suffix for d in self._documentos_que_citan() if d.is_relative_to(ROOT / carpeta)}
+            for carpeta in ("scripts", "tests")
+        }
+        for carpeta, sufijos in sufijos_por_carpeta.items():
+            self.assertIn(".py", sufijos, f"el recorrido de test_b no incluye ningun .py de {carpeta}/")
+        self.assertIn(ROOT / "scripts" / "detectar_commit.py", set(self._documentos_que_citan()))
 
     # --- C y D: formato y evidencia --------------------------------------------------
 
