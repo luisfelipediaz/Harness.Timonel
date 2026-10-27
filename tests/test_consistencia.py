@@ -2264,6 +2264,54 @@ class CasoRealDelVerificadorTests(unittest.TestCase):
         )
 
 
+class OrdenYProhibicionEnUnidadTests(unittest.TestCase):
+    """`unidad-de-verificacion.md` cubre el orden y la prohibicion (#359).
+
+    Cada test se acota a la subseccion `### Orden y prohibición` (o a `## Caso real`),
+    no al archivo entero: la misma palabra en otra seccion no lo satisface. Los tests de
+    la subseccion se reparten las ideas (orden / prohibicion / ancla) para que borrar una
+    deje un solo test en rojo.
+    """
+
+    RUTA = ROOT / "heuristics" / "general" / "unidad-de-verificacion.md"
+    TITULO = "### Orden y prohibición"
+
+    @classmethod
+    def _subseccion(cls) -> str:
+        texto = cls.RUTA.read_text(encoding="utf-8")
+        inicio = texto.find("\n" + cls.TITULO)
+        assert inicio != -1, f"{cls.RUTA.name} no tiene `{cls.TITULO}`"
+        inicio += 1
+        fin = re.search(r"\n#{2,3} ", texto[inicio + len(cls.TITULO):])
+        return texto[inicio:] if fin is None else texto[inicio:inicio + len(cls.TITULO) + fin.start()]
+
+    @classmethod
+    def _caso_real(cls) -> str:
+        cuerpo = HeuristicasDescubriblesTests._cuerpo_de_seccion(cls.RUTA.read_text(encoding="utf-8"), "Caso real")
+        assert cuerpo is not None, f"{cls.RUTA.name} no tiene `## Caso real`"
+        return cuerpo
+
+    def test_el_orden_ancla_el_literal_a_la_misma_frase_que_el_elemento_ordenado(self):
+        self.assertRegex(self._subseccion(), r"(?is)El\W+orden\W.*misma\W+frase.*elemento\W+ordenado")
+
+    def test_la_prohibicion_exige_el_literal_con_su_negacion(self):
+        self.assertRegex(self._subseccion(), r"(?is)La\W+prohibici\w+\W.*incluye\W+la\W+negaci\w+")
+
+    def test_la_prohibicion_distingue_presente_de_prohibido(self):
+        self.assertRegex(self._subseccion(), r"(?is)La\W+prohibici\w+\W.*exigir\w*\W+(?:como\W+)?presente.*prohibido")
+
+    def test_caso_real_cita_textual_el_orden_de_321(self):
+        self.assertIn("deja los 2 tests en verde (fallos 0 de 2)", self._caso_real())
+
+    def test_caso_real_cita_textual_la_prohibicion_de_321(self):
+        self.assertIn("solo se exige como presente, no como prohibido", self._caso_real())
+
+    def test_caso_real_cita_el_issue_y_el_commit(self):
+        cuerpo = self._caso_real()
+        self.assertRegex(cuerpo, r"#321")
+        self.assertRegex(cuerpo, r"579ec4a")
+
+
 class GherkinDelRefinamientoTests(unittest.TestCase):
     """El bullet **Ficha incompleta** de la Fase 4 del refiner manda dos reglas al redactar Gherkin (#365).
 
