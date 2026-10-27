@@ -1575,6 +1575,52 @@ class TestsVerdesPrimeraCorridaTests(unittest.TestCase):
                 )
 
 
+class ReglasDeEvidenciaPorMutacionTests(unittest.TestCase):
+    """Tres reglas de doctrina en el bullet `### Tests verdes en su primera corrida`
+    del skill `implement-plugin-change` (#338). La unidad de verificacion es ese
+    bullet, no el archivo: la misma frase en otra seccion no cubre donde se ejerce.
+    Las frases exigidas viven en los patrones de abajo, no en este docstring. El
+    patron se compara contra el bullet sin backticks ni negritas, para que el
+    formato no decida el resultado."""
+
+    RUTA = "skills/implement-plugin-change/SKILL.md"
+    SECCION = "## Output (obligatorio)"
+    PATRONES = {
+        "prosa_primero": r"primero la prosa(?: correcta)?[^.\n]*literal[^.\n]*ancla[^.\n]*dupliqu[^.\n]*forzar",
+        "fail_closed": r"except[^.\n]*(?:no se|no sé)[^.\n]*fail-closed[^.\n]*NameError[^.\n]*sustituyendo",
+        "una_linea": r"lineas mutadas: K[^.\n]*K > 1[^.\n]*--linea[^.\n]*manual",
+    }
+
+    def _bullet(self) -> str:
+        texto = (ROOT / self.RUTA).read_text(encoding="utf-8")
+        recorte = SincronizacionDelWorktreeTests._seccion(texto, self.SECCION)
+        lineas = recorte.splitlines()
+        marca = next((i for i, l in enumerate(lineas) if TestsVerdesPrimeraCorridaTests.LITERAL in l), None)
+        self.assertIsNotNone(marca, f"{self.RUTA}: `{self.SECCION}` no tiene el bullet del bloque")
+        cuerpo = [lineas[marca]]
+        for linea in lineas[marca + 1:]:
+            if linea.startswith("- "):
+                break
+            cuerpo.append(linea)
+        return re.sub(r"\s+", " ", re.sub(r"[`*]", "", "\n".join(cuerpo)))
+
+    def _exige(self, clave: str) -> None:
+        with self.subTest(regla=clave):
+            self.assertRegex(
+                self._bullet().replace(" . ", ". "), self.PATRONES[clave],
+                f"{self.RUTA}: el bullet del bloque no dice la regla `{clave}`",
+            )
+
+    def test_prosa_primero(self):
+        self._exige("prosa_primero")
+
+    def test_fail_closed(self):
+        self._exige("fail_closed")
+
+    def test_una_linea(self):
+        self._exige("una_linea")
+
+
 class VerificarPluginCitadoTests(unittest.TestCase):
     """Los tres consumidores de la verificacion citan el script unico (#270), en la
     seccion/item donde se ejerce y no en cualquier parte del archivo: un literal
@@ -2262,6 +2308,54 @@ class CasoRealDelVerificadorTests(unittest.TestCase):
             cuerpo,
             r"(?im)^\s*-[^\n]*(?:herramienta\W+ausente|timeout)[^\n]*(?:resultado\W+favorable|\bTrue\b)",
         )
+
+
+class OrdenYProhibicionEnUnidadTests(unittest.TestCase):
+    """`unidad-de-verificacion.md` cubre el orden y la prohibicion (#359).
+
+    Cada test se acota a la subseccion `### Orden y prohibición` (o a `## Caso real`),
+    no al archivo entero: la misma palabra en otra seccion no lo satisface. Los tests de
+    la subseccion se reparten las ideas (orden / prohibicion / ancla) para que borrar una
+    deje un solo test en rojo.
+    """
+
+    RUTA = ROOT / "heuristics" / "general" / "unidad-de-verificacion.md"
+    TITULO = "### Orden y prohibición"
+
+    @classmethod
+    def _subseccion(cls) -> str:
+        texto = cls.RUTA.read_text(encoding="utf-8")
+        inicio = texto.find("\n" + cls.TITULO)
+        assert inicio != -1, f"{cls.RUTA.name} no tiene `{cls.TITULO}`"
+        inicio += 1
+        fin = re.search(r"\n#{2,3} ", texto[inicio + len(cls.TITULO):])
+        return texto[inicio:] if fin is None else texto[inicio:inicio + len(cls.TITULO) + fin.start()]
+
+    @classmethod
+    def _caso_real(cls) -> str:
+        cuerpo = HeuristicasDescubriblesTests._cuerpo_de_seccion(cls.RUTA.read_text(encoding="utf-8"), "Caso real")
+        assert cuerpo is not None, f"{cls.RUTA.name} no tiene `## Caso real`"
+        return cuerpo
+
+    def test_el_orden_ancla_el_literal_a_la_misma_frase_que_el_elemento_ordenado(self):
+        self.assertRegex(self._subseccion(), r"(?is)El\W+orden\W.*misma\W+frase.*elemento\W+ordenado")
+
+    def test_la_prohibicion_exige_el_literal_con_su_negacion(self):
+        self.assertRegex(self._subseccion(), r"(?is)La\W+prohibici\w+\W.*incluye\W+la\W+negaci\w+")
+
+    def test_la_prohibicion_distingue_presente_de_prohibido(self):
+        self.assertRegex(self._subseccion(), r"(?is)La\W+prohibici\w+\W.*exigir\w*\W+(?:como\W+)?presente.*prohibido")
+
+    def test_caso_real_cita_textual_el_orden_de_321(self):
+        self.assertIn("deja los 2 tests en verde (fallos 0 de 2)", self._caso_real())
+
+    def test_caso_real_cita_textual_la_prohibicion_de_321(self):
+        self.assertIn("solo se exige como presente, no como prohibido", self._caso_real())
+
+    def test_caso_real_cita_el_issue_y_el_commit(self):
+        cuerpo = self._caso_real()
+        self.assertRegex(cuerpo, r"#321")
+        self.assertRegex(cuerpo, r"579ec4a")
 
 
 class GherkinDelRefinamientoTests(unittest.TestCase):
