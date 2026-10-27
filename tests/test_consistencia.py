@@ -1228,6 +1228,39 @@ class ChangelogEnHotfixPluginTests(unittest.TestCase):
         self.assertIn(orden, frase, "el orden debe estar en la misma frase que manda correr `verificar_plugin.py`")
 
 
+class MutacionCompletaEnChangelogTests(unittest.TestCase):
+    """#350: si la linea del CHANGELOG cita evidencia de mutacion, la viñeta de
+    `consolidate-story` manda listar la cifra de cada modulo medido, no solo la del que sale
+    limpio (`sensor-declara-su-evidencia`). Evidencia #327: el CHANGELOG reporto la mutacion de
+    `test_hooks_integracion` (8 de 100) y omitio la de `test_detectar_push_forzado`. Se ancla a
+    la viñeta del perfil plugin (`- **CHANGELOG**: con la Fase B en verde`), no a la
+    `- **CHANGELOG** (perfil plugin)` de otra seccion; la prosa se compara con regex tolerante
+    al markup (`aserciones-no-vacuas`)."""
+
+    INICIO = "- **CHANGELOG**: con la Fase B en verde"
+    PATRONES = (
+        r"cita\w*\s+(?:evidencia\s+de\s+)?mutaci",
+        r"`?fallos: N de M`?",
+        r"`?base: B de M`?",
+        r"cada\s+m[oó]dulo\s+medido",
+        r"fuera\s+de\s+lo\s+esperado",
+    )
+
+    def _vineta(self):
+        texto = (ROOT / "skills/consolidate-story/SKILL.md").read_text(encoding="utf-8")
+        return next((l for l in texto.splitlines() if l.startswith(self.INICIO)), "")
+
+    def test_vineta_existe(self):
+        self.assertTrue(self._vineta(), f"consolidate-story debe tener la viñeta `{self.INICIO}`")
+
+    def test_vineta_exige_la_mutacion_de_cada_modulo_medido(self):
+        vineta = self._vineta()
+        self.assertTrue(vineta, f"consolidate-story debe tener la viñeta `{self.INICIO}`")
+        for patron in self.PATRONES:
+            with self.subTest(patron=patron):
+                self.assertRegex(vineta, patron, f"la viñeta CHANGELOG debe cubrir `{patron}`")
+
+
 class LintYTestsDelHotfixPorPerfilTests(unittest.TestCase):
     """#356: en la `## Fase 2` de `flechodiezx-hotfix` el bloque `npx nx affected` es del
     perfil consumidor; en perfil plugin (sin Nx) el lint y los tests los da
@@ -1721,6 +1754,7 @@ class HeuristicasDescubriblesTests(unittest.TestCase):
     PREFIJO_CUANDO = "Cuándo"
     CARPETA_SIEMPRE_ALCANZABLE = "general"
     DIRS_CON_MARKDOWN = ("agents", "commands", "skills", "scripts", "hooks", "heuristics", "docs", "evals", "tests", ".github")
+    DIRS_CON_PYTHON = ("scripts", "tests", "hooks")
     _RE_RUTA_HEURISTICA = re.compile(r"heuristics/([A-Za-z0-9_-]+)/([A-Za-z0-9_.-]+\.md)")
 
     @staticmethod
@@ -1766,12 +1800,14 @@ class HeuristicasDescubriblesTests(unittest.TestCase):
         return re.split(r"\n[ \t]*\n", texto)
 
     @classmethod
-    def _markdown_del_repo(cls):
-        """Solo los directorios versionados con documentacion. `rglob` desde la raiz
-        entraria a `.claude/worktrees/`, donde viven copias completas del repo."""
+    def _documentos_que_citan(cls):
+        """Markdown y `.py` (docstrings, comentarios) de los directorios versionados.
+        `rglob` desde la raiz entraria a `.claude/worktrees/`, donde viven copias completas del repo."""
         yield from sorted(ROOT.glob("*.md"))
         for carpeta in cls.DIRS_CON_MARKDOWN:
             yield from sorted((ROOT / carpeta).rglob("*.md"))
+        for carpeta in cls.DIRS_CON_PYTHON:
+            yield from sorted((ROOT / carpeta).rglob("*.py"))
 
     # --- A: descubrimiento por glob -------------------------------------------------
 
@@ -1806,13 +1842,23 @@ class HeuristicasDescubriblesTests(unittest.TestCase):
     # --- B: sin referencias huerfanas -----------------------------------------------
 
     def test_b_toda_ruta_de_heuristica_citada_existe_en_disco(self):
-        for doc in self._markdown_del_repo():
+        for doc in self._documentos_que_citan():
             for carpeta, archivo in self._RE_RUTA_HEURISTICA.findall(doc.read_text(encoding="utf-8")):
                 ruta = ROOT / "heuristics" / carpeta / archivo
                 self.assertTrue(
                     ruta.exists(),
                     f"{doc.relative_to(ROOT)} cita `heuristics/{carpeta}/{archivo}` y ese archivo no existe",
                 )
+
+    def test_b_el_recorrido_incluye_los_py_de_scripts_tests_y_hooks(self):
+        """Sin esto, una cita en un docstring `.py` quedaria fuera de la invariante en silencio (#195)."""
+        sufijos_por_carpeta = {
+            carpeta: {d.suffix for d in self._documentos_que_citan() if d.is_relative_to(ROOT / carpeta)}
+            for carpeta in ("scripts", "tests")
+        }
+        for carpeta, sufijos in sufijos_por_carpeta.items():
+            self.assertIn(".py", sufijos, f"el recorrido de test_b no incluye ningun .py de {carpeta}/")
+        self.assertIn(ROOT / "scripts" / "detectar_commit.py", set(self._documentos_que_citan()))
 
     # --- C y D: formato y evidencia --------------------------------------------------
 
@@ -2215,6 +2261,38 @@ class CasoRealDelVerificadorTests(unittest.TestCase):
         self.assertRegex(
             cuerpo,
             r"(?im)^\s*-[^\n]*(?:herramienta\W+ausente|timeout)[^\n]*(?:resultado\W+favorable|\bTrue\b)",
+        )
+
+
+class GherkinDelRefinamientoTests(unittest.TestCase):
+    """El bullet **Ficha incompleta** de la Fase 4 del refiner manda dos reglas al redactar Gherkin (#365).
+
+    Defecto: un Gherkin de #325/#326 nombro `TABLA_DE_CASOS` como la tabla que debia fallar
+    en la mutacion cuando no era la que ejercia el guard; y en #327 "no cambia lo existente"
+    se midio solo en el hook cuando, a nivel del sensor, 9 filas pasaban de NOSE a SI por diseno.
+    Cada test se acota al bullet: la misma palabra en otra parte del agente no lo satisface.
+    """
+
+    @staticmethod
+    def _bullet() -> str:
+        texto = (ROOT / "agents" / "backlog-refiner.md").read_text(encoding="utf-8")
+        fase = SincronizacionDelWorktreeTests._seccion(texto, "## Fase 4")
+        bullets = [b for b in re.split(r"(?m)^- ", fase) if b.startswith("**Ficha incompleta**")]
+        assert len(bullets) == 1, "el bullet **Ficha incompleta** debe existir una sola vez en la Fase 4"
+        return bullets[0]
+
+    def test_contenedor(self):
+        self.assertRegex(
+            self._bullet(),
+            r"(?is)mutaci\W*on[^.]*nombr\w*[^.]*escenarios[^.]*deben\s+fallar"
+            r"[^.]*verific\w*[^.]*`?grep`?[^.]*contenedor[^.]*ejerce",
+        )
+
+    def test_sensor(self):
+        self.assertRegex(
+            self._bullet(),
+            r"(?is)fix\s+de\s+sensor[^.]*m\w+\s+el\s+m\w*dulo\s+unitario\s+del\s+sensor"
+            r"[^.]*\bhook\b[^.]*no\s+cambia\s+lo\s+existente[^.]*nivel\s+observable",
         )
 
 
