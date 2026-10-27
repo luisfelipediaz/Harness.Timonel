@@ -1575,6 +1575,52 @@ class TestsVerdesPrimeraCorridaTests(unittest.TestCase):
                 )
 
 
+class ReglasDeEvidenciaPorMutacionTests(unittest.TestCase):
+    """Tres reglas de doctrina en el bullet `### Tests verdes en su primera corrida`
+    del skill `implement-plugin-change` (#338). La unidad de verificacion es ese
+    bullet, no el archivo: la misma frase en otra seccion no cubre donde se ejerce.
+    Las frases exigidas viven en los patrones de abajo, no en este docstring. El
+    patron se compara contra el bullet sin backticks ni negritas, para que el
+    formato no decida el resultado."""
+
+    RUTA = "skills/implement-plugin-change/SKILL.md"
+    SECCION = "## Output (obligatorio)"
+    PATRONES = {
+        "prosa_primero": r"primero la prosa(?: correcta)?[^.\n]*literal[^.\n]*ancla[^.\n]*dupliqu[^.\n]*forzar",
+        "fail_closed": r"except[^.\n]*(?:no se|no sé)[^.\n]*fail-closed[^.\n]*NameError[^.\n]*sustituyendo",
+        "una_linea": r"lineas mutadas: K[^.\n]*K > 1[^.\n]*--linea[^.\n]*manual",
+    }
+
+    def _bullet(self) -> str:
+        texto = (ROOT / self.RUTA).read_text(encoding="utf-8")
+        recorte = SincronizacionDelWorktreeTests._seccion(texto, self.SECCION)
+        lineas = recorte.splitlines()
+        marca = next((i for i, l in enumerate(lineas) if TestsVerdesPrimeraCorridaTests.LITERAL in l), None)
+        self.assertIsNotNone(marca, f"{self.RUTA}: `{self.SECCION}` no tiene el bullet del bloque")
+        cuerpo = [lineas[marca]]
+        for linea in lineas[marca + 1:]:
+            if linea.startswith("- "):
+                break
+            cuerpo.append(linea)
+        return re.sub(r"\s+", " ", re.sub(r"[`*]", "", "\n".join(cuerpo)))
+
+    def _exige(self, clave: str) -> None:
+        with self.subTest(regla=clave):
+            self.assertRegex(
+                self._bullet().replace(" . ", ". "), self.PATRONES[clave],
+                f"{self.RUTA}: el bullet del bloque no dice la regla `{clave}`",
+            )
+
+    def test_prosa_primero(self):
+        self._exige("prosa_primero")
+
+    def test_fail_closed(self):
+        self._exige("fail_closed")
+
+    def test_una_linea(self):
+        self._exige("una_linea")
+
+
 class VerificarPluginCitadoTests(unittest.TestCase):
     """Los tres consumidores de la verificacion citan el script unico (#270), en la
     seccion/item donde se ejerce y no en cualquier parte del archivo: un literal
