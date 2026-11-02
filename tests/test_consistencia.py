@@ -1757,6 +1757,42 @@ class CableadoDeMainTests(unittest.TestCase):
         )
 
 
+class RamasDeNoSeDelSensorTests(unittest.TestCase):
+    """El item `2. **TDD**` de `## Pasos` exige, para todo sensor nuevo, un test por cada
+    rama de degradacion (herramienta ausente, timeout, salida ilegible) que asevere el
+    "no se" con su motivo y nunca la respuesta favorable (#381, caso real #352).
+    El ambito es solo ese item: la misma palabra en otro paso no obliga al TDD."""
+
+    SKILL = "skills/implement-plugin-change/SKILL.md"
+    SECCION_PASOS = "## Pasos"
+    PASO_TDD = "2. **TDD**"
+    REGLAS = {
+        "herramienta ausente": r"herramienta\s+ausente",
+        "timeout": r"\btimeout\b",
+        "salida ilegible": r"salida\s+ilegible",
+        'asevera "no se" con su motivo': r"asevere\s+(?:la\s+salida\s+)?[\"“]no s[eé][\"”]\s+con\s+su\s+motivo",
+    }
+
+    def _paso_tdd(self) -> str:
+        texto = (ROOT / self.SKILL).read_text(encoding="utf-8")
+        seccion = SincronizacionDelWorktreeTests._seccion(texto, self.SECCION_PASOS)
+        self.assertTrue(seccion, f"{self.SKILL}: no tiene la seccion `{self.SECCION_PASOS}`")
+        pasos = [p for p in PoliticaDeIntegracionDocumentadaTests._parrafos(seccion) if p.lstrip().startswith(self.PASO_TDD)]
+        self.assertEqual(len(pasos), 1, f"{self.SKILL}: `{self.SECCION_PASOS}` debe tener exactamente un item `{self.PASO_TDD}`")
+        return re.sub(r"[`*]", "", pasos[0])
+
+    def test_paso_tdd_exige_un_test_por_rama_de_no_se(self):
+        paso = self._paso_tdd()
+        self.assertGreaterEqual(len(self.REGLAS), 1, "invariante vacua: sin reglas")
+        for nombre, patron in self.REGLAS.items():
+            with self.subTest(regla=nombre):
+                self.assertRegex(
+                    paso, patron,
+                    f"{self.SKILL}: el item `{self.PASO_TDD}` perdio `{nombre}`. Sin el, un sensor nuevo "
+                    "puede salir con su camino de degradacion sin ejercitar (#352)",
+                )
+
+
 class SeccionSinEncabezadoTests(unittest.TestCase):
     """Los helpers que recortan una seccion de markdown no incluyen la linea del
     encabezado (#332/#303): un literal que solo vive en el titulo no debe satisfacer
