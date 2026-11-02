@@ -1621,6 +1621,35 @@ class ReglasDeEvidenciaPorMutacionTests(unittest.TestCase):
         self._exige("una_linea")
 
 
+class MutacionDelLiteralProtegidoTests(unittest.TestCase):
+    """La mutacion de evidencia sustituye el literal que la asercion protege, no el
+    ancla que recorta el ambito (#375). Acotado al mismo bullet que
+    `ReglasDeEvidenciaPorMutacionTests`; cada patron protege una frase distinta, para
+    que mutar una sola deje un solo test en rojo. Se compara sin backticks ni negritas."""
+
+    PATRONES = {
+        "literal_protegido": r"mutación sustituye el literal protegido, el que la aserción protege",
+        "solo_el_test_que_lo_cubre": r"fallar solo el test que lo cubre",
+        "encabezado_o_ancla": r"borrar el encabezado o el ancla del ámbito[^.\n]*no es evidencia de la aserción",
+    }
+
+    def _exige(self, clave: str) -> None:
+        bullet = ReglasDeEvidenciaPorMutacionTests()._bullet()
+        self.assertRegex(
+            bullet.replace(" . ", ". "), "(?i)" + self.PATRONES[clave],
+            f"{ReglasDeEvidenciaPorMutacionTests.RUTA}: el bullet del bloque no dice `{clave}`",
+        )
+
+    def test_la_mutacion_sustituye_el_literal_protegido(self):
+        self._exige("literal_protegido")
+
+    def test_debe_fallar_solo_el_test_que_lo_cubre(self):
+        self._exige("solo_el_test_que_lo_cubre")
+
+    def test_borrar_el_encabezado_o_el_ancla_no_es_evidencia(self):
+        self._exige("encabezado_o_ancla")
+
+
 class VerificarPluginCitadoTests(unittest.TestCase):
     """Los tres consumidores de la verificacion citan el script unico (#270), en la
     seccion/item donde se ejerce y no en cualquier parte del archivo: un literal
