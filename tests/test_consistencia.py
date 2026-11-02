@@ -1621,6 +1621,35 @@ class ReglasDeEvidenciaPorMutacionTests(unittest.TestCase):
         self._exige("una_linea")
 
 
+class MutacionDelLiteralProtegidoTests(unittest.TestCase):
+    """La mutacion de evidencia sustituye el literal que la asercion protege, no el
+    ancla que recorta el ambito (#375). Acotado al mismo bullet que
+    `ReglasDeEvidenciaPorMutacionTests`; cada patron protege una frase distinta, para
+    que mutar una sola deje un solo test en rojo. Se compara sin backticks ni negritas."""
+
+    PATRONES = {
+        "literal_protegido": r"mutación sustituye el literal protegido, el que la aserción protege",
+        "solo_el_test_que_lo_cubre": r"fallar solo el test que lo cubre",
+        "encabezado_o_ancla": r"borrar el encabezado o el ancla del ámbito[^.\n]*no es evidencia de la aserción",
+    }
+
+    def _exige(self, clave: str) -> None:
+        bullet = ReglasDeEvidenciaPorMutacionTests()._bullet()
+        self.assertRegex(
+            bullet.replace(" . ", ". "), "(?i)" + self.PATRONES[clave],
+            f"{ReglasDeEvidenciaPorMutacionTests.RUTA}: el bullet del bloque no dice `{clave}`",
+        )
+
+    def test_la_mutacion_sustituye_el_literal_protegido(self):
+        self._exige("literal_protegido")
+
+    def test_debe_fallar_solo_el_test_que_lo_cubre(self):
+        self._exige("solo_el_test_que_lo_cubre")
+
+    def test_borrar_el_encabezado_o_el_ancla_no_es_evidencia(self):
+        self._exige("encabezado_o_ancla")
+
+
 class VerificarPluginCitadoTests(unittest.TestCase):
     """Los tres consumidores de la verificacion citan el script unico (#270), en la
     seccion/item donde se ejerce y no en cualquier parte del archivo: un literal
@@ -1726,6 +1755,42 @@ class CableadoDeMainTests(unittest.TestCase):
         self._exige(
             self.SKILL, self._seccion(self.SKILL, self.SECCION_OUTPUT), self.LITERALES_OUTPUT, "`## Output (obligatorio)`",
         )
+
+
+class RamasDeNoSeDelSensorTests(unittest.TestCase):
+    """El item `2. **TDD**` de `## Pasos` exige, para todo sensor nuevo, un test por cada
+    rama de degradacion (herramienta ausente, timeout, salida ilegible) que asevere el
+    "no se" con su motivo y nunca la respuesta favorable (#381, caso real #352).
+    El ambito es solo ese item: la misma palabra en otro paso no obliga al TDD."""
+
+    SKILL = "skills/implement-plugin-change/SKILL.md"
+    SECCION_PASOS = "## Pasos"
+    PASO_TDD = "2. **TDD**"
+    REGLAS = {
+        "herramienta ausente": r"herramienta\s+ausente",
+        "timeout": r"\btimeout\b",
+        "salida ilegible": r"salida\s+ilegible",
+        'asevera "no se" con su motivo': r"asevere\s+(?:la\s+salida\s+)?[\"“]no s[eé][\"”]\s+con\s+su\s+motivo",
+    }
+
+    def _paso_tdd(self) -> str:
+        texto = (ROOT / self.SKILL).read_text(encoding="utf-8")
+        seccion = SincronizacionDelWorktreeTests._seccion(texto, self.SECCION_PASOS)
+        self.assertTrue(seccion, f"{self.SKILL}: no tiene la seccion `{self.SECCION_PASOS}`")
+        pasos = [p for p in PoliticaDeIntegracionDocumentadaTests._parrafos(seccion) if p.lstrip().startswith(self.PASO_TDD)]
+        self.assertEqual(len(pasos), 1, f"{self.SKILL}: `{self.SECCION_PASOS}` debe tener exactamente un item `{self.PASO_TDD}`")
+        return re.sub(r"[`*]", "", pasos[0])
+
+    def test_paso_tdd_exige_un_test_por_rama_de_no_se(self):
+        paso = self._paso_tdd()
+        self.assertGreaterEqual(len(self.REGLAS), 1, "invariante vacua: sin reglas")
+        for nombre, patron in self.REGLAS.items():
+            with self.subTest(regla=nombre):
+                self.assertRegex(
+                    paso, patron,
+                    f"{self.SKILL}: el item `{self.PASO_TDD}` perdio `{nombre}`. Sin el, un sensor nuevo "
+                    "puede salir con su camino de degradacion sin ejercitar (#352)",
+                )
 
 
 class SeccionSinEncabezadoTests(unittest.TestCase):
