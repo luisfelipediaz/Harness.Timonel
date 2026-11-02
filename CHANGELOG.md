@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.31.0 — en desarrollo
+## 0.31.0 — 2026-11-02
 
 - El paso `2. **TDD**` de `## Pasos` en `skills/implement-plugin-change/SKILL.md` exige, para todo sensor nuevo (todo `scripts/*.py` nuevo, o toda función nueva que llame a un proceso o lea una fuente externa y devuelva un veredicto), un test por cada rama de degradación (`herramienta ausente`, `timeout`, `salida ilegible`) que asevere la salida "no sé" con su motivo y nunca la favorable, citando `heuristics/general/sensor-declara-su-evidencia.md` (caso real #352: `_pasa_bash_n` devolvía `True` sin `bash` ni plazo). Test nuevo `RamasDeNoSeDelSensorTests` (1, con 4 subTests acotados al item `2. **TDD**`, regex tolerante al markup; rojo antes del cambio con `FAILED (failures=4)`): 578 en la suite; `verificar_plugin.py` PASSED. Mutación con `mutar_literal.py --ruta skills/implement-plugin-change/SKILL.md --modo sustituir` de la lista completa ``(`herramienta ausente`, `timeout`, `salida ilegible`)`` por la misma sin `timeout`: con `--test tests.test_consistencia.RamasDeNoSeDelSensorTests` `lineas mutadas: 1`, `fallos: 1 de 1`, `base: 0 de 1`; con `--test tests.test_consistencia` `lineas mutadas: 1`, `fallos: 1 de 153`, `base: 0 de 153`. La lista sin `herramienta ausente`, sin `salida ilegible` y la frase del "no sé" recortada dan `fallos: 1 de 1`, `base: 0 de 1` con la clase. (#381)
 
