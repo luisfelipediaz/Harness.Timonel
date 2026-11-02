@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.30.0 — en desarrollo
+## 0.30.0 — 2026-11-02
 
 - El bullet `### Tests verdes en su primera corrida` de `## Output (obligatorio)` en `skills/implement-plugin-change/SKILL.md` pasa de tres a cuatro reglas: la mutación de evidencia sustituye el literal protegido, el que la aserción protege, y debe fallar solo el test que lo cubre; borrar el encabezado o el ancla del ámbito vacía el ámbito y rompe todo lo que hay en él, así que no es evidencia de la aserción (caso real #356: borrar el encabezado rompió 2 de 513 sin ejercitar la aserción de `exit 2`). Test nuevo `MutacionDelLiteralProtegidoTests` (3, uno por frase, acotado al mismo bullet que `ReglasDeEvidenciaPorMutacionTests`; rojo antes del cambio con `FAILED (failures=3)`): 577 en la suite; `verificar_plugin.py` PASSED. Mutación con `mutar_literal.py --ruta skills/implement-plugin-change/SKILL.md --modo sustituir` de cada frase completa por otra sin el literal: con `--test tests.test_consistencia.MutacionDelLiteralProtegidoTests` `lineas mutadas: 1`, `fallos: 1 de 3`, `base: 0 de 3` en las tres; la primera frase con `--test tests.test_consistencia` da `lineas mutadas: 1`, `fallos: 1 de 152`, `base: 0 de 152`. (#375)
 
