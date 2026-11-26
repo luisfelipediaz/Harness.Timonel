@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.31.0 — en desarrollo
+
+- `skills/disenar-epica/SKILL.md`: skill nuevo que diseña una épica completa de front en el prototipo del consumidor. Arma la matriz perfil × flujo × estado desde la épica y sus HU, investiga, diseña con agentes en paralelo por área y repite rondas de auditoría e2e por perfil y de sistema visual (más un barrido automático con Playwright) hasta una ronda sin hallazgos altos ni medios. Antes de diseñar pide la URL del artifact del prototipo y publica siempre sobre ella; si no hay, pregunta si crear uno o trabajar en local. No nombra ningún consumidor: las rutas salen de su `CLAUDE.md` o se preguntan. Mencionado en README y CLAUDE.md. (#429)
+
 ## 0.30.0 — en desarrollo
 
 - El skill `disenar` entrega el prototipo interactivo publicado como artifact y deja de convertirlo en canvas de Claude Design (#435): el canvas dependía del runtime no documentado de un canvas ya publicado (`appifact-doc`), exigía un `canvas.config.json` que enumeraba cada estado a mano y le imponía al prototipo restricciones que solo le servían a él (un solo `<style>`, `body` como `.root`, captura temprana a 350 ms), y sus artboards eran fotos que quedaban viejas en la siguiente iteración. Se borran `references/config.md`, `capture.js`, `build.js` y `verify.js`; entra `scripts/barrido.js`, que sin configuración recorre cada `button[data-p]` en escritorio y móvil, falla con errores de JavaScript o un `#frame` vacío, y reporta los escenarios con DOM idéntico. El paso 1 pregunta por un prototipo ya publicado y la publicación va sobre esa URL, sin crear otro artifact. Verificado con un prototipo mínimo: sano (exit 0, el duplicado reportado), con un escenario que lanza antes y después de pintar, y sin escenarios (exit 1 en ambos).
