@@ -1,6 +1,6 @@
 ---
 name: disenar-epica
-description: Diseña una épica completa de front en el prototipo del proyecto, con cada flujo y cada variante pensados desde el perfil que usa la pantalla, y cierra con barridos e2e por perfil repetidos hasta que no queden hallazgos de diseño ni de UI. Usa agentes en paralelo. Úsalo cuando el usuario pida «diseña la épica N en el prototipo», «agrega la épica N al prototipo», «diseña todos los flujos de…» o un barrido e2e de diseño de una épica. Para entregar un diseño suelto como canvas, usa `disenar`.
+description: Diseña una épica completa de front en el prototipo del proyecto, con cada flujo y cada variante pensados desde el perfil que usa la pantalla, y cierra con barridos e2e por perfil repetidos hasta que no queden hallazgos de diseño ni de UI. Usa agentes en paralelo. Úsalo cuando el usuario pida «diseña la épica N en el prototipo», «agrega la épica N al prototipo», «diseña todos los flujos de…» o un barrido e2e de diseño de una épica. Para diseñar pantallas sueltas como prototipo publicado, usa `disenar`.
 argument-hint: "<número de la épica>"
 ---
 
